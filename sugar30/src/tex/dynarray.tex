@@ -1,0 +1,387 @@
+
+\section{Introduction}
+
+The {\tt{}dynarray} module implements a grow-able array type.
+It behaves (mostly) like a normal array, but it can be expanded
+when space is needed for more elements.  The index space is
+assumed to be dense, and indexing starts at 0.
+
+Note that objects stored in a dynamic array may change locations
+when the array is forced to grow.  That means that pointer references
+into the array are \emph{not} necessarily valid across calls to add
+more elements.
+
+
+\section{Interface}
+
+\nwfilename{dynarray.nw}\nwbegincode{1}\sublabel{NWdynB-dynA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-dynA-1}}}\moddef{dynarray.h~{\nwtagstyle{}\subpageref{NWdynB-dynA-1}}}\endmoddef
+#ifndef DYNARRAY_H
+#define DYNARRAY_H
+
+typedef struct dynarray_t* dynarray_t;
+
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWdynB-expI-1}}\RA{}
+
+#endif /* DYNARRAY_H */
+\nwnotused{dynarray.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+Dynamic arrays are created and destroyed by the functions
+{\tt{}dynarray{\char95}create} and {\tt{}dynarray{\char95}destroy}.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWdynB-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWdynB-expI-1}}}\endmoddef
+dynarray_t dynarray_create (int element_size, int capacity);
+void       dynarray_destroy(dynarray_t self);
+
+\nwalsodefined{\\{NWdynB-expI-2}\\{NWdynB-expI-3}}\nwused{\\{NWdynB-dynA-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The {\tt{}capacity} argument sets the initial capacity of the
+array.  If the user writes to a location past the number
+of elements indicated by {\tt{}capacity}, the array will grow
+to match the new requirements.  It is probably more efficient
+to have a good guess at the capacity from the beginning, though.
+It is an error to have a negative or zero initial capacity.
+
+The {\tt{}capacity} is \emph{not} the same as the number of
+entries in the array.  Regardless of the capacity, the number
+of entries in any newly-created array is zero.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWdynB-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWdynB-expI-1}}}\plusendmoddef
+void*      dynarray_data  (dynarray_t self);
+void*      dynarray_get   (dynarray_t self, int i);
+void*      dynarray_set   (dynarray_t self, int i, const void* data);
+void*      dynarray_append(dynarray_t self, const void* data);
+
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\tt{}dynarray{\char95}set} and {\tt{}dynarray{\char95}get} routines respectively
+set and get entries of the dynamic array.  The {\tt{}dynarray{\char95}append}
+function is equivalent to {\tt{}set}ting the element one past the
+current end of the array.  The {\tt{}dynarray{\char95}data}
+function returns a pointer to the current data array, which can
+be used directly in routines like {\tt{}qsort}.  Note that the
+pointer returned by {\tt{}dynarray{\char95}data} will not necessarily remain
+valid across calls to {\tt{}dynarray{\char95}get} or {\tt{}dynarray{\char95}append}.
+
+If the index to {\tt{}dynarray{\char95}get} is out of bounds, the function will 
+return NULL.  If the index to {\tt{}dynarray{\char95}set} is past the current end 
+of the dynamic array, the array will be appropriately expanded to
+accomodate the new element.  It is a checked error to pass a negative
+index to {\tt{}dynarray{\char95}set}.
+
+If the index to {\tt{}dynarray{\char95}set} is more than one past the current
+end of the dynamic array, some new elements will be implicitly created.
+These elements are initialized to zero.
+
+The {\tt{}data} argument to {\tt{}dynarray{\char95}set} can also be NULL,
+in which case the desired element is left alone if it existed
+before, or set to zero if it is a new element.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWdynB-expI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-expI-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWdynB-expI-1}}}\plusendmoddef
+int        dynarray_count    (dynarray_t self);
+void       dynarray_set_count(dynarray_t self, int n);
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+The {\tt{}dynarray{\char95}count} function returns the number of elements
+currently in the array.  That number of elements can be increased
+or reduced with calls to {\tt{}dynarray{\char95}set{\char95}count}.  Elements newly
+created by expanding the array with {\tt{}dynarray{\char95}set{\char95}count} are
+initialized to zero.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWdynB-dynA.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-dynA.2-1}}}\moddef{dynarray.c~{\nwtagstyle{}\subpageref{NWdynB-dynA.2-1}}}\endmoddef
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "dynarray.h"
+
+struct dynarray_t \{
+    char*  data;
+    int    element_size;
+    int    count;
+    int    capacity;
+\};
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}\RA{}
+\nwnotused{dynarray.c}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+There are two pieces to a dynamic array.  The first is the ``handle''
+structure, which resides at a fixed location of memory and keeps
+track of where the array currently lives, how big it is, and how
+many elements it has.  The second piece is the array itself, which
+may be destroyed and reallocated during the course of normal
+operation.
+
+A dynamic array starts out with no elements, but with a user
+specified capacity for storing elements before reallocation
+is necessary.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWdynB-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}}\endmoddef
+dynarray_t dynarray_create(int element_size, int capacity)
+\{
+    dynarray_t self;
+
+    assert(element_size > 0 && capacity > 0);
+
+    self = (dynarray_t) calloc(1, sizeof(struct dynarray_t));
+    assert(self != NULL);
+
+    self->data = (char*) calloc(capacity, element_size);
+    assert(self->data != NULL);
+
+    self->element_size = element_size;
+    self->capacity = capacity;
+    self->count = 0;
+    return self;
+\}
+
+\nwalsodefined{\\{NWdynB-fun9-2}\\{NWdynB-fun9-3}\\{NWdynB-fun9-4}\\{NWdynB-fun9-5}\\{NWdynB-fun9-6}\\{NWdynB-fun9-7}}\nwused{\\{NWdynB-dynA.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+When we free a dynamic array, we must free both the array and
+the handle object.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWdynB-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}}\plusendmoddef
+void dynarray_destroy(dynarray_t self)
+\{
+    free(self->data);
+    free(self);
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+The {\tt{}data} function and {\tt{}count} function just retrieve the
+corresponding fields from the handle object.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWdynB-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}}\plusendmoddef
+void* dynarray_data(dynarray_t self)
+\{
+    assert(self != NULL);
+    return self->data;
+\}
+
+int dynarray_count(dynarray_t self)
+\{
+    assert(self != NULL);
+    return self->count;
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The {\tt{}set{\char95}count} function expands or contracts the array,
+adding new space if necessary.  When the count is increased,
+the new slots are always empty, even if the expansion did
+not require a reallocation.  We actually do the clear
+operation on \emph{contraction}, though, in order to make
+it simpler to catch errors involving pointers to invalid data
+more quickly.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWdynB-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}}\plusendmoddef
+void dynarray_set_count(dynarray_t self, int n)
+\{
+    assert(self != NULL && n >= 0);
+
+    if (n > self->capacity) \{
+        \LA{}increase capacity~{\nwtagstyle{}\subpageref{NWdynB-incH-1}}\RA{}
+    \}
+
+    if (n < self->count) \{
+        \LA{}clear deallocated slots~{\nwtagstyle{}\subpageref{NWdynB-cleN-1}}\RA{}
+    \}
+
+    self->count = n;
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+Every time we run out of room, we try to double our capacity
+(or we reluctantly increase more, if that's necessary).
+Once we have the space, we copy over the data, free the old
+buffer, and update our handle.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWdynB-incH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-incH-1}}}\moddef{increase capacity~{\nwtagstyle{}\subpageref{NWdynB-incH-1}}}\endmoddef
+int   new_capacity = (n > self->capacity*2) ? n : (self->capacity*2);
+char* new_data     = (char*) calloc(new_capacity, self->element_size);
+
+assert(new_data != NULL);
+memcpy(new_data, self->data, self->count * self->element_size);
+free(self->data);
+
+self->data = new_data;
+self->capacity = new_capacity;
+\nwused{\\{NWdynB-fun9-4}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWdynB-cleN-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-cleN-1}}}\moddef{clear deallocated slots~{\nwtagstyle{}\subpageref{NWdynB-cleN-1}}}\endmoddef
+memset(&(self->data[n * self->element_size]), 0, 
+        (self->count - n) * self->element_size);
+\nwused{\\{NWdynB-fun9-4}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+The {\tt{}get} function basically just does a check to make sure
+the requested element is within range, and then some pointer
+arithmetic.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWdynB-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}}\plusendmoddef
+void* dynarray_get(dynarray_t self, int i)
+\{
+    assert(self != NULL);
+
+    if (i >= self->count || i < 0)
+        return NULL;
+
+    return &(self->data[i * self->element_size]);
+\}
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The {\tt{}set} function is a little more complicated than its
+{\tt{}get} counterpart, since {\tt{}set} might have to expand the
+array.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWdynB-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}}\plusendmoddef
+void* dynarray_set(dynarray_t self, int i, const void* data)
+\{
+    assert(self != NULL && i >= 0);
+
+    if (i >= self->count)
+        dynarray_set_count(self, i+1);
+
+    if (data != NULL)
+        memcpy(&(self->data[i * self->element_size]), data, 
+               self->element_size);
+
+    return &(self->data[i * self->element_size]);
+\}
+
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+Appending an element really is just setting the element after
+the one that is currently last.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWdynB-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWdynB-fun9-1}}}\plusendmoddef
+void* dynarray_append(dynarray_t self, const void* data)
+\{
+    return dynarray_set(self, self->count, data);
+\}
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+
+\section{Test program}
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWdynB-dynF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-dynF-1}}}\moddef{dynarray-test.c~{\nwtagstyle{}\subpageref{NWdynB-dynF-1}}}\endmoddef
+#include <stdio.h>
+#include "dynarray.h"
+
+int main()
+\{
+    \LA{}test definitions~{\nwtagstyle{}\subpageref{NWdynB-tesG-1}}\RA{}
+    \LA{}test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}\RA{}
+    return 0;
+\}
+\nwnotused{dynarray-test.c}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+Our test array initially has the capacity to hold four
+entries.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWdynB-tes9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\moddef{test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\endmoddef
+dynarray_t array;
+array = dynarray_create(sizeof(int), 4);
+dynarray_destroy(array);
+array = dynarray_create(sizeof(int), 4);
+\nwalsodefined{\\{NWdynB-tes9-2}\\{NWdynB-tes9-3}\\{NWdynB-tes9-4}\\{NWdynB-tes9-5}\\{NWdynB-tes9-6}\\{NWdynB-tes9-7}\\{NWdynB-tes9-8}}\nwused{\\{NWdynB-dynF-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+The first thing we do is to populate those entries (and four more)
+using {\tt{}append}, then print out the results.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWdynB-tesG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tesG-1}}}\moddef{test definitions~{\nwtagstyle{}\subpageref{NWdynB-tesG-1}}}\endmoddef
+int i;
+\nwused{\\{NWdynB-dynF-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWdynB-tes9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tes9-2}}}\moddef{test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\plusendmoddef
+for (i = 0; i < 8; ++i)
+    dynarray_append(array, &i);
+
+printf("After appending eight times:");
+\LA{}print array contents~{\nwtagstyle{}\subpageref{NWdynB-priK-1}}\RA{}
+\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWdynB-priK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-priK-1}}}\moddef{print array contents~{\nwtagstyle{}\subpageref{NWdynB-priK-1}}}\endmoddef
+for (i = 0; i < dynarray_count(array); ++i)
+    printf(" %d", *(int*) dynarray_get(array, i));
+printf("\\n");
+\nwused{\\{NWdynB-tes9-2}\\{NWdynB-tes9-3}\\{NWdynB-tes9-4}\\{NWdynB-tes9-5}\\{NWdynB-tes9-7}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+At this point, the array should be at capacity.  The border
+case for the expansion code is between doubling the size
+and increasing the size to the number of elements plus 1;
+we test to make sure that we didn't screw up at that border.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWdynB-tes9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tes9-3}}}\moddef{test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\plusendmoddef
+i = 16;
+dynarray_set(array, i, &i);
+
+printf("After setting element sixteen:");
+\LA{}print array contents~{\nwtagstyle{}\subpageref{NWdynB-priK-1}}\RA{}
+\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+Now we shrink the array back to five elements using {\tt{}set{\char95}count}.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWdynB-tes9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tes9-4}}}\moddef{test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\plusendmoddef
+dynarray_set_count(array, 5);
+
+printf("After decreasing to five elements:");
+\LA{}print array contents~{\nwtagstyle{}\subpageref{NWdynB-priK-1}}\RA{}
+\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+And immediately we shoot back up to sixteen elements to ensure
+that things were properly cleared.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWdynB-tes9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tes9-5}}}\moddef{test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\plusendmoddef
+dynarray_set_count(array, 16);
+
+printf("After increasing to 16 elements:");
+\LA{}print array contents~{\nwtagstyle{}\subpageref{NWdynB-priK-1}}\RA{}
+\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+Now let's see what happens when we try to read elements until we
+starting hitting NULL returns from {\tt{}get}.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWdynB-tes9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tes9-6}}}\moddef{test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\plusendmoddef
+for (i = 0; dynarray_get(array, i) != NULL; ++i);
+printf("Ran into a NULL get at index %d\\n", i);
+\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+Again, let's make sure that the expansion code does not have an
+off-by-one problem by testing around the boundary of where an expansion
+should occur.
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWdynB-tes9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tes9-7}}}\moddef{test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\plusendmoddef
+*(int*) dynarray_set(array, 31, NULL) = 31;
+
+printf("After setting element 31:");
+\LA{}print array contents~{\nwtagstyle{}\subpageref{NWdynB-priK-1}}\RA{}
+\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+Finally, clean up and call it a day.
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWdynB-tes9-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWdynB-tes9-8}}}\moddef{test code~{\nwtagstyle{}\subpageref{NWdynB-tes9-1}}}\plusendmoddef
+dynarray_destroy(array);
+\nwendcode{}
+
+\nwixlogsorted{c}{{clear deallocated slots}{NWdynB-cleN-1}{\nwixu{NWdynB-fun9-4}\nwixd{NWdynB-cleN-1}}}%
+\nwixlogsorted{c}{{dynarray.c}{NWdynB-dynA.2-1}{\nwixd{NWdynB-dynA.2-1}}}%
+\nwixlogsorted{c}{{dynarray.h}{NWdynB-dynA-1}{\nwixd{NWdynB-dynA-1}}}%
+\nwixlogsorted{c}{{dynarray-test.c}{NWdynB-dynF-1}{\nwixd{NWdynB-dynF-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWdynB-expI-1}{\nwixu{NWdynB-dynA-1}\nwixd{NWdynB-expI-1}\nwixd{NWdynB-expI-2}\nwixd{NWdynB-expI-3}}}%
+\nwixlogsorted{c}{{functions}{NWdynB-fun9-1}{\nwixu{NWdynB-dynA.2-1}\nwixd{NWdynB-fun9-1}\nwixd{NWdynB-fun9-2}\nwixd{NWdynB-fun9-3}\nwixd{NWdynB-fun9-4}\nwixd{NWdynB-fun9-5}\nwixd{NWdynB-fun9-6}\nwixd{NWdynB-fun9-7}}}%
+\nwixlogsorted{c}{{increase capacity}{NWdynB-incH-1}{\nwixu{NWdynB-fun9-4}\nwixd{NWdynB-incH-1}}}%
+\nwixlogsorted{c}{{print array contents}{NWdynB-priK-1}{\nwixu{NWdynB-tes9-2}\nwixd{NWdynB-priK-1}\nwixu{NWdynB-tes9-3}\nwixu{NWdynB-tes9-4}\nwixu{NWdynB-tes9-5}\nwixu{NWdynB-tes9-7}}}%
+\nwixlogsorted{c}{{test code}{NWdynB-tes9-1}{\nwixu{NWdynB-dynF-1}\nwixd{NWdynB-tes9-1}\nwixd{NWdynB-tes9-2}\nwixd{NWdynB-tes9-3}\nwixd{NWdynB-tes9-4}\nwixd{NWdynB-tes9-5}\nwixd{NWdynB-tes9-6}\nwixd{NWdynB-tes9-7}\nwixd{NWdynB-tes9-8}}}%
+\nwixlogsorted{c}{{test definitions}{NWdynB-tesG-1}{\nwixu{NWdynB-dynF-1}\nwixd{NWdynB-tesG-1}}}%
+\nwbegindocs{50}\nwdocspar
+
+
+
+
+\nwenddocs{}

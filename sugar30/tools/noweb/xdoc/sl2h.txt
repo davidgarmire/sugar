@@ -1,0 +1,66 @@
+
+
+
+NOWEB(1)                                                 NOWEB(1)
+
+
+NNAAMMEE
+       sl2h - simple latex to HTML converter
+
+SSYYNNOOPPSSIISS
+       ssll22hh [--sshhooww--uunnkknnoowwnnss] [file ...]
+
+DDEESSCCRRIIPPTTIIOONN
+       _s_l_2_h  is  a  simple converter from _l_a_t_e_x(1) format to HTML
+       (which can be used with, e.g., _n_e_t_s_c_a_p_e(1) or  _M_o_s_a_i_c(1)).
+       If the --sshhooww--uunnkknnoowwnnss options is given, unrecognized _L_a_T_e_X
+       control sequences appear in bold in the output.  _s_l_2_h uses
+       the  LaTeX-generated  .toc  and  .bbl files to help create
+       table of contents and bibliography.
+
+BBUUGGSS
+       It is possible to tell ssll22hh about new control sequences by
+       putting   special  TeX  comments  in  one's  documentation
+       chunks, but there's no  documentation.   Use  the  source,
+       Luke.
+
+SSEEEE AALLSSOO
+       _n_o_w_e_b_f_i_l_t_e_r_s(7), _h_t_m_l_t_o_c(1)
+
+VVEERRSSIIOONN
+       This man page is from _n_o_w_e_b version 2.10a.
+
+AAUUTTHHOORR
+       Norman   Ramsey,  Harvard  University.   Internet  address
+       nnrr@@eeeeccss..hhaarrvvaarrdd..eedduu.
+       Noweb home page at  hhttttpp::////wwwwww..eeeeccss..hhaarrvvaarrdd..eedduu//~~nnrr//nnoowweebb.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                         local 3/28/2001                        1
+
+

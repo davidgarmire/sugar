@@ -1,0 +1,92 @@
+% -*- mode: Noweb; noweb-code-mode: c-mode; c-indent-level: 4 -*-
+% Copyright 1991 by Norman Ramsey.  All rights reserved.
+% See file COPYRIGHT for more information.
+\subsection{Error messages}
+Here is a big set of functions that other places can call to issue
+error messages.
+
+It might be worth implementing these as macros so they could indicate
+the file name and line number in the source of where they were called.
+
+[[errorlevel]] is an integer that says how bad the worst error so far
+has been.
+[[newerrorlevel]] will update it conditionally.
+Some day we should hide it and give the world a function call that
+queries it.
+<<*>>=
+static char rcsid[] = "$Id: errors.nw,v 1.3 2002/04/05 09:49:35 strive Exp $";
+static char rcsname[] = "$Name:  $";
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdarg.h>
+#include "errors.h"
+
+<<C functions>>
+@
+I track degrees of error as they occur.
+<<header>>=
+enum errorlevel { Normal=0, Warning, Error, Fatal, Impossible };
+extern enum errorlevel errorlevel;
+extern int finalstage; /* set nonzero if this main() is a final stage */
+extern char *progname; /* set to name of program if main() is a filter */
+<<C functions>>=
+enum errorlevel errorlevel = Normal;
+int finalstage = 0;
+char *progname = NULL;
+@ 
+If an error occurred, one can exit with the proper notice on the
+filter:
+<<header>>=
+extern void nowebexit(char *optional_msg);
+@ 
+<<C functions>>=
+void nowebexit(char *msg) {
+  if (!finalstage && errorlevel > Normal)
+    printf("@fatal %s %s\n", progname != NULL ? progname : "a-noweb-filter",
+	   msg != NULL ? msg : "an unspecified error occurred");
+  exit(errorlevel);
+}
+@
+The rest is just varying flavors of error messages.
+<<header>>=
+void errormsg(enum errorlevel level, char *s, ...);
+#define overflow(S) errormsg(Fatal,"Capacity exceeded: %s", S)
+#define impossible(S) errormsg(Impossible, "This can't happen: %s", S)
+#define checkptr(P) do { if (!(P)) overflow("memory"); } while (0)
+<<C functions>>=
+void errormsg(enum errorlevel level, char *s,...) {     
+    va_list args;                       /* see K&R, page 174 */
+    va_start(args,s);
+    <<set [[errorlevel]] and print [[s]] with [[args]]>>
+    va_end(args);
+    if (level >= Fatal)
+        nowebexit(s);
+}
+<<header>>=
+void errorat(char *filename, int lineno, enum errorlevel level, char *s, ...);
+<<C functions>>=
+void errorat(char *filename, int lineno, enum errorlevel level, char *s, ...) {     
+    va_list args;                       /* see K&R, page 174 */
+    va_start(args,s);
+    fprintf(stderr, "%s:%d: ", filename, lineno);
+    <<set [[errorlevel]] and print [[s]] with [[args]]>>
+    va_end(args);
+    if (level >= Fatal)
+        nowebexit(s);
+}
+<<set [[errorlevel]] and print [[s]] with [[args]]>>=
+if (level > errorlevel)
+    errorlevel = level;
+vfprintf(stderr, s, args);
+fprintf(stderr,"\n");
+@
+Some older machines don't do [[vfprintf]]; here's an implementation:
+<<crock for non-ANSI machines>>=
+extern int _doprnt(const char *format, va_list args, FILE *stream);
+
+int vfprintf(FILE *stream, const char *format, va_list arg) { 
+    return _doprnt(format,arg,stream);
+}
+
+

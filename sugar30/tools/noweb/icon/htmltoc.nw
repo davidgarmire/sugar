@@ -1,0 +1,264 @@
+% -*- mode: Noweb; noweb-code-mode: icon-mode -*-
+\title{htmltoc -- A Table of Contents Generater for HTML}
+\author{stephen parker\thanks{Revisions by Norman Ramsey}\\
+	 \texttt{stephen@stephen.uk.eu.org}}
+
+\tableofcontents
+
+\section{Introduction}
+\texttt{htmltoc} reads an HTML document on standard input and writes the
+same document, but optionally including a table of contents on output.
+The motivation for this program was Norman Ramsey's \texttt{htmltoc}
+program included with the \texttt{noweb} distribution which this program
+has no advantages over other than not being written in perl.
+
+% noweave mangles the references in rawhtml blocks if you're not
+% careful.  don't ask me why.
+\begin{rawhtml}
+This html document is created from a noweb
+<a href="http://lila.york.ac.uk/htmltoc/htmltoc.nw">source</a>
+document which also produces the notangled
+<a href="http://lila.york.ac.uk/htmltoc/htmltoc.icn">icon source</a>.
+The <a href="http://lila.york.ac.uk/htmltoc/mkfile">mkfile</a> to control
+this is also available; if you haven't got mk then it shouldn't be too
+hard to turn it into a Makefile.
+\end{rawhtml}
+
+\section{Implementation}
+The Icon source follows the usual pattern.
+<<*>>=
+<<Preprocessor constants>>
+<<Data structures>>
+<<Global Variables>>
+<<Procedures>>
+@ Any text between the marks [["<tableofcontents>"]] and
+[["</tableofcontents>"]] is replaced on output with a table
+of contents for the document.
+<<Preprocessor constants>>=
+$define	sentinel "<tableofcontents>"
+$define	sentinel_end "</tableofcontents>"
+@ The TOC is created from the header items in the text.  These
+are stored in an [[ioc]] record.  The headers are sequentially
+numbered and the level of the heading and the heading text are
+stored in a list of [[ioc]]s named [[contents]].
+<<Data structures>>=
+record	ioc(number, level, text)
+<<Global Variables>>=
+global	contents
+@ HTMLtoc must make two passes through the file in order to
+generate a TOC before the actual material.  Since we'd like
+HTMLtoc to run in a pipeline we actually store the entire
+input in a list named [[file]].
+<<Procedures>>=
+procedure	readfile(f)
+	local old_contents
+	intoc := &null
+	contents := []
+        old_contents := []
+	no := 0
+
+	file := list()
+	while l := read(f) do l ? { <<handle line>> }
+        if \intoc then {
+           push(old_contents, sentinel_end)
+           every l := !copy(old_contents) do l ? { <<handle line>> }
+	}
+
+	return file
+end
+@ The variable [[intoc]] is [[1]] if we are between the TOC markers
+on input.  [[no]] is incremented for each header read.
+<<handle line>>=
+if =sentinel then {
+	intoc := "in table of contents"
+	put(file, l)
+} else if =sentinel_end then {
+	intoc := &null
+	put(file, l)
+} else if \intoc then {
+        put(old_contents, l)
+} else if /intoc then {
+	if <<[[l]] includes a header>> then {
+		<<add header line to [[contents]] and [[file]]>>
+	} else
+		put(file, l)
+}
+@ We look for a string of the form \verb|<[Hh][0-9]>| which
+signifies the beginning of a header.  This isn't nice Icon.
+<<[[l]] includes a header>>=
+(pre := tab(upto('<')), ="<", skip(), tab(any('hH')), n := tab(many(&digits)), 
+ skip(), =">")
+@  [[skip]] skips white space, if present.
+<<Procedures>>=
+procedure skip()
+  suspend tab(many(' \t')) | ""
+end
+@ The scanning environment contains a header, the 
+\verb|<[Hh][0-9]>| has already been consumed, so
+the text of the header can by found by scanning for the close of header.
+The header number,
+[[no]] is incremented and then [[addcontents()]] is
+called to add the item to the [[contents]] list.
+<<add header line to [[contents]] and [[file]]>>=
+if (c := tab(upto('<')), ="</", skip(), tab(any('hH')), =n, skip(), =">") then {
+  no +:= 1
+  c ? c := strip_toc_anchors() || tab(0)
+  addcontents(no, n, c)
+  <<append modified line to [[file]]>>
+} else
+  write(&errout, "Unterminated <h", n, ">", tab(0), "...")
+@ We also need to label the heading in the text, so
+we can reference it from the TOC.  
+<<append modified line to [[file]]>>=
+put(file, pre || "<h" || n || "><a name=toc" || no || ">" || c ||
+          "</a></h" || n || ">" || tab(0))
+@ When stripping these, we rely on their having been put there by this
+program.
+<<Procedures>>=
+procedure strip_toc_anchors()
+  local s, p
+  if (="<a name=toc", tab(many(&digits)), =">", s := strip_toc_anchors(), ="</a>") then
+    return s
+  else {
+    s := to_next_anchor_or_end_anchor() | runerr(1, "never found an anchor")
+    if pos(0) | at_end_anchor() then
+      return s
+    else
+      return s || tab_past_anchor_start() || strip_toc_anchors() ||
+             tab_past_anchor_end()
+  }      
+end
+@
+<<Procedures>>=
+procedure at_end_anchor() 
+  &subject[&pos:0] ?
+    return tab_past_anchor_end()
+end
+
+procedure at_start_anchor() 
+  &subject[&pos:0] ?
+    return tab_past_anchor_start()
+end
+
+procedure tab_past_anchor_end()
+  suspend ="<" || optwhite() || ="/" || optwhite() || =("a"|"A") || optwhite() || =">"
+end
+
+procedure tab_past_anchor_start()
+  suspend ="<" || optwhite() || =("a"|"A") || white() || tab(upto('>')) || =">"
+end
+
+procedure to_next_anchor_or_end_anchor()
+  return (1(tab(upto('<')), at_start_anchor() | at_end_anchor()) | tab(0)) \ 1
+end
+
+procedure white()
+  suspend tab(many(' \t'))
+end
+procedure optwhite()
+  suspend white() | ""
+end
+@ [[addcontents()]] should simply append the [[ioc]]
+record for the header to the [[contents]] list.  But
+one problem is that the text in the header may not
+be simple -- it might contain markup.  One case where
+we don't want to copy this markup is if it is
+a \verb|<a name="|... token, since then there would be
+multiple targets for this name.  Any markup of the
+form \verb|<| ... \verb|>| is stripped from the header --
+this harsh rule may be relaxed in future.
+We also avoid adding the line ``Contents'' to the contents.
+<<Procedures>>=
+procedure addcontents(no, n, s)
+	if map(s) ~== "contents" & find(n, toclevels) then
+		put(contents, ioc(no, n, strip_tags(s)))
+	return
+end
+
+procedure strip_tags(s)
+  s ? {
+    r := ""
+    while r ||:= tab(upto('<')) do (tab(upto('>')), =">")
+    return r || tab(0)
+  }
+end
+@ 
+The procedure [[writetoc()]] writes the TOC on
+output using the [[contents]] list.  We keep a current
+header level in the integer variable [[level]].  As
+we iterate through the [[contents]] list we insert \verb|<ul compact>|s and
+\verb|</ul>|s as required for formatting.
+<<Procedures>>=
+global minlevel
+
+procedure tocindent(level)
+  return repl("  ", level-minlevel)
+end
+
+procedure	writetoc()
+	local level
+	minlevel := 99
+        every minlevel >:= (!contents).level 
+	level := minlevel - 1 # triggers opening list
+
+	every l := !contents do {
+		<<adjust [[level]] to [[l.level]]>>
+		write(tocindent(level),
+		      "<li><a href=\"#toc", l.number, "\">", l.text, "</a></li>")
+	}
+	<<close any lists>>
+end
+@ We write out a \verb|</ul>| for each level we are beyond the
+current item, and a \verb|<ul compact>| for each level we are below
+the current.  The call to [[repl()]] merely writes the correct
+number of tabs so as to make the contents look ok.
+<<adjust [[level]] to [[l.level]]>>=
+while level > l.level do {
+	write(tocindent(level), "</ul>")
+	level -:= 1
+}
+while level < l.level do {
+	level +:= 1
+	write(tocindent(level), "<ul compact>")
+}
+@ At the end of the contents we need to write as many
+\verb|</ul>|s as are required.
+<<close any lists>>=
+while level >= minlevel do {
+	write(tocindent(level), "</ul>")
+	level -:= 1
+}
+@ The [[add_contents()]] procedure simply reads the input using
+[[readfile()]] then writes it out again.  If the
+sentinel line is found then the TOC is written at
+that point.
+<<Procedures>>=
+procedure add_contents(f)
+	file := readfile(f)
+
+	every l := !file do {
+	        write(l)
+		if match(sentinel, l) then writetoc()
+	}
+end
+@ 
+[[main]] makes the program read its arguments or act as a filter.
+<<Procedures>>=
+global toclevels
+procedure main(args)
+  if args[1] ? (="-", toclevels := tab(many(&digits)), pos(0)) then get(args)
+  else toclevels := "2345"
+  if *args = 0 then add_contents(&input)
+  else every add_contents(openfile(!args))
+  return
+end
+
+procedure openfile(f)
+  return open(f) | stop("Cannot open file ", f)
+end
+<<*>>=
+procedure rcsinfo () 
+  return "$Id: htmltoc.nw,v 1.3 2002/04/05 09:49:35 strive Exp $" ||
+         "$Name:  $"
+end
+@

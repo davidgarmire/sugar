@@ -1,0 +1,493 @@
+
+\section{Introduction}
+
+The {\tt{}vars} module manages variable global index assignment.
+
+
+\section{Interface}
+
+\nwfilename{vars.nw}\nwbegincode{1}\sublabel{NWvar7-var6-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-var6-1}}}\moddef{vars.h~{\nwtagstyle{}\subpageref{NWvar7-var6-1}}}\endmoddef
+#ifndef VARS_H
+#define VARS_H
+
+struct mesh_struct;
+typedef struct vars_mgr_struct* vars_mgr_t;
+
+typedef struct vars_desc_t \{
+    const char*  name;
+    int          offset;
+    int          parent;
+    char         type;
+\} vars_desc_t;
+
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWvar7-expI-1}}\RA{}
+
+#endif /* VARS_H */
+\nwnotused{vars.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}vars{\char95}create} and {\tt{}vars{\char95}destroy} construct and destroy
+{\tt{}vars{\char95}mgr{\char95}t} objects.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWvar7-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWvar7-expI-1}}}\endmoddef
+vars_mgr_t vars_create (struct mesh_struct* mesh);
+void       vars_destroy(vars_mgr_t self);
+
+\nwalsodefined{\\{NWvar7-expI-2}\\{NWvar7-expI-3}\\{NWvar7-expI-4}\\{NWvar7-expI-5}\\{NWvar7-expI-6}}\nwused{\\{NWvar7-var6-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The {\tt{}vars{\char95}add{\char95}vartype} function adds a new type of nodal variable
+(if it has not already been added) and returns its identifier.
+The {\tt{}vars{\char95}vartype} function looks up the identifier of a nodal
+variable which has already been declared with {\tt{}vars{\char95}add{\char95}vartype};
+if the variable type has not been declared, {\tt{}vars{\char95}vartype} returns
+a negative value.
+
+The {\tt{}vars{\char95}get{\char95}vartypes} function runs through all the model functions
+and queries them for the variable types that they wish to export.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWvar7-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWvar7-expI-1}}}\plusendmoddef
+int  vars_add_vartype (vars_mgr_t self, const char* name);
+int  vars_vartype     (vars_mgr_t self, const char* name);
+void vars_get_vartypes(vars_mgr_t self);
+
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\tt{}vars{\char95}node} and {\tt{}vars{\char95}branch} functions add new nodal
+and branch variables, respectively.  The arguments identify the
+variables locally, and global identifiers are returned.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWvar7-expI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-expI-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWvar7-expI-1}}}\plusendmoddef
+int vars_node  (vars_mgr_t self, int node_id, const char* name);
+int vars_branch(vars_mgr_t self, const char* name);
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+The {\tt{}vars{\char95}assign} function assigns global identifiers to all
+the variables in a mesh.
+Once the variables have been assigned, {\tt{}vars{\char95}count} returns
+the count of how many there were.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWvar7-expI-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-expI-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWvar7-expI-1}}}\plusendmoddef
+void vars_assign(vars_mgr_t self);
+int  vars_count (vars_mgr_t self);
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+The {\tt{}vars{\char95}permute} function applies a permutation to the
+variables.  This permutation may be to improve the efficiency
+of parallel solvers, or just to move the variables subject
+to displacement boundary conditions to the end of the list.
+The rule is $x_i \rightarrow x_{\pi(i)}$.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWvar7-expI-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-expI-5}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWvar7-expI-1}}}\plusendmoddef
+void vars_permute(vars_mgr_t self, int* pi);
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+The {\tt{}vars{\char95}lookup{\char95}node} and {\tt{}vars{\char95}lookup{\char95}branch} function
+look up nodal and branch variables.  A negative return code
+means that there is no such entry.
+
+The {\tt{}vars{\char95}lookup} function fills in a table of information
+for each variable.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWvar7-expI-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-expI-6}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWvar7-expI-1}}}\plusendmoddef
+int vars_lookup_node  (vars_mgr_t self, int node_id, const char* name);
+int vars_lookup_branch(vars_mgr_t self, int elt_id,  int var_number);
+void vars_lookup(vars_mgr_t self, vars_desc_t* v);
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWvar7-var6.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-var6.2-1}}}\moddef{vars.c~{\nwtagstyle{}\subpageref{NWvar7-var6.2-1}}}\endmoddef
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "mempool.h"
+#include "dynarray.h"
+#include "mesh.h"
+#include "vars.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWvar7-typ5-1}}\RA{}
+\LA{}macros~{\nwtagstyle{}\subpageref{NWvar7-mac6-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWvar7-staG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}\RA{}
+\nwnotused{vars.c}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWvar7-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWvar7-typ5-1}}}\endmoddef
+struct vars_mgr_struct \{
+    \LA{}\code{}vars{\char95}mgr{\char95}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWvar7-**vM-1}}\RA{}
+\};
+
+\nwused{\\{NWvar7-var6.2-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+The {\tt{}var{\char95}types} array is just a dynamic array of names for allowed
+nodal variable types.  The identifier for a variable is given by its
+index in the array.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWvar7-**vM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-**vM-1}}}\moddef{\code{}vars{\char95}mgr{\char95}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWvar7-**vM-1}}}\endmoddef
+dynarray_t var_types;
+\nwalsodefined{\\{NWvar7-**vM-2}\\{NWvar7-**vM-3}\\{NWvar7-**vM-4}}\nwused{\\{NWvar7-typ5-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+The variable table ({\tt{}node{\char95}vars}) keeps track of the assignment of
+global indices for nodal variables.  For each node there is a row of
+integers, one for each variable type.  The $j$th entry of node $i$
+is the global index of the $j$th variable type for node $i$.  When
+the entry is zero, the variable has not been assigned an index yet.
+
+The table {\tt{}branch{\char95}vars} keeps track of the assignment of indices
+to branch variables.  The $i$th entry (zero-based) is the $i$th
+branch variable assigned from a call to {\tt{}var{\char95}branch}.
+The {\tt{}branch{\char95}var{\char95}count} variable tracks the total number of branch
+variables.  The {\tt{}elt{\char95}branch{\char95}vars} table stores the offset of the
+first branch variable in {\tt{}branch{\char95}vars} for each element.
+
+The {\tt{}var{\char95}count} field is the total number of variable identifiers that
+have been assigned so far.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWvar7-**vM-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-**vM-2}}}\moddef{\code{}vars{\char95}mgr{\char95}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWvar7-**vM-1}}}\plusendmoddef
+int* node_vars;
+int* branch_vars;
+int* elt_branch_vars;
+int var_count;
+int branch_var_count;
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+We also store a pointer to the mesh and a pointer to a local pool
+for allocating the variable table and for storing the names of variable
+types.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWvar7-**vM-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-**vM-3}}}\moddef{\code{}vars{\char95}mgr{\char95}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWvar7-**vM-1}}}\plusendmoddef
+mesh_t mesh;
+mempool_t pool;
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The sizes of the pool and of the initial variable types array are
+pretty ad-hoc.  I'm not sure how much difference an intelligent %'
+choice would make.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWvar7-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\endmoddef
+vars_mgr_t vars_create(mesh_t mesh)
+\{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    vars_mgr_t self = (vars_mgr_t) mempool_cget(pool, sizeof(*self));
+
+    self->pool = pool;
+    self->var_types = dynarray_create(sizeof(const char*), 16);
+    self->mesh = mesh;
+
+    self->node_vars   = NULL;
+    self->branch_vars = NULL;
+    self->elt_branch_vars = NULL;
+
+    return self;
+\}
+
+\nwalsodefined{\\{NWvar7-fun9-2}\\{NWvar7-fun9-3}\\{NWvar7-fun9-4}\\{NWvar7-fun9-5}\\{NWvar7-fun9-6}\\{NWvar7-fun9-7}\\{NWvar7-fun9-8}\\{NWvar7-fun9-9}\\{NWvar7-fun9-A}\\{NWvar7-fun9-B}\\{NWvar7-fun9-C}\\{NWvar7-fun9-D}}\nwused{\\{NWvar7-var6.2-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWvar7-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+void vars_destroy(vars_mgr_t self)
+\{
+    dynarray_destroy(self->var_types);
+    mempool_destroy(self->pool);
+\}
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+
+A variable type identifier is given by the index of its name
+in the {\tt{}var{\char95}types} array.  If we can't find a match, %'
+we return $-1$.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWvar7-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+int vars_vartype(vars_mgr_t self, const char* name)
+\{
+    int i, n;
+
+    n = dynarray_count(self->var_types);
+    for (i = 0; i < n; ++i)
+        if (strcmp(name, *(char**) dynarray_get(self->var_types, i)) == 0)
+            return i;
+    return -1;
+\}
+
+\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWvar7-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+int vars_add_vartype(vars_mgr_t self, const char* name)
+\{
+    int var_id = vars_vartype(self, name);
+    if (var_id < 0) \{
+        \LA{}add new variable type~{\nwtagstyle{}\subpageref{NWvar7-addL-1}}\RA{}
+    \}
+    return var_id;
+\}
+
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+We need to make a copy of the name string when we add
+a new variable type.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWvar7-addL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-addL-1}}}\moddef{add new variable type~{\nwtagstyle{}\subpageref{NWvar7-addL-1}}}\endmoddef
+name = mempool_strdup(self->pool, name);
+dynarray_append(self->var_types, &name);
+var_id = num_types(self)-1;
+\nwused{\\{NWvar7-fun9-4}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+The {\tt{}num{\char95}types} macro returns the number of variable types
+declared so far.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWvar7-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWvar7-staG-1}}}\endmoddef
+#define num_types(self) dynarray_count((self)->var_types)
+
+\nwused{\\{NWvar7-var6.2-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+If the current {\tt{}mode} flag is set to {\tt{}REGISTER{\char95}VARS},
+the {\tt{}vars{\char95}node} and {\tt{}vars{\char95}branch} functions return zero
+and record the names of the variables for this mesh.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWvar7-mac6-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-mac6-1}}}\moddef{macros~{\nwtagstyle{}\subpageref{NWvar7-mac6-1}}}\endmoddef
+#define ASSIGN_VARS 0
+#define REGISTER_VARS 1
+
+\nwused{\\{NWvar7-var6.2-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWvar7-**vM-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-**vM-4}}}\moddef{\code{}vars{\char95}mgr{\char95}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWvar7-**vM-1}}}\plusendmoddef
+int mode;
+\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+Note that we explicitly use the fact that node indexing is one
+based.  If we change to zero-based indexing for the node identifiers,
+we need to make a corresponding change to this code.
+
+The variable type identifiers are zero-based externally, but are
+internally one-based so that we can use zero to represent
+``unassigned.''
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWvar7-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+int vars_node(vars_mgr_t self, int node_id, const char* name)
+\{
+    int var_type  = vars_vartype(self, name);
+    int var_index = (node_id-1)*num_types(self) + var_type;
+
+    if (self->mode == REGISTER_VARS) \{
+        vars_add_vartype(self, name);
+        return 0;
+    \} else \{
+        \LA{}check validity of variable type~{\nwtagstyle{}\subpageref{NWvar7-cheV-1}}\RA{}
+        \LA{}assign index if not already assigned~{\nwtagstyle{}\subpageref{NWvar7-assa-1}}\RA{}
+        return self->node_vars[var_index]-1;
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWvar7-cheV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-cheV-1}}}\moddef{check validity of variable type~{\nwtagstyle{}\subpageref{NWvar7-cheV-1}}}\endmoddef
+if (var_type < 0)
+    mesh_error(self->mesh, "Invalid nodal variable type");
+\nwused{\\{NWvar7-fun9-5}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWvar7-assa-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-assa-1}}}\moddef{assign index if not already assigned~{\nwtagstyle{}\subpageref{NWvar7-assa-1}}}\endmoddef
+if (self->node_vars[var_index] == 0) 
+    self->node_vars[var_index] = ++(self->var_count);
+\nwused{\\{NWvar7-fun9-5}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWvar7-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+int vars_branch(vars_mgr_t self, const char* name)
+\{
+    if (self->mode == REGISTER_VARS) \{
+        (self->branch_var_count)++;
+        return 0;
+    \} else \{
+        if (self->branch_vars[self->branch_var_count] == 0) \{
+            return (self->branch_vars[(self->branch_var_count)++] = 
+                    ++self->var_count)-1;
+        \} else \{
+            return self->branch_vars[(self->branch_var_count)++]-1;
+        \}
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+The variable assignment routine does little work on its own.
+All the real work is done by the model functions calling
+{\tt{}vars{\char95}node} and {\tt{}vars{\char95}branch}.
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWvar7-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+void vars_assign(vars_mgr_t self)
+\{
+    int i, n;
+
+    \LA{}initialize variable assignment~{\nwtagstyle{}\subpageref{NWvar7-iniU-1}}\RA{}
+
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i) \{
+        self->elt_branch_vars[i-1] = self->branch_var_count;
+        element_vars( mesh_element(self->mesh, i), self );
+    \}
+    self->elt_branch_vars[n] = self->branch_var_count;
+\}
+
+\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWvar7-iniU-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-iniU-1}}}\moddef{initialize variable assignment~{\nwtagstyle{}\subpageref{NWvar7-iniU-1}}}\endmoddef
+if (self->node_vars)
+     mempool_freeh(self->node_vars);
+
+self->node_vars = 
+(int*) mempool_cgeth(self->pool, num_types(self) * 
+                     mesh_num_nodes(self->mesh) * sizeof(int));
+
+self->branch_vars = 
+(int*) mempool_cgeth(self->pool, self->branch_var_count * sizeof(int));
+
+self->elt_branch_vars = 
+(int*) mempool_cgeth(self->pool, (mesh_num_elements(self->mesh) + 1) * 
+                     sizeof(int));
+
+self->mode = ASSIGN_VARS;
+self->var_count = 0;
+self->branch_var_count = 0;
+
+\nwused{\\{NWvar7-fun9-7}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWvar7-fun9-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+int vars_count(vars_mgr_t self)
+\{
+    return self->var_count;
+\}
+
+\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWvar7-fun9-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+void vars_permute(vars_mgr_t self, int* pi)
+\{
+    int ntypes = num_types(self);
+    int nnodes = mesh_num_nodes(self->mesh);
+    int i, n;
+
+    for (i = 0; i < nnodes * ntypes; ++i) \{
+        if (self->node_vars[i] != 0)
+            self->node_vars[i] = pi[self->node_vars[i]-1] + 1;
+    \}
+
+    for (i = 0; i < self->branch_var_count; ++i) \{
+        if (self->branch_vars[i] != 0)
+            self->branch_vars[i] = pi[self->branch_vars[i]-1] + 1;
+    \}
+
+    self->mode = ASSIGN_VARS;
+    self->branch_var_count = 0;
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i) \{
+        element_vars( mesh_element(self->mesh, i), self );
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+The {\tt{}vars{\char95}get{\char95}vartypes} function is similar to {\tt{}vars{\char95}assign},
+but since it does not actually generate the variable assignments,
+it does not need to keep the same internal arrays.
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWvar7-fun9-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+void vars_get_vartypes(vars_mgr_t self)
+\{
+    int i, n;
+
+    self->mode = REGISTER_VARS;
+    self->branch_var_count = 0;
+
+    self->branch_var_count = 0;
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i) \{
+        element_vars( mesh_element(self->mesh, i), self );
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NWvar7-fun9-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+int vars_lookup_node(vars_mgr_t self, int node_id, const char* name)
+\{
+    int var_type, var_index;
+
+    assert(self->node_vars);
+    if (node_id <= 0 || node_id > mesh_num_nodes(self->mesh) ||
+        (var_type = vars_vartype(self, name)) < 0) \{
+        return -1;
+    \}
+
+    var_index = (node_id-1)*num_types(self) + var_type;
+    return self->node_vars[var_index]-1;
+\}
+
+\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NWvar7-fun9-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+int vars_lookup_branch(vars_mgr_t self, int elt_id, int var_number)
+\{
+    int var_index;
+
+    assert(self->elt_branch_vars);
+    if (elt_id <= 0 || elt_id > mesh_num_elements(self->mesh)) \{
+        return -1;
+    \}   
+
+    var_index = self->elt_branch_vars[elt_id-1] + var_number-1;
+    if (var_index >= self->elt_branch_vars[elt_id]) \{
+        return -1;
+    \}
+
+    return self->branch_vars[var_index];
+\}
+
+\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NWvar7-fun9-D}\nwmargintag{{\nwtagstyle{}\subpageref{NWvar7-fun9-D}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvar7-fun9-1}}}\plusendmoddef
+void vars_lookup(vars_mgr_t self, vars_desc_t* v)
+\{
+    int nnodes    = mesh_num_nodes(self->mesh);
+    int nelements = mesh_num_elements(self->mesh);
+    int ntypes    = dynarray_count(self->var_types);
+    int i, j;
+
+    for (i = 0; i < nnodes; ++i) \{
+        for (j = 0; j < ntypes; ++j) \{
+            int vid = self->node_vars[i*ntypes + j]-1;
+            if (vid >= 0) \{
+                v[vid].type   = 'n';
+                v[vid].parent = i+1;
+                v[vid].name   = *(char**) dynarray_get(self->var_types, j);
+            \}
+        \}
+    \}
+
+    for (i = 0; i < nelements; ++i) \{
+        for (j=self->elt_branch_vars[i]; j < self->elt_branch_vars[i+1]; ++j) \{
+            int vid = self->branch_vars[j]-1;
+            v[vid].type   = 'b';
+            v[vid].parent = i+1;
+            v[vid].offset = j - self->elt_branch_vars[i];
+        \}
+    \}
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{add new variable type}{NWvar7-addL-1}{\nwixu{NWvar7-fun9-4}\nwixd{NWvar7-addL-1}}}%
+\nwixlogsorted{c}{{assign index if not already assigned}{NWvar7-assa-1}{\nwixu{NWvar7-fun9-5}\nwixd{NWvar7-assa-1}}}%
+\nwixlogsorted{c}{{check validity of variable type}{NWvar7-cheV-1}{\nwixu{NWvar7-fun9-5}\nwixd{NWvar7-cheV-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWvar7-expI-1}{\nwixu{NWvar7-var6-1}\nwixd{NWvar7-expI-1}\nwixd{NWvar7-expI-2}\nwixd{NWvar7-expI-3}\nwixd{NWvar7-expI-4}\nwixd{NWvar7-expI-5}\nwixd{NWvar7-expI-6}}}%
+\nwixlogsorted{c}{{functions}{NWvar7-fun9-1}{\nwixu{NWvar7-var6.2-1}\nwixd{NWvar7-fun9-1}\nwixd{NWvar7-fun9-2}\nwixd{NWvar7-fun9-3}\nwixd{NWvar7-fun9-4}\nwixd{NWvar7-fun9-5}\nwixd{NWvar7-fun9-6}\nwixd{NWvar7-fun9-7}\nwixd{NWvar7-fun9-8}\nwixd{NWvar7-fun9-9}\nwixd{NWvar7-fun9-A}\nwixd{NWvar7-fun9-B}\nwixd{NWvar7-fun9-C}\nwixd{NWvar7-fun9-D}}}%
+\nwixlogsorted{c}{{initialize variable assignment}{NWvar7-iniU-1}{\nwixu{NWvar7-fun9-7}\nwixd{NWvar7-iniU-1}}}%
+\nwixlogsorted{c}{{macros}{NWvar7-mac6-1}{\nwixu{NWvar7-var6.2-1}\nwixd{NWvar7-mac6-1}}}%
+\nwixlogsorted{c}{{static functions}{NWvar7-staG-1}{\nwixu{NWvar7-var6.2-1}\nwixd{NWvar7-staG-1}}}%
+\nwixlogsorted{c}{{types}{NWvar7-typ5-1}{\nwixu{NWvar7-var6.2-1}\nwixd{NWvar7-typ5-1}}}%
+\nwixlogsorted{c}{{vars.c}{NWvar7-var6.2-1}{\nwixd{NWvar7-var6.2-1}}}%
+\nwixlogsorted{c}{{vars.h}{NWvar7-var6-1}{\nwixd{NWvar7-var6-1}}}%
+\nwixlogsorted{c}{{\code{}vars{\char95}mgr{\char95}t\edoc{} entries}{NWvar7-**vM-1}{\nwixu{NWvar7-typ5-1}\nwixd{NWvar7-**vM-1}\nwixd{NWvar7-**vM-2}\nwixd{NWvar7-**vM-3}\nwixd{NWvar7-**vM-4}}}%
+\nwbegindocs{64}\nwdocspar
+\nwenddocs{}

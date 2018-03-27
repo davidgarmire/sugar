@@ -1,0 +1,245 @@
+
+\section{Introduction}
+
+The dense matrix assembly functions handle the assembly and
+disassembly of global dense matrices and vectors, stored
+in column-major order.  The matrix assembler objects export
+the generic matrix assembly interface defined in {\tt{}assemblem.nw}.
+
+
+\section{Interface}
+
+\nwfilename{assemblem-dense.nw}\nwbegincode{1}\sublabel{NWassI-assH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-assH-1}}}\moddef{assemblem-dense.h~{\nwtagstyle{}\subpageref{NWassI-assH-1}}}\endmoddef
+#ifndef ASSEMBLEM_DENSE_H
+#define ASSEMBLEM_DENSE_H
+
+#include "assemblem.h"
+
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWassI-expI-1}}\RA{}
+
+#endif /* ASSEMBLEM_DENSE_H */
+\nwnotused{assemblem-dense.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWassI-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWassI-expI-1}}}\endmoddef
+assemble_matrix_t* assembler_dense_vector   (double* data, int n, int ldA);
+assemble_matrix_t* assembler_dense_getvector(double* data, int n, int ldA);
+assemble_matrix_t* assembler_dense_matrix   (double* data, int n, int ldA);
+\nwalsodefined{\\{NWassI-expI-2}}\nwused{\\{NWassI-assH-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The {\tt{}assembler{\char95}dense{\char95}vector} routine creates a new assembler for
+dense vectors, and the {\tt{}assembler{\char95}dense{\char95}matrix} routine creates
+an assembler for dense, column-major matrices.
+The {\tt{}assembler{\char95}dense{\char95}getvector} routine creates a new vector disassembler
+object (one that extracts the local contribution from the global object).
+
+The {\tt{}data} argument specifies the global data object.  The {\tt{}data}
+object should have space for either {\tt{}n} entries for a vector,
+or {\tt{}n*ldA} entries for a matrix ({\tt{}n*n} of them are actually filled
+with useful data).
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWassI-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWassI-expI-1}}}\plusendmoddef
+assemble_matrix_t* assembler_bc(double* displacements, char* has_bc, int n);
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\tt{}assembler{\char95}bc} routine creates a specialized assembler for
+tracking displacement boundary conditions.  The {\tt{}displacements}
+argument is a buffer into which displacement values are placed.
+The {\tt{}has{\char95}bc} argument is a buffer of flags -- flags which have
+associated displacment boundary conditions are true, others are false.
+Both buffers should be zero-filled when the assembler constructor
+is called.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWassI-assH.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-assH.2-1}}}\moddef{assemblem-dense.c~{\nwtagstyle{}\subpageref{NWassI-assH.2-1}}}\endmoddef
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "modelmgr.h"
+#include "assemblem-dense.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWassI-typ5-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWassI-staG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWassI-fun9-1}}\RA{}
+\nwnotused{assemblem-dense.c}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Dense matrices}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWassI-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWassI-typ5-1}}}\endmoddef
+struct assemble_dense_t \{
+    double* data;
+    int     n;
+    int     ldA;
+\};
+
+\nwalsodefined{\\{NWassI-typ5-2}}\nwused{\\{NWassI-assH.2-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+The {\tt{}assemble{\char95}dense{\char95}t} structure contains the information for both matrix
+and vector assembly.  The {\tt{}data} field contains the matrix entries,
+stored in column-major order with leading dimension {\tt{}ldA}.  There are
+{\tt{}n} variables.
+
+The {\tt{}dense{\char95}vector{\char95}put}, {\tt{}dense{\char95}vector{\char95}get}, and {\tt{}dense{\char95}matrix{\char95}put}
+routines are the {\tt{}assemble} methods for the vector assembler/disassembler
+and matrix assembler types.  All of the methods have the same general
+pattern: we loop through the index set, throwing away any indices out of
+bounds, and move in-bounds contributions between the local buffer and the 
+global structure.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWassI-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWassI-staG-1}}}\endmoddef
+static void dense_vector_put(void* pself, int* vars, int n, double* local)
+\{
+    struct assemble_dense_t* self = pself;
+    int i;
+
+    for (i = 0; i < n; ++i) \{
+        int i_var = vars[i];
+        if (i_var < self->n) \{
+            self->data[i_var] += local[i];
+        \}
+    \}
+\}
+
+\nwalsodefined{\\{NWassI-staG-2}\\{NWassI-staG-3}\\{NWassI-staG-4}\\{NWassI-staG-5}}\nwused{\\{NWassI-assH.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWassI-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWassI-staG-1}}}\plusendmoddef
+static void dense_vector_get(void* pself, int* vars, int n,
+                                     double* local)
+\{
+    struct assemble_dense_t* self = pself;
+    int i;
+
+    for (i = 0; i < n; ++i) \{
+        int i_var = vars[i];
+        if (i_var < self->n) \{
+            local[i] = self->data[i_var];
+        \}
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWassI-staG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-staG-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWassI-staG-1}}}\plusendmoddef
+static void dense_matrix_put(void* pself, int* vars, int n, double* local)
+\{
+    struct assemble_dense_t* self = pself;
+    int i, j;
+
+    for (j = 0; j < n; ++j) \{
+        for (i = 0; i < n; ++i) \{
+            int i_var = vars[i];
+            int j_var = vars[j];
+            if (i_var < self->n && j_var < self->n) \{
+                self->data[j_var*self->ldA + i_var] += local[j*n+i];
+            \}
+        \}
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The only difference in the dense vector assembler/disassembler and
+dense matrix assembler types is the {\tt{}assemble} method.  We put
+the common aspects of initialization in a local routine.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWassI-staG-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-staG-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWassI-staG-1}}}\plusendmoddef
+static assemble_matrix_t* dense_create(double* data, int n, int ldA)
+\{
+    assemble_matrix_t* assembler  = malloc(sizeof(*assembler));
+    struct assemble_dense_t* self = malloc(sizeof(*self));
+    assembler->data   = self;
+    self->n           = n;
+    self->ldA         = ldA;
+    self->data        = data;
+    assembler->destroy  = free; 
+    return assembler;
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWassI-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassI-fun9-1}}}\endmoddef
+assemble_matrix_t* assembler_dense_vector(double* data, int n, int ldA)
+\{
+    assemble_matrix_t* assembler = dense_create(data, n, ldA);
+    assembler->assemble = dense_vector_put;
+    return assembler;
+\}
+
+\nwalsodefined{\\{NWassI-fun9-2}\\{NWassI-fun9-3}\\{NWassI-fun9-4}}\nwused{\\{NWassI-assH.2-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWassI-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassI-fun9-1}}}\plusendmoddef
+assemble_matrix_t* assembler_dense_getvector(double* data, int n, int ldA)
+\{
+    assemble_matrix_t* assembler = dense_create(data, n, ldA);
+    assembler->assemble = dense_vector_get;
+    return assembler;
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWassI-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassI-fun9-1}}}\plusendmoddef
+assemble_matrix_t* assembler_dense_matrix(double* data, int n, int ldA)
+\{
+    assemble_matrix_t* assembler = dense_create(data, n, ldA);
+    assembler->assemble = dense_matrix_put;
+    return assembler;
+\}
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+
+
+\subsection{Boundary condition assembly}
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWassI-typ5-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-typ5-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NWassI-typ5-1}}}\plusendmoddef
+struct assemble_bc_t \{
+    double* data;
+    char*   has_bc;
+    int     n;
+\};
+
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWassI-staG-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-staG-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWassI-staG-1}}}\plusendmoddef
+static void bc_put(void* pself, int* vars, int n, double* local)
+\{
+    struct assemble_bc_t* self = pself;
+    int i;
+
+    for (i = 0; i < n; ++i) \{
+        if (vars[i] < self->n) \{
+            self->has_bc[vars[i]] = 1;
+            self->data  [vars[i]] = local[i];
+        \}
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWassI-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWassI-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassI-fun9-1}}}\plusendmoddef
+assemble_matrix_t* assembler_bc(double* displacements, char* has_bc, int n)
+\{
+    assemble_matrix_t* assembler = malloc(sizeof(*assembler));
+    struct assemble_bc_t* self = malloc(sizeof(*self));
+    assembler->data = self;
+    self->data          = displacements;
+    self->has_bc        = has_bc;
+    self->n             = n;
+    assembler->assemble = bc_put;
+    assembler->destroy  = free;
+    return assembler;
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{assemblem-dense.c}{NWassI-assH.2-1}{\nwixd{NWassI-assH.2-1}}}%
+\nwixlogsorted{c}{{assemblem-dense.h}{NWassI-assH-1}{\nwixd{NWassI-assH-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWassI-expI-1}{\nwixu{NWassI-assH-1}\nwixd{NWassI-expI-1}\nwixd{NWassI-expI-2}}}%
+\nwixlogsorted{c}{{functions}{NWassI-fun9-1}{\nwixu{NWassI-assH.2-1}\nwixd{NWassI-fun9-1}\nwixd{NWassI-fun9-2}\nwixd{NWassI-fun9-3}\nwixd{NWassI-fun9-4}}}%
+\nwixlogsorted{c}{{static functions}{NWassI-staG-1}{\nwixu{NWassI-assH.2-1}\nwixd{NWassI-staG-1}\nwixd{NWassI-staG-2}\nwixd{NWassI-staG-3}\nwixd{NWassI-staG-4}\nwixd{NWassI-staG-5}}}%
+\nwixlogsorted{c}{{types}{NWassI-typ5-1}{\nwixu{NWassI-assH.2-1}\nwixd{NWassI-typ5-1}\nwixd{NWassI-typ5-2}}}%
+\nwbegindocs{30}\nwdocspar
+\nwenddocs{}

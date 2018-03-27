@@ -1,0 +1,668 @@
+
+\section{Introduction}
+
+The {\tt{}assemble{\char95}mex} module provides the Matlab interface to
+the assembly routines.
+
+
+\section{Interface}
+
+\nwfilename{assemble-mex.nw}\nwbegincode{1}\sublabel{NWassF-assE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-assE-1}}}\moddef{assemble-mex.h~{\nwtagstyle{}\subpageref{NWassF-assE-1}}}\endmoddef
+#ifndef ASSEMBLE_MEX_H
+#define ASSEMBLE_MEX_H
+
+#include <mex.h>
+#include "assemble.h"
+
+void assemble_mex_register();
+int  assemble_mex_tag();
+
+assemble_matrix_t* mx_to_assemble(const mxArray* array);
+
+#endif /* ASSEMBLE_MEX_H */
+\nwnotused{assemble-mex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}assemble{\char95}mex{\char95}register} function registers the commands
+{\tt{}assemble{\char95}R}, {\tt{}assemble{\char95}bc}, {\tt{}add{\char95}displace}, {\tt{}add{\char95}R},
+{\tt{}add{\char95}dR}, and {\tt{}x{\char95}local}.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWassF-assE.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-assE.2-1}}}\moddef{assemble-mex.c~{\nwtagstyle{}\subpageref{NWassF-assE.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "mex-handle.h"
+#include "sugarmex.h"
+#include "mesh-mex.h"
+#include "assemble-mex.h"
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NWassF-staB-1}}\RA{}
+\LA{}mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWassF-fun9-1}}\RA{}
+\nwnotused{assemble-mex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Assembler data structures}
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWassF-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWassF-staB-1}}}\endmoddef
+static int assemble_handle_tag;
+
+\nwused{\\{NWassF-assE.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWassF-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassF-fun9-1}}}\endmoddef
+void assemble_mex_register()
+\{
+    assemble_handle_tag = mex_handle_new_tag();
+    \LA{}register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}\RA{}
+\}
+
+void assemble_mex_shutdown()
+\{
+\}
+
+int assemble_mex_handle_tag()
+\{
+    return assemble_handle_tag;
+\}
+
+\nwalsodefined{\\{NWassF-fun9-2}}\nwused{\\{NWassF-assE.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Conversion functions}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWassF-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassF-fun9-1}}}\plusendmoddef
+assemble_matrix_t* mx_to_assemble(const mxArray* array)
+\{
+    return mx_to_handle(array, assemble_handle_tag, 
+                        "Invalid assembler handle");
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{{\tt{}mesh{\char95}nactive} command}
+
+The {\tt{}mesh{\char95}nactive(mesh)} function returns the number of active
+degrees of freedom in the system.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWassF-choI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choI-1}}}\moddef{cho-mesh-nactive.m~{\nwtagstyle{}\subpageref{NWassF-choI-1}}}\endmoddef
+function [n] = cho_mesh_nactive(mesh)
+n = sugarmex('mesh_nactive', mesh);
+\nwnotused{cho-mesh-nactive.m}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWassF-regM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\endmoddef
+mexmgr_add("mesh_nactive", mesh_nactive);
+\nwalsodefined{\\{NWassF-regM-2}\\{NWassF-regM-3}\\{NWassF-regM-4}\\{NWassF-regM-5}\\{NWassF-regM-6}\\{NWassF-regM-7}\\{NWassF-regM-8}\\{NWassF-regM-9}}\nwused{\\{NWassF-fun9-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWassF-mexD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\endmoddef
+static void mesh_nactive(int nlhs, mxArray* plhs[],
+                         int nrhs, const mxArray* prhs[])
+\{
+    mesh_t mesh;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+
+    plhs[0] = mx_from_double(assemble_get_active(mesh_assembler(mesh)));
+\}
+
+\nwalsodefined{\\{NWassF-mexD-2}\\{NWassF-mexD-3}\\{NWassF-mexD-4}\\{NWassF-mexD-5}\\{NWassF-mexD-6}\\{NWassF-mexD-7}\\{NWassF-mexD-8}\\{NWassF-mexD-9}}\nwused{\\{NWassF-assE.2-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{{\tt{}assemble{\char95}R} and {\tt{}assemble{\char95}R{\char95}full} commands}
+
+The {\tt{}[R]\ =\ assemble{\char95}R(mesh,\ x)} function computes the
+residual vector at $x$.  If $x$ is omitted, then a zero 
+vector is used.  The {\tt{}[R]\ =\ assemble{\char95}R{\char95}full(mesh,\ x)} function
+computes the unreduced residual vector (including components
+corresponding to reaction forces at nodes subject to
+displacement boundary conditions).
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWassF-choG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choG-1}}}\moddef{cho-assemble-R.m~{\nwtagstyle{}\subpageref{NWassF-choG-1}}}\endmoddef
+function [R] = cho_assemble_R(mesh, x, v, a)
+
+if nargin == 1
+    [R] = sugarmex('assemble_R', mesh, 0);
+else
+    [R] = sugarmex('assemble_R', mesh, 0, x);
+end
+\nwnotused{cho-assemble-R.m}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWassF-choL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choL-1}}}\moddef{cho-assemble-R-full.m~{\nwtagstyle{}\subpageref{NWassF-choL-1}}}\endmoddef
+function [R] = cho_assemble_R_full(mesh, x, v, a)
+
+if nargin == 1
+    [R] = sugarmex('assemble_R', mesh, 1);
+else
+    [R] = sugarmex('assemble_R', mesh, 1, x);
+end
+\nwnotused{cho-assemble-R-full.m}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWassF-regM-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-2}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\plusendmoddef
+mexmgr_add("assemble_R", mex_assemble_R);
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWassF-mexD-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-2}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\plusendmoddef
+static void mex_assemble_R(int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    int         full_size;
+    assembler_t assembler;
+    double*     x = NULL;
+    double*     v = NULL;
+    double*     a = NULL;
+    double*     R;
+    int         Rsize;
+
+    int nvars;
+    int nactive;
+
+    mex_check_num_args(nrhs, 2);
+    mesh      = mx_to_mesh(prhs[0]);
+    full_size = mx_to_double(prhs[1]);
+    assembler = mesh_assembler(mesh);
+
+    nvars   = vars_count(mesh_vars_mgr(mesh));
+    nactive = assemble_get_active(assembler);
+
+    Rsize   = (full_size ? nvars : nactive);
+
+    x = mxMalloc(nvars * sizeof(double));
+    memcpy(x, assemble_get_displacements(assembler), nvars * sizeof(double));
+    if (nrhs > 2) \{
+        if (!mxIsNumeric(prhs[2]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[2]) != nactive || mxGetN(prhs[2]) != 1)
+            mexErrMsgTxt("x vector is wrong size");
+        memcpy(x, mxGetPr(prhs[2]), nactive * sizeof(double));
+    \}
+
+    if (nrhs > 3) \{
+        v = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[3]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[3]) != nactive || mxGetN(prhs[3]) != 1)
+            mexErrMsgTxt("v vector is wrong size");
+        memcpy(v, mxGetPr(prhs[3]), nactive * sizeof(double));
+    \}
+
+    if (nrhs > 4) \{
+        a = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[4]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[4]) != nactive || mxGetN(prhs[4]) != 1)
+            mexErrMsgTxt("a vector is wrong size");
+        memcpy(a, mxGetPr(prhs[4]), nactive * sizeof(double));
+    \}
+
+    plhs[0] = mxCreateDoubleMatrix(Rsize, 1, mxREAL);
+    R       = mxGetPr(plhs[0]);
+
+    assemble_R(assembler, x, v, a, R, Rsize); 
+
+    if (a) mxFree(a);
+    if (v) mxFree(v);
+    if (x) mxFree(x);
+\}
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+
+\subsection{{\tt{}assemble{\char95}dR} command}
+
+The {\tt{}[dR]\ =\ assemble{\char95}dR(mesh,\ x)} function computes the
+residual tangent matrix at $x$.  If $x$ is omitted,
+then a zero vector is used.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWassF-choH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choH-1}}}\moddef{cho-assemble-dR.m~{\nwtagstyle{}\subpageref{NWassF-choH-1}}}\endmoddef
+function [dR] = cho_assemble_dR(mesh, c, x, v, a)
+
+if nargin == 1
+    [dR] = sugarmex('assemble_dR', mesh, [1 0 0]);
+elseif nargin == 2
+    [dR] = sugarmex('assemble_dR', mesh, c);
+elseif nargin == 3
+    [dR] = sugarmex('assemble_dR', mesh, c, x);
+elseif nargin == 4
+    [dR] = sugarmex('assemble_dR', mesh, c, x, v);
+elseif nargin == 5
+    [dR] = sugarmex('assemble_dR', mesh, c, x, v, a);
+end
+\nwnotused{cho-assemble-dR.m}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWassF-regM-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-3}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\plusendmoddef
+mexmgr_add("assemble_dR", mex_assemble_dR);
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWassF-mexD-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-3}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\plusendmoddef
+static void mex_assemble_dR(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    assembler_t assembler;
+    double      c[3] = \{1, 0, 0\};
+    double*     x = NULL;
+    double*     v = NULL;
+    double*     a = NULL;
+    double*     dR;
+
+    int nvars;
+    int nactive;
+
+    mex_check_num_args(nrhs, 2);
+    mesh      = mx_to_mesh(prhs[0]);
+    assembler = mesh_assembler(mesh);
+
+    nvars   = vars_count(mesh_vars_mgr(mesh));
+    nactive = assemble_get_active(assembler);
+
+    if (!mxIsNumeric(prhs[1])) \{
+        mexErrMsgTxt("c argument must be a numeric vector");
+    \} else if (mxGetM(prhs[1]) * mxGetN(prhs[1]) > 3) \{
+        mexErrMsgTxt("c vector is wrong size");
+    \} else \{
+        memcpy(c, mxGetPr(prhs[1]), 
+               mxGetM(prhs[1]) * mxGetN(prhs[1]) * sizeof(double));
+    \}
+
+    x = mxMalloc(nvars * sizeof(double));
+    memcpy(x, assemble_get_displacements(assembler), nvars * sizeof(double));
+    if (nrhs > 2) \{
+        if (!mxIsNumeric(prhs[2]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[2]) != nactive || mxGetN(prhs[2]) != 1)
+            mexErrMsgTxt("x vector is wrong size");
+        memcpy(x, mxGetPr(prhs[2]), nactive * sizeof(double));
+    \}
+
+    if (nrhs > 3) \{
+        v = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[3]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[3]) != nactive || mxGetN(prhs[3]) != 1)
+            mexErrMsgTxt("v vector is wrong size");
+        memcpy(v, mxGetPr(prhs[3]), nactive * sizeof(double));
+    \}
+
+    if (nrhs > 4) \{
+        a = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[4]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[4]) != nactive || mxGetN(prhs[4]) != 1)
+            mexErrMsgTxt("a vector is wrong size");
+        memcpy(a, mxGetPr(prhs[4]), nactive * sizeof(double));
+    \}
+
+    plhs[0] = mxCreateDoubleMatrix(nactive, nactive, mxREAL);
+    dR      = mxGetPr(plhs[0]);
+
+    assemble_dR(assembler, c[0], x, c[1], v, c[2], a, dR, nactive);
+
+    if (a) mxFree(a);
+    if (v) mxFree(v);
+    if (x) mxFree(x);
+\}
+
+\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+
+\subsection{{\tt{}assemble{\char95}dR{\char95}sparse} command}
+
+The {\tt{}[dR]\ =\ assemble{\char95}dR{\char95}sparse(mesh,\ x)} function computes the
+residual vector and tangent matrix at $x$.  If $x$ is omitted,
+then a zero vector is used.  The tangent matrix is assembled 
+in sparse form.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWassF-choO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choO-1}}}\moddef{cho-assemble-dR-sparse.m~{\nwtagstyle{}\subpageref{NWassF-choO-1}}}\endmoddef
+function [dR] = cho_assemble_dR_sparse(mesh, c, x, v, a)
+
+if nargin == 1
+    [dR] = sugarmex('assemble_dR_sparse', mesh, [1 0 0]);
+elseif nargin == 2
+    [dR] = sugarmex('assemble_dR_sparse', mesh, c);
+elseif nargin == 3
+    [dR] = sugarmex('assemble_dR_sparse', mesh, c, x);
+elseif nargin == 4
+    [dR] = sugarmex('assemble_dR_sparse', mesh, c, x, v);
+elseif nargin == 5
+    [dR] = sugarmex('assemble_dR_sparse', mesh, c, x, v, a);
+end
+\nwnotused{cho-assemble-dR-sparse.m}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWassF-regM-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-4}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\plusendmoddef
+mexmgr_add("assemble_dR_sparse", mex_assemble_dR_sparse);
+\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWassF-mexD-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-4}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\plusendmoddef
+static void mex_assemble_dR_sparse(int nlhs, mxArray* plhs[],
+                                   int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    assembler_t assembler;
+    double      c[3] = \{1, 0, 0\};
+    double*     x = NULL;
+    double*     v = NULL;
+    double*     a = NULL;
+    int*        pi;
+
+    assemble_matrix_t* assembler_x = NULL;
+    assemble_matrix_t* assembler_v = NULL;
+    assemble_matrix_t* assembler_a = NULL;
+    assemble_matrix_t* assembler_dR;
+
+    int i, n;
+    int nvars;
+    int nactive;
+
+    mex_check_num_args(nrhs, 1);
+    mesh      = mx_to_mesh(prhs[0]);
+    assembler = mesh_assembler(mesh);
+
+    nvars   = vars_count(mesh_vars_mgr(mesh));
+    nactive = assemble_get_active(assembler);
+
+    if (!mxIsNumeric(prhs[1])) \{
+        mexErrMsgTxt("c argument must be a numeric vector");
+    \} else if (mxGetM(prhs[1]) * mxGetN(prhs[1]) > 3) \{
+        mexErrMsgTxt("c vector is wrong size");
+    \} else \{
+        memcpy(c, mxGetPr(prhs[1]), 
+               mxGetM(prhs[1]) * mxGetN(prhs[1]) * sizeof(double));
+    \}
+
+    x = mxMalloc(nvars * sizeof(double));
+    memcpy(x, assemble_get_displacements(assembler), nvars * sizeof(double));
+    if (nrhs > 2) \{
+        if (!mxIsNumeric(prhs[2]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[2]) != nactive || mxGetN(prhs[2]) != 1)
+            mexErrMsgTxt("x vector is wrong size");
+        memcpy(x, mxGetPr(prhs[2]), nactive * sizeof(double));
+    \}
+
+    if (nrhs > 3) \{
+        v = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[3]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[3]) != nactive || mxGetN(prhs[3]) != 1)
+            mexErrMsgTxt("v vector is wrong size");
+        memcpy(v, mxGetPr(prhs[3]), nactive * sizeof(double));
+    \}
+
+    if (nrhs > 4) \{
+        a = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[4]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[4]) != nactive || mxGetN(prhs[4]) != 1)
+            mexErrMsgTxt("a vector is wrong size");
+        memcpy(a, mxGetPr(prhs[4]), nactive * sizeof(double));
+    \}
+
+    if (x) assembler_x = assembler_dense_getvector(x, nvars, nvars);
+    if (v) assembler_v = assembler_dense_getvector(v, nvars, nvars);
+    if (a) assembler_a = assembler_dense_getvector(a, nvars, nvars);
+    assembler_dR = assembler_sparse_matrix(nactive, nactive);
+
+    n = mesh_num_elements(mesh);
+    for (i = 1; i <= n; ++i) \{
+        element_dR( mesh_element(mesh, i), assembler_dR, 
+                    c[0], assembler_x,
+                    c[1], assembler_v,
+                    c[2], assembler_a);
+    \}
+
+    assembler_sparse_csc(assembler_dR);
+
+    n = assembler_sparse_nnz(assembler_dR);
+    plhs[0] = mxCreateSparse(nactive, nactive, n, mxREAL);
+    memcpy(mxGetPr(plhs[0]), assembler_sparse_nzval(assembler_dR), 
+           n * sizeof(double));
+    memcpy(mxGetIr(plhs[0]), assembler_sparse_rowind(assembler_dR), 
+           n * sizeof(int));
+    memcpy(mxGetJc(plhs[0]), assembler_sparse_colptr(assembler_dR), 
+           (nactive+1) * sizeof(int));
+
+    assembler_matrix_free(assembler_dR);
+    if (assembler_a) assembler_matrix_free(assembler_a);
+    if (assembler_v) assembler_matrix_free(assembler_v);
+    if (assembler_x) assembler_matrix_free(assembler_x);
+
+    if (a) mxFree(a);
+    if (v) mxFree(v);
+    if (x) mxFree(x);
+\}
+
+\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+
+\subsection{{\tt{}assemble{\char95}bc} command}
+
+The {\tt{}assemble{\char95}bc(mesh)} function applies displacement boundary
+conditions from the mesh.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWassF-choH.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choH.2-1}}}\moddef{cho-assemble-bc.m~{\nwtagstyle{}\subpageref{NWassF-choH.2-1}}}\endmoddef
+function cho_assemble_bc(mesh)
+sugarmex('assemble_bc', mesh);
+\nwnotused{cho-assemble-bc.m}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWassF-regM-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-5}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\plusendmoddef
+mexmgr_add("assemble_bc", mex_assemble_bc);
+\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWassF-mexD-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-5}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\plusendmoddef
+static void mex_assemble_bc(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    assembler_t assembler;
+
+    mex_check_num_args(nrhs, 1);
+    mesh      = mx_to_mesh(prhs[0]);
+    assembler = mesh_assembler(mesh);
+
+    assemble_displace(assembler);
+\}
+
+\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+
+\subsection{{\tt{}add{\char95}displace} command}
+
+The {\tt{}add{\char95}displace(assembler,\ var{\char95}id,\ value)} function applies displacement
+boundary conditions to an indicated degree of freedom in the mesh.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWassF-choI.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choI.2-1}}}\moddef{cho-add-displace.m~{\nwtagstyle{}\subpageref{NWassF-choI.2-1}}}\endmoddef
+function cho_add_displace(assembler, var_id, value)
+
+if nargin == 2
+    value = 0;
+end
+sugarmex('add_displace', assembler, var_id, value);
+\nwnotused{cho-add-displace.m}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWassF-regM-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-6}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\plusendmoddef
+mexmgr_add("add_displace", mex_add_displace);
+\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWassF-mexD-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-6}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\plusendmoddef
+static void mex_add_displace(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+\{
+    assemble_matrix_t* assembler;
+
+    int     var_id;
+    double  value;
+
+    mex_check_num_args(nrhs, 3);
+    assembler = mx_to_assemble(prhs[0]);
+    var_id    = (int) mx_to_double(prhs[1]);
+    value     = mx_to_double(prhs[2]);
+
+    assemble_matrix_add1(assembler, var_id, value);
+\}
+
+\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+
+\subsection{{\tt{}add{\char95}R} command}
+
+The {\tt{}add{\char95}R(assembler,\ var{\char95}ids,\ Rlocal)} function assembles the local
+residual contribution into the global vector.
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWassF-choB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choB-1}}}\moddef{cho-add-R.m~{\nwtagstyle{}\subpageref{NWassF-choB-1}}}\endmoddef
+function cho_add_R(assembler, var_ids, Rlocal)
+sugarmex('add_R', assembler, var_ids, Rlocal);
+\nwnotused{cho-add-R.m}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWassF-regM-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-7}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\plusendmoddef
+mexmgr_add("add_R", mex_add_R);
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWassF-mexD-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-7}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\plusendmoddef
+static void mex_add_R(int nlhs, mxArray* plhs[],
+                      int nrhs, const mxArray* prhs[])
+\{
+    assemble_matrix_t* assembler;
+
+    int*    var_ids;
+    double* value;
+    int     num_vars;
+    int     i;
+
+    mex_check_num_args(nrhs, 3);
+    assembler = mx_to_assemble(prhs[0]);
+
+    if (!mxIsNumeric(prhs[1]) || !mxIsNumeric(prhs[2]))
+        mexErrMsgTxt("Arguments must be numeric");
+
+    num_vars  = mxGetM(prhs[1]) * mxGetN(prhs[1]);
+    if (mxGetM(prhs[2]) != num_vars || mxGetN(prhs[2]) != 1)
+        mexErrMsgTxt("Mismatch between number of arguments and Rlocal");
+
+    value     = mxGetPr(prhs[2]);
+    var_ids   = mxCalloc(num_vars, sizeof(int));
+    for (i = 0; i < num_vars; ++i)
+        var_ids[i] = (int) (mxGetPr(prhs[1])[i]);
+
+    assemble_matrix_add(assembler, var_ids, num_vars, value);
+    mxFree(var_ids);
+\}
+
+\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+
+\subsection{{\tt{}add{\char95}dR} command}
+
+The {\tt{}add{\char95}dR(assembler,\ var{\char95}ids,\ dRlocal)} function assembles the local
+residual tangent contribution into the global matrix.
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWassF-choC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choC-1}}}\moddef{cho-add-dR.m~{\nwtagstyle{}\subpageref{NWassF-choC-1}}}\endmoddef
+function cho_add_dR(assembler, var_ids, dRlocal)
+sugarmex('add_dR', assembler, var_ids, dRlocal);
+\nwnotused{cho-add-dR.m}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWassF-regM-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-8}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\plusendmoddef
+mexmgr_add("add_dR", mex_add_dR);
+\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NWassF-mexD-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-8}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\plusendmoddef
+static void mex_add_dR(int nlhs, mxArray* plhs[],
+                       int nrhs, const mxArray* prhs[])
+\{
+    assemble_matrix_t* assembler;
+
+    int*    var_ids;
+    double* value;
+    int     num_vars;
+    int     i;
+
+    mex_check_num_args(nrhs, 3);
+    assembler = mx_to_assemble(prhs[0]);
+
+    if (!mxIsNumeric(prhs[1]) || !mxIsNumeric(prhs[2]))
+        mexErrMsgTxt("Arguments must be numeric");
+
+    num_vars  = mxGetM(prhs[1]) * mxGetN(prhs[1]);
+    if (mxGetM(prhs[2]) != num_vars || mxGetN(prhs[2]) != num_vars)
+        mexErrMsgTxt("Mismatch between number of arguments and dRlocal");
+
+    value     = mxGetPr(prhs[2]);
+    var_ids   = mxCalloc(num_vars, sizeof(int));
+    for (i = 0; i < num_vars; ++i)
+        var_ids[i] = (int) (mxGetPr(prhs[1])[i]);
+
+    assemble_matrix_add(assembler, var_ids, num_vars, value);
+    mxFree(var_ids);
+\}
+
+\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+
+\subsection{{\tt{}x{\char95}local} command}
+
+The {\tt{}x{\char95}local(assembler,\ var{\char95}ids)} function assembles the local
+residual contribution into the global vector.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NWassF-choD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-choD-1}}}\moddef{cho-x-local.m~{\nwtagstyle{}\subpageref{NWassF-choD-1}}}\endmoddef
+function [xlocal] = cho_x_local(assembler, var_ids)
+xlocal = sugarmex('x_local', assembler, var_ids);
+\nwnotused{cho-x-local.m}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NWassF-regM-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-regM-9}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWassF-regM-1}}}\plusendmoddef
+mexmgr_add("x_local", mex_x_local);
+\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NWassF-mexD-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWassF-mexD-9}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWassF-mexD-1}}}\plusendmoddef
+static void mex_x_local(int nlhs, mxArray* plhs[],
+                        int nrhs, const mxArray* prhs[])
+\{
+    assemble_matrix_t* assembler;
+
+    int*    var_ids;
+    double* value;
+    int     num_vars;
+    int     i;
+
+    mex_check_num_args(nrhs, 2);
+    assembler = mx_to_assemble(prhs[0]);
+
+    if (!mxIsNumeric(prhs[1]))
+        mexErrMsgTxt("Arguments must be numeric");
+
+    num_vars  = mxGetM(prhs[1]) * mxGetN(prhs[1]);
+    plhs[0]   = mxCreateDoubleMatrix(mxGetM(prhs[1]) * mxGetN(prhs[1]), 1, 
+                                     mxREAL);
+    value     = mxGetPr(plhs[0]);
+
+    var_ids   = mxCalloc(num_vars, sizeof(int));
+    for (i = 0; i < num_vars; ++i)
+        var_ids[i] = (int) (mxGetPr(prhs[1])[i]);
+
+    assemble_matrix_add(assembler, var_ids, num_vars, value);
+    mxFree(var_ids);
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{assemble-mex.c}{NWassF-assE.2-1}{\nwixd{NWassF-assE.2-1}}}%
+\nwixlogsorted{c}{{assemble-mex.h}{NWassF-assE-1}{\nwixd{NWassF-assE-1}}}%
+\nwixlogsorted{c}{{cho-add-R.m}{NWassF-choB-1}{\nwixd{NWassF-choB-1}}}%
+\nwixlogsorted{c}{{cho-add-dR.m}{NWassF-choC-1}{\nwixd{NWassF-choC-1}}}%
+\nwixlogsorted{c}{{cho-add-displace.m}{NWassF-choI.2-1}{\nwixd{NWassF-choI.2-1}}}%
+\nwixlogsorted{c}{{cho-assemble-R-full.m}{NWassF-choL-1}{\nwixd{NWassF-choL-1}}}%
+\nwixlogsorted{c}{{cho-assemble-R.m}{NWassF-choG-1}{\nwixd{NWassF-choG-1}}}%
+\nwixlogsorted{c}{{cho-assemble-bc.m}{NWassF-choH.2-1}{\nwixd{NWassF-choH.2-1}}}%
+\nwixlogsorted{c}{{cho-assemble-dR.m}{NWassF-choH-1}{\nwixd{NWassF-choH-1}}}%
+\nwixlogsorted{c}{{cho-assemble-dR-sparse.m}{NWassF-choO-1}{\nwixd{NWassF-choO-1}}}%
+\nwixlogsorted{c}{{cho-mesh-nactive.m}{NWassF-choI-1}{\nwixd{NWassF-choI-1}}}%
+\nwixlogsorted{c}{{cho-x-local.m}{NWassF-choD-1}{\nwixd{NWassF-choD-1}}}%
+\nwixlogsorted{c}{{functions}{NWassF-fun9-1}{\nwixu{NWassF-assE.2-1}\nwixd{NWassF-fun9-1}\nwixd{NWassF-fun9-2}}}%
+\nwixlogsorted{c}{{mex functions}{NWassF-mexD-1}{\nwixu{NWassF-assE.2-1}\nwixd{NWassF-mexD-1}\nwixd{NWassF-mexD-2}\nwixd{NWassF-mexD-3}\nwixd{NWassF-mexD-4}\nwixd{NWassF-mexD-5}\nwixd{NWassF-mexD-6}\nwixd{NWassF-mexD-7}\nwixd{NWassF-mexD-8}\nwixd{NWassF-mexD-9}}}%
+\nwixlogsorted{c}{{register mex functions}{NWassF-regM-1}{\nwixu{NWassF-fun9-1}\nwixd{NWassF-regM-1}\nwixd{NWassF-regM-2}\nwixd{NWassF-regM-3}\nwixd{NWassF-regM-4}\nwixd{NWassF-regM-5}\nwixd{NWassF-regM-6}\nwixd{NWassF-regM-7}\nwixd{NWassF-regM-8}\nwixd{NWassF-regM-9}}}%
+\nwixlogsorted{c}{{static data}{NWassF-staB-1}{\nwixu{NWassF-assE.2-1}\nwixd{NWassF-staB-1}}}%
+\nwbegindocs{66}\nwdocspar
+\nwenddocs{}

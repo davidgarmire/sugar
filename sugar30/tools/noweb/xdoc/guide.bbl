@@ -1,0 +1,26 @@
+\begin{thebibliography}{}
+
+\bibitem[\protect\citeauthoryear{Aho, Kernighan, and Weinberger}{Aho
+  et~al.}{1988}]{aho:awk}
+Aho, A.~V., B.~W. Kernighan, and P.~J. Weinberger (1988).
+\newblock {\em The {AWK} Programming Language}.
+\newblock Reading, MA: Addison-Wesley.
+
+\bibitem[\protect\citeauthoryear{Fraser and Hanson}{Fraser and
+  Hanson}{1995}]{fraser:retargetable:book}
+Fraser, C.~W. and D.~R. Hanson (1995).
+\newblock {\em A Retargetable {C} Compiler: Design and Implementation}.
+\newblock Redwood City, CA: Benjamin/Cummings.
+
+\bibitem[\protect\citeauthoryear{Kernighan and Pike}{Kernighan and
+  Pike}{1984}]{kernighan:unix}
+Kernighan, B.~W. and R.~Pike (1984).
+\newblock {\em The {UNIX} Programming Environment}.
+\newblock Englewood Cliffs, NJ: Prentice-Hall.
+
+\bibitem[\protect\citeauthoryear{Ramsey}{Ramsey}{1994}]{ramsey:simplified}
+Ramsey, N. (1994, September).
+\newblock Literate programming simplified.
+\newblock {\em IEEE Software\/}~{\em 11\/}(5), 97--105.
+
+\end{thebibliography}

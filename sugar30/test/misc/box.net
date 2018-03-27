@@ -1,0 +1,15 @@
+
+use("std.net")
+use("mumps.net")
+
+A = node{0, 0, 0; name = "A"}
+B = node{name = "B"}
+C = node{name = "C"}
+D = node{name = "D"}
+
+beam2d {A, B, p1; w=2u,         l=100u}
+beam2d {B, C, p1; w=2u, oz=90,  l=100u}
+beam2d {C, D, p1; w=2u, oz=180, l=100u}
+beam2d {D, A, p1; w=2u, oz=270, l=100u}
+
+relpos_treewalk();

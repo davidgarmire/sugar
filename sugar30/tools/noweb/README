@@ -1,0 +1,23 @@
+These are the base sources and documents for version 2.10a of
+``noweb'', a simple, extensible literate-programming tool.  noweb is
+available via anonymous ftp from the Comprehensive TeX Archive
+Network, in directory web/noweb.  CTAN includes hosts ftp.ctan.org,
+ftp.tex.ac.uk, and ftp.uni-stuttgart.de.  These sites mirror the
+master directory ftp.eecs.harvard.edu:pub/nr/noweb.  The file INSTALL
+tells how to build noweb.  The file FAQ answers some frequently asked
+questions about building and using noweb.
+
+
+STRUCTURE OF THE BASE SOURCES
+
+This part of the distribution contains the following directories:
+
+  awk		pipeline stages and back ends in awk and sh
+  src		C source code for nt, markup, and finduses
+  icon		pipeline stages and back ends in Icon
+  lib		other pipeline stages and back ends, not available in Icon
+  rc            replacements for shell scripts; useful on Plan 9
+  shell		the shell scripts that make up the actual commands
+  tex		supporting tex code for /usr/local/lib/tex/macros
+  xdoc		man pages, hacker's guide (named to be unpacked last)
+  

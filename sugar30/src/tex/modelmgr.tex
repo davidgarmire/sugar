@@ -1,0 +1,641 @@
+
+\section{Introduction}
+
+The model manager module defines the interfaces for element and
+material model functions.  It also defines the \emph{model manager},
+which manages a registry of available model functions.
+
+
+\section{Interface}
+
+\nwfilename{modelmgr.nw}\nwbegincode{1}\sublabel{NWmodB-modA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-modA-1}}}\moddef{modelmgr.h~{\nwtagstyle{}\subpageref{NWmodB-modA-1}}}\endmoddef
+#ifndef MODELMGR_H
+#define MODELMGR_H
+
+#include <stdio.h>
+
+struct mesh_struct;
+struct mesh_param_t;
+struct vars_mgr_struct;
+struct assembler_struct;
+struct assemble_matrix_t;
+struct netdraw_gc_t;
+struct netout_t;
+typedef struct model_mgr_struct* model_mgr_t;
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NWmodB-expE-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}\RA{}
+
+#endif /* MODELMGR_H */
+\nwnotused{modelmgr.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\subsection{The element interface}
+
+The table of functions that implement a particular element are organized
+in an object of type {\tt{}model{\char95}element{\char95}t}.  Not all the functions in the
+table need to be defined; if one of the function pointers is NULL, some
+default behavior will be assumed.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmodB-expE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expE-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NWmodB-expE-1}}}\endmoddef
+typedef struct model_element_t \{
+    \LA{}element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}\RA{}
+\} model_element_t;
+
+typedef struct element_t \{
+    model_element_t* model;
+    void* data;
+\} element_t;
+
+\nwalsodefined{\\{NWmodB-expE-2}}\nwused{\\{NWmodB-modA-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The element {\tt{}init} function constructs the data structures
+for a particular element.  The function can use the pool
+associated with a mesh to allocate space; what it does with that
+space is up to the element writer.  Typically, the init function
+will initialize a structure to store the indices of the attached
+nodes, whatever material models are used, parameters like beam
+width, etc.
+
+The initializer function gets a pointer to the current mesh,
+which it can use to access the mesh memory pool, to access
+the node and material tables, and to access the parameter lists.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmodB-eleH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\endmoddef
+struct element_t* (*init)(struct mesh_struct* mesh, const char* model,
+                          struct model_element_t* modelfunc);
+\nwalsodefined{\\{NWmodB-eleH-2}\\{NWmodB-eleH-3}\\{NWmodB-eleH-4}\\{NWmodB-eleH-5}\\{NWmodB-eleH-6}\\{NWmodB-eleH-7}\\{NWmodB-eleH-8}}\nwused{\\{NWmodB-expE-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmodB-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\endmoddef
+element_t* element_init(model_mgr_t model_mgr, 
+                        struct mesh_struct* mesh, const char* model);
+\nwalsodefined{\\{NWmodB-expI-2}\\{NWmodB-expI-3}\\{NWmodB-expI-4}\\{NWmodB-expI-5}\\{NWmodB-expI-6}\\{NWmodB-expI-7}\\{NWmodB-expI-8}\\{NWmodB-expI-9}\\{NWmodB-expI-A}\\{NWmodB-expI-B}\\{NWmodB-expI-C}\\{NWmodB-expI-D}\\{NWmodB-expI-E}\\{NWmodB-expI-F}\\{NWmodB-expI-G}}\nwused{\\{NWmodB-modA-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+If the model function performs any allocations outside the mesh
+pool, it may need to perform deallocation on shutdown.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmodB-eleH-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-eleH-2}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\plusendmoddef
+void (*destroy)(void* self);
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmodB-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void element_destroy(element_t* self);
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+The {\tt{}set{\char95}position} method can be used to compute or update any 
+quantities that rely on undisplaced node positions.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmodB-eleH-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-eleH-3}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\plusendmoddef
+void (*set_position)(void* self, struct mesh_struct* mesh);
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmodB-expI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void element_set_position(element_t* self, struct mesh_struct* mesh);
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The {\tt{}vars} function is responsible for assigning variable indices.
+It may be called multiple times, so it probably should not be doing
+new allocations every time.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmodB-eleH-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-eleH-4}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\plusendmoddef
+void (*vars)(void* self, struct vars_mgr_struct* vars);
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmodB-expI-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void element_vars(element_t* self, struct vars_mgr_struct* vars);
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+
+The {\tt{}displace} function is responsible for assigning displacement
+boundary conditions, if there are any such to be assigned.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmodB-eleH-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-eleH-5}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\plusendmoddef
+void (*displace)(void* self, struct assemble_matrix_t* assembler);
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmodB-expI-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-5}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void element_displace(element_t* self, struct assemble_matrix_t* assembler);
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+
+The {\tt{}R} and {\tt{}dR} routines contribute the local contributions
+to the residual function and the tangent matrix, respectively.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmodB-eleH-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-eleH-6}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\plusendmoddef
+void (*R) (void* self, struct assemble_matrix_t* R, 
+           struct assemble_matrix_t* x,
+           struct assemble_matrix_t* v,
+           struct assemble_matrix_t* a);
+void (*dR)(void* self, struct assemble_matrix_t* dR,
+           double cx, struct assemble_matrix_t* x,
+           double cv, struct assemble_matrix_t* v,
+           double ca, struct assemble_matrix_t* a);
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmodB-expI-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-6}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void element_R (element_t* self, struct assemble_matrix_t* R,
+                struct assemble_matrix_t* x,
+                struct assemble_matrix_t* v,
+                struct assemble_matrix_t* a);
+void element_dR(element_t* self, struct assemble_matrix_t* dR,
+                double cx, struct assemble_matrix_t* x,
+                double cv, struct assemble_matrix_t* v,
+                double ca, struct assemble_matrix_t* a);
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+
+The {\tt{}output} function for an element is currently solely
+responsible for dumping out a text representation of whatever
+the element data structure might be.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmodB-eleH-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-eleH-7}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\plusendmoddef
+void (*output)(void* self, struct netout_t* netout);
+\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWmodB-expI-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-7}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void element_output(element_t* self, struct netout_t* netout);
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+
+The {\tt{}display} function is responsible for drawing the element
+to a {\tt{}netdraw} context.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWmodB-eleH-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-eleH-8}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NWmodB-eleH-1}}}\plusendmoddef
+void (*display)(void* self, struct netdraw_gc_t* gc);
+\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWmodB-expI-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-8}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void element_display(element_t* self, struct netdraw_gc_t* gc);
+\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+
+\subsection{The material interface}
+
+The table of functions to implement a material model are stored in
+a {\tt{}model{\char95}material{\char95}t} structure.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWmodB-expE-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expE-2}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NWmodB-expE-1}}}\plusendmoddef
+typedef struct model_material_t \{
+    \LA{}material functions~{\nwtagstyle{}\subpageref{NWmodB-matI-1}}\RA{}
+\} model_material_t;
+
+typedef struct material_t \{
+    model_material_t* model;
+    void* data;
+\} material_t;
+
+\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+Like the element initializer function, the model initializer function
+constructs the data structures used by the model and does basic
+checking on the model parameters.
+
+The {\tt{}mesh} argument provides a handle by which the initializer can
+access most of the information it will need: the parameter list,
+any other materials, etc.  The model name is useful since it may
+be the case that a single model may go by multiple aliases,
+or that a default model that calls through to Matlab (for instance)
+might need the model name.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWmodB-matI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-matI-1}}}\moddef{material functions~{\nwtagstyle{}\subpageref{NWmodB-matI-1}}}\endmoddef
+struct material_t* (*init)(struct mesh_struct* mesh, const char* model,
+                           struct model_material_t* modelfunc);
+\nwalsodefined{\\{NWmodB-matI-2}\\{NWmodB-matI-3}\\{NWmodB-matI-4}}\nwused{\\{NWmodB-expE-2}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWmodB-expI-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-9}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+struct material_t* material_init(model_mgr_t model_mgr, 
+                                 struct mesh_struct* mesh, const char* model);
+\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+If the material allocated anything outside the mesh pool,
+we may need to do some cleanup.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWmodB-matI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-matI-2}}}\moddef{material functions~{\nwtagstyle{}\subpageref{NWmodB-matI-1}}}\plusendmoddef
+void (*destroy)(void* self);
+\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWmodB-expI-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-A}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void material_destroy(material_t* self);
+\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+
+One of the roles of the material objects is to keep track of any
+parameters to be passed forward to the individual elements.
+The {\tt{}param} function is a query method to get those parameters
+by name.
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWmodB-matI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-matI-3}}}\moddef{material functions~{\nwtagstyle{}\subpageref{NWmodB-matI-1}}}\plusendmoddef
+struct mesh_param_t* (*param)(void* self, const char* name);
+\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWmodB-expI-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-B}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+struct mesh_param_t* material_param(material_t* self, const char* name);
+\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+The {\tt{}output} function for a material is responsible for printing
+a text representation of the material data structure.
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWmodB-matI-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-matI-4}}}\moddef{material functions~{\nwtagstyle{}\subpageref{NWmodB-matI-1}}}\plusendmoddef
+void (*output)(void* self, struct netout_t* netout);
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWmodB-expI-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-C}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void material_output(material_t* self, struct netout_t* netout);
+\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+
+\subsection{Manager interface}
+
+The {\tt{}model{\char95}mgr{\char95}t} type is an opaque pointer to a model manager
+object.  Since the model manager object maintains its own memory
+pool, it has a nontrivial destructor function associated with it.
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWmodB-expI-D}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-D}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+model_mgr_t model_mgr_init();
+void        model_mgr_destroy(model_mgr_t self);
+
+\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+To add a set of standard model functions, call the {\tt{}standard{\char95}register}.
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWmodB-expI-E}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-E}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void        model_mgr_standard_register(model_mgr_t self);
+\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+The {\tt{}add{\char95}element} and {\tt{}add{\char95}material} functions add function
+tables to the registry.  Though the function table is passed in
+by reference, the model manager makes its own copy for safe
+keeping rather than just storing the pointer.  If the {\tt{}name}
+argument is NULL, the model will be registered as the default model.
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NWmodB-expI-F}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-F}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+void model_mgr_add_element (model_mgr_t self, const char* name, 
+                            model_element_t*  funcs);
+void model_mgr_add_material(model_mgr_t self, const char* name, 
+                            model_material_t* funcs);
+
+\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+The {\tt{}element} and {\tt{}material} functions retrieve function
+tables from the registry.  If the table does not contain any models
+matching the requested name, these functions will return NULL.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NWmodB-expI-G}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-expI-G}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmodB-expI-1}}}\plusendmoddef
+model_element_t*  model_mgr_element (model_mgr_t self, const char* name);
+model_material_t* model_mgr_material(model_mgr_t self, const char* name);
+\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NWmodB-modA.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-modA.2-1}}}\moddef{modelmgr.c~{\nwtagstyle{}\subpageref{NWmodB-modA.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "mempool.h"
+#include "hash.h"
+#include "mesh.h"
+#include "modelmgr.h"
+
+\LA{}model headers~{\nwtagstyle{}\subpageref{NWmodB-modD-1}}\RA{}
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWmodB-typ5-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWmodB-staG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}\RA{}
+\nwnotused{modelmgr.c}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\subsection{Material and element interface wrappers}
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NWmodB-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\endmoddef
+element_t* element_init(model_mgr_t model_mgr,
+                        mesh_t mesh, const char* model)
+\{
+    model_element_t* modelfunc = model_mgr_element(model_mgr, model);
+    if (modelfunc == NULL) \{
+        mesh_error(mesh, "Unknown model");
+        return NULL;
+    \}
+
+    return modelfunc->init(mesh, model, modelfunc);
+\}
+
+void element_destroy(element_t* self)
+\{
+    if (self->model->destroy)
+        self->model->destroy(self->data);
+\}
+
+\nwalsodefined{\\{NWmodB-fun9-2}\\{NWmodB-fun9-3}\\{NWmodB-fun9-4}\\{NWmodB-fun9-5}\\{NWmodB-fun9-6}\\{NWmodB-fun9-7}\\{NWmodB-fun9-8}\\{NWmodB-fun9-9}\\{NWmodB-fun9-A}\\{NWmodB-fun9-B}\\{NWmodB-fun9-C}\\{NWmodB-fun9-D}\\{NWmodB-fun9-E}\\{NWmodB-fun9-F}}\nwused{\\{NWmodB-modA.2-1}}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NWmodB-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void element_set_position(element_t* self, struct mesh_struct* mesh)
+\{
+    if (self->model->set_position)
+        self->model->set_position(self->data, mesh);
+\}
+
+\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NWmodB-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void element_vars(element_t* self, struct vars_mgr_struct* vars)
+\{
+    if (self->model->vars)
+        self->model->vars(self->data, vars);
+\}
+
+\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NWmodB-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void element_displace(element_t* self, struct assemble_matrix_t* assembler)
+\{
+    if (self->model->displace)
+        self->model->displace(self->data, assembler);
+\}
+
+void element_R(element_t* self, struct assemble_matrix_t* R,
+               struct assemble_matrix_t* x,
+               struct assemble_matrix_t* v,
+               struct assemble_matrix_t* a)
+\{
+    if (self->model->R)
+        self->model->R(self->data, R, x, v, a);
+\}
+
+void element_dR(element_t* self, struct assemble_matrix_t* dR,
+                double cx, struct assemble_matrix_t* x,
+                double cv, struct assemble_matrix_t* v,
+                double ca, struct assemble_matrix_t* a)
+\{
+    if (self->model->dR)
+        self->model->dR(self->data, dR, cx, x, cv, v, ca, a);
+\}
+
+\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NWmodB-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void element_output(element_t* self, struct netout_t* netout)
+\{
+    if (self->model->output)
+        self->model->output(self->data, netout);
+\}
+
+void element_display(element_t* self, struct netdraw_gc_t* gc)
+\{
+    if (self->model->display)
+        self->model->display(self->data, gc);
+\}
+
+\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NWmodB-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+material_t* material_init(model_mgr_t model_mgr,
+                          mesh_t mesh, const char* model)
+\{
+    model_material_t* modelfunc = model_mgr_material(model_mgr, model);
+    if (modelfunc == NULL) \{
+        mesh_error(mesh, "Unknown model");
+        return NULL;
+    \}
+
+    return modelfunc->init(mesh, model, modelfunc);
+\}
+
+void material_destroy(material_t* self)
+\{
+    if (self->model->destroy)
+        self->model->destroy(self->data);
+\}
+
+\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NWmodB-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+struct mesh_param_t* material_param(material_t* self, const char* name)
+\{
+    if (self->model->param)
+        return self->model->param(self->data, name);
+    return NULL;
+\}
+
+\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NWmodB-fun9-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void material_output(material_t* self, struct netout_t* netout)
+\{
+    if (self->model->output)
+        self->model->output(self->data, netout);
+\}
+
+\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+\subsection{Model manager}
+
+A model manager has an associated pool and two hash tables: one for
+storing element function tables, and the other for material function
+tables.
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NWmodB-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmodB-typ5-1}}}\endmoddef
+struct model_mgr_struct \{
+    mempool_t pool;
+    hash_t element_table;
+    hash_t material_table;
+    model_element_t*  default_element;
+    model_material_t* default_material;
+\};
+
+\nwalsodefined{\\{NWmodB-typ5-2}}\nwused{\\{NWmodB-modA.2-1}}\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+The entries in the hash tables are just (name, function table) pairs.
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NWmodB-typ5-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-typ5-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmodB-typ5-1}}}\plusendmoddef
+typedef struct element_entry_t \{
+    const char* name;
+    model_element_t element;
+\} element_entry_t;
+
+typedef struct material_entry_t \{
+    const char* name;
+    model_material_t material;
+\} material_entry_t;
+
+\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+
+We allocate everything (including the model manager object) on
+a locally allocated pool.  Note that, lacking a better size estimate,
+I assume a ``small'' number of different element and material types 
+(on the order of 100).  There is no {\tt{}copy} function defined;
+all the copying is done by the wrapper functions in this module.
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NWmodB-fun9-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+model_mgr_t model_mgr_init()
+\{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr_t self = 
+        (model_mgr_t) mempool_cget(pool, sizeof(struct model_mgr_struct));
+
+    self->pool = pool;
+
+    self->element_table = hash_pcreate(pool, 100, 
+                                       (hash_compare_fun_t) element_compare,
+                                       (hash_hash_fun_t)    element_hash,
+                                       NULL);
+
+    self->material_table = hash_pcreate(pool, 100,
+                                        (hash_compare_fun_t) material_compare,
+                                        (hash_hash_fun_t)    material_hash,
+                                        NULL);
+
+    self->default_element = NULL;
+    self->default_material = NULL;
+
+    return self;
+\}
+
+\nwendcode{}\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}\nwbegincode{87}\sublabel{NWmodB-fun9-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void model_mgr_destroy(model_mgr_t self)
+\{
+    mempool_destroy(self->pool);
+\}
+
+\nwendcode{}\nwbegindocs{88}\nwdocspar
+
+When we add a new element or material, we just copy everything
+(including the name) onto the pool and then insert the pointer
+into the hash.  Note that we make no special check to see if a
+model with the requested name already exists; if there is a conflict,
+the old model just goes away.
+
+\nwenddocs{}\nwbegincode{89}\sublabel{NWmodB-fun9-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void model_mgr_add_element(model_mgr_t self, const char* name,
+                           model_element_t* element)
+\{
+    element_entry_t* entry = 
+        (element_entry_t*) mempool_get(self->pool, sizeof(*entry));
+    
+    entry->name = mempool_strdup(self->pool, name);
+    memcpy(&(entry->element), element, sizeof(*element));
+    if (entry->name == NULL)
+        self->default_element = &(entry->element);
+    else
+        hash_insert(self->element_table, entry);
+\}
+
+\nwendcode{}\nwbegindocs{90}\nwdocspar
+
+\nwenddocs{}\nwbegincode{91}\sublabel{NWmodB-fun9-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void model_mgr_add_material(model_mgr_t self, const char* name,
+                            model_material_t* material)
+\{
+    material_entry_t* entry = 
+        (material_entry_t*) mempool_get(self->pool, sizeof(*entry));
+    
+    entry->name = mempool_strdup(self->pool, name);
+    memcpy(&(entry->material), material, sizeof(*material));
+    if (entry->name == NULL)
+        self->default_material = &(entry->material);
+    else
+        hash_insert(self->material_table, entry);
+\}
+
+\nwendcode{}\nwbegindocs{92}\nwdocspar
+
+When we retrieve an element or material, we first check to make
+sure that it exists in the table.  If it does exist, we return
+a pointer to the function table (not to the entire entry pair);
+if it does not exist, we return the default.
+
+\nwenddocs{}\nwbegincode{93}\sublabel{NWmodB-fun9-D}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-D}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+model_element_t* model_mgr_element(model_mgr_t self, const char* name)
+\{
+    element_entry_t key;
+    element_entry_t* entry = NULL;
+    key.name = name;
+    if (name != NULL)
+        entry = hash_retrieve(self->element_table, &key);
+    return (entry == NULL) ? self->default_element : &(entry->element);
+\}
+
+\nwendcode{}\nwbegindocs{94}\nwdocspar
+
+\nwenddocs{}\nwbegincode{95}\sublabel{NWmodB-fun9-E}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-E}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+model_material_t* model_mgr_material(model_mgr_t self, const char* name)
+\{
+    material_entry_t key;
+    material_entry_t* entry = NULL;
+    key.name = name;
+    if (name != NULL)
+        entry = hash_retrieve(self->material_table, &key);
+    return (entry == NULL) ? self->default_material : &(entry->material);
+\}
+
+\nwendcode{}\nwbegindocs{96}\nwdocspar
+
+The hash table helper functions are just wrappers around
+the standard string hash and comparison functions.
+
+\nwenddocs{}\nwbegincode{97}\sublabel{NWmodB-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmodB-staG-1}}}\endmoddef
+static unsigned element_hash(element_entry_t* entry)
+\{
+    return hash_strhash(entry->name);
+\}
+
+static unsigned material_hash(material_entry_t* entry)
+\{
+    return hash_strhash(entry->name);
+\}
+
+\nwalsodefined{\\{NWmodB-staG-2}}\nwused{\\{NWmodB-modA.2-1}}\nwendcode{}\nwbegindocs{98}\nwdocspar
+
+\nwenddocs{}\nwbegincode{99}\sublabel{NWmodB-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmodB-staG-1}}}\plusendmoddef
+static int element_compare(element_entry_t* a, element_entry_t* b)
+\{
+    return strcmp(a->name, b->name);
+\}
+
+static int material_compare(material_entry_t* a, material_entry_t* b)
+\{
+    return strcmp(a->name, b->name);
+\}
+
+\nwendcode{}\nwbegindocs{100}\nwdocspar
+
+\subsection{Registering standard models}
+
+\nwenddocs{}\nwbegincode{101}\sublabel{NWmodB-modD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-modD-1}}}\moddef{model headers~{\nwtagstyle{}\subpageref{NWmodB-modD-1}}}\endmoddef
+/* Standard model headers */
+#include "model-anchor.h"
+#include "model-force.h"
+#include "model-beam2d.h"
+#include "model-rigid.h"
+#include "model-gap.h"
+
+\nwused{\\{NWmodB-modA.2-1}}\nwendcode{}\nwbegindocs{102}\nwdocspar
+
+\nwenddocs{}\nwbegincode{103}\sublabel{NWmodB-fun9-F}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodB-fun9-F}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmodB-fun9-1}}}\plusendmoddef
+void model_mgr_standard_register(model_mgr_t self)
+\{
+    model_anchor_register (self);
+    model_force_register  (self);
+    model_beam2d_register (self);
+    model_rigid_register  (self);
+    model_gap_register    (self);
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{element functions}{NWmodB-eleH-1}{\nwixu{NWmodB-expE-1}\nwixd{NWmodB-eleH-1}\nwixd{NWmodB-eleH-2}\nwixd{NWmodB-eleH-3}\nwixd{NWmodB-eleH-4}\nwixd{NWmodB-eleH-5}\nwixd{NWmodB-eleH-6}\nwixd{NWmodB-eleH-7}\nwixd{NWmodB-eleH-8}}}%
+\nwixlogsorted{c}{{exported functions}{NWmodB-expI-1}{\nwixu{NWmodB-modA-1}\nwixd{NWmodB-expI-1}\nwixd{NWmodB-expI-2}\nwixd{NWmodB-expI-3}\nwixd{NWmodB-expI-4}\nwixd{NWmodB-expI-5}\nwixd{NWmodB-expI-6}\nwixd{NWmodB-expI-7}\nwixd{NWmodB-expI-8}\nwixd{NWmodB-expI-9}\nwixd{NWmodB-expI-A}\nwixd{NWmodB-expI-B}\nwixd{NWmodB-expI-C}\nwixd{NWmodB-expI-D}\nwixd{NWmodB-expI-E}\nwixd{NWmodB-expI-F}\nwixd{NWmodB-expI-G}}}%
+\nwixlogsorted{c}{{exported types}{NWmodB-expE-1}{\nwixu{NWmodB-modA-1}\nwixd{NWmodB-expE-1}\nwixd{NWmodB-expE-2}}}%
+\nwixlogsorted{c}{{functions}{NWmodB-fun9-1}{\nwixu{NWmodB-modA.2-1}\nwixd{NWmodB-fun9-1}\nwixd{NWmodB-fun9-2}\nwixd{NWmodB-fun9-3}\nwixd{NWmodB-fun9-4}\nwixd{NWmodB-fun9-5}\nwixd{NWmodB-fun9-6}\nwixd{NWmodB-fun9-7}\nwixd{NWmodB-fun9-8}\nwixd{NWmodB-fun9-9}\nwixd{NWmodB-fun9-A}\nwixd{NWmodB-fun9-B}\nwixd{NWmodB-fun9-C}\nwixd{NWmodB-fun9-D}\nwixd{NWmodB-fun9-E}\nwixd{NWmodB-fun9-F}}}%
+\nwixlogsorted{c}{{material functions}{NWmodB-matI-1}{\nwixu{NWmodB-expE-2}\nwixd{NWmodB-matI-1}\nwixd{NWmodB-matI-2}\nwixd{NWmodB-matI-3}\nwixd{NWmodB-matI-4}}}%
+\nwixlogsorted{c}{{model headers}{NWmodB-modD-1}{\nwixu{NWmodB-modA.2-1}\nwixd{NWmodB-modD-1}}}%
+\nwixlogsorted{c}{{modelmgr.c}{NWmodB-modA.2-1}{\nwixd{NWmodB-modA.2-1}}}%
+\nwixlogsorted{c}{{modelmgr.h}{NWmodB-modA-1}{\nwixd{NWmodB-modA-1}}}%
+\nwixlogsorted{c}{{static functions}{NWmodB-staG-1}{\nwixu{NWmodB-modA.2-1}\nwixd{NWmodB-staG-1}\nwixd{NWmodB-staG-2}}}%
+\nwixlogsorted{c}{{types}{NWmodB-typ5-1}{\nwixu{NWmodB-modA.2-1}\nwixd{NWmodB-typ5-1}\nwixd{NWmodB-typ5-2}}}%
+\nwbegindocs{104}\nwdocspar
+\nwenddocs{}

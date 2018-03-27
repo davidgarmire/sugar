@@ -1,0 +1,104 @@
+# Awk is used for some of the make scripts
+
+AWK=gawk
+
+
+# Location of noweb installation
+
+NOWEBDIR= ../../tools/build/bin
+NOWEAVE=  $(NOWEBDIR)/noweave
+NOTANGLE= $(NOWEBDIR)/notangle
+NOTEXINPUTS=TEXINPUTS=../../tools/build/lib/tex/inputs
+
+# Default compiler and flags.  If we insist on all warnings (-Wall)
+# and finicky warnings (-pedantic), the code has a better chance of
+# compiling elsewhere.
+
+CC=       /usr/bin/gcc
+CFLAGS=   -g -Wall -pedantic
+
+
+# Tools for building the SUGAR core library.  If your system doesn't
+# have ranlib, change the ranlib line to RANLIB=echo.  If your system
+# doesn't have ar, consider either switching to Unix, Cygwin, or
+# something precompiled for Windows.  :)
+
+ARCH=ar
+ARCHFLAGS=cr
+RANLIB=ranlib
+
+
+# Leave this line in place to get generated code with #line references
+# to the original source.  For a prettier version of the source (and
+# one that you won't debug as often), comment the line out.
+
+TANGLEOPTS=-L
+
+
+# You don't have a choice about including the Lua libraries
+# Point LUADIR in the right direction and leave the other
+# entries alone.
+
+LUADIR=   ../../tools/lua
+LUAINC=   -I$(LUADIR)/include
+LUALIBS=  -L$(LUADIR)/lib -llua -llualib
+
+
+# Dense linear algebra libraries.  We need LAPACK and the BLAS
+# to support the dense solvers (or Matlab).
+
+DENSEDEF=  -DHAS_LAPACK
+#DENSELIBS= -llapack -lblas -lg2c
+DENSEDIR=/home/eecs/dbindel/work/lapack/flapack3/arch/linux-atlas/
+DENSELIBS= $(DENSEDIR)/lapack_LINUX.a -L$(DENSEDIR) -lf77blas -latlas -lg2c
+
+
+# Include these lines to link in SuperLU.  You will probably need to
+# modify the name specified in SUPERLU, and you may need to modify
+# the architecture of the library.
+
+SUPERDEF= -DHAS_SUPERLU
+SUPERLU=  /home/eecs/dbindel/work/SuperLU
+SUPERINC= -I$(SUPERLU)/SRC
+SUPERLIB= $(SUPERLU)/superlu_linux.a
+
+
+# Include these lines to enable the X window displayer
+
+XDEF=  -DHAS_X11
+XLIBS= -L/usr/X11R6/lib/ -lXaw -lXt -lX11
+
+
+# We need the eXternal Data Representation (XDR) routines provided
+# in libnsl to generate output for the Java viewer
+
+XDRDEF= -DHAS_XDR
+XDRLIB= -lnsl
+
+
+# We use the GNU readline library, if it is available, to provide
+# a nice user interface (with scrolling history and all that stuff).
+
+READDEF = -DHAS_READLINE
+READLINE= -lreadline -lncurses
+
+
+# All the libraries and include paths we need for the C code.
+
+CLIBS= $(LUALIBS) $(SUPERLIB) $(DENSELIBS) \
+       $(XLIBS) $(XDRLIB) $(READLINE) -lm
+
+CINCL= $(CFLAGS) $(SUPERINC) $(LUAINC) \
+       $(SUPERDEF) $(DENSEDEF) $(XDEF) $(XDRDEF) $(READDEF)
+
+
+
+# The mex compiler, flags, and libraries
+
+CMEX=     mex
+
+MEXFLAGS= -g $(LUAINC) $(SUPERINC) \
+       $(SUPERDEF) $(DENSEDEF) $(XDEF) $(XDRDEF) $(READDEF)
+
+MEXLIBS =  $(LUALIBS) $(SUPERLIB) $(XLIBS) $(XDRLIB) -lm
+

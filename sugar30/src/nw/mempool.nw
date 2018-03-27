@@ -1,0 +1,669 @@
+
+\section{Introduction}
+
+The [[mempool]] module manages a region-based allocator,
+or memory pool.  A user can create a region associated with
+some task or data structure and allocate from it freely;
+when the time comes to finish the program task or destroy
+the data structure, the region can be deallocated.
+See Dave Hanson's book ``C Interfaces and Implementations'' %'
+for some further information on region-based allocators.
+
+This particular allocator is not very fancy.  It \emph{does}
+allow us to mark entire data structures as persistent across
+MeX files in Matlab, which is convenient.  It also has special
+support for stack-order allocation / deallocation patterns.
+
+
+\section{Interface}
+
+<<mempool.h>>=
+#ifndef MEMPOOL_H
+#define MEMPOOL_H
+
+typedef struct mempool_struct* mempool_t;
+
+<<exported types>>
+<<exported macros>>
+<<exported functions>>
+
+#endif /* MEMPOOL_H */
+@ 
+
+The [[mempool_create]] and [[mempool_destroy]]
+functions create and destroy regions.  When creating a new
+region, you must specify the typical size of a \emph{span},
+or chunk of memory to be allocated contiguously.  New spans
+are allocated as needed, and requests to allocate a contiguous
+chunk of memory larger than the ordinary span size are accomodated
+by special extra-large spans.  The default span size,
+[[MEMPOOL_DEFAULT_SPAN]] is 4K.
+
+<<exported functions>>=
+mempool_t mempool_create (int span_size);
+void      mempool_destroy(mempool_t pool);
+
+@
+
+<<exported macros>>=
+#define MEMPOOL_DEFAULT_SPAN (4096)
+
+@
+
+The basic operation on a memory pool is (obviously enough)
+getting memory.  The [[mempool_get]] function gets a chunk
+of memory from the pool; the [[mempool_cget]] function gets
+a zero-filled chunk of memory.
+
+It is sometimes convenient to access memory pools using a
+\emph{stack discipline}.  That is, allocation and deletion
+requests can be interlaced in stack order.  The beginning
+of a ``stack frame'' in our memory pool module is marked
+by a \emph{handle}.  The functions [[mempool_geth]] and
+[[mempool_cgeth]] are much like [[mempool_get]] and
+[[mempool_cget]], except that the memory returned is associated
+with a handle in the memory pool.  If [[mempool_freeh]] is
+called on a pointer returned from [[mempool_geth]], the memory
+pool is rolled back to the state it was in immediately before
+the corresponding [[mempool_geth]] call.  This means that not
+only is the memory allocated in that [[mempool_geth]] call
+freed, but so also is all the memory allocated from the pool
+\emph{after} the call.
+
+<<exported functions>>=
+void* mempool_get  (mempool_t pool, int size);
+void* mempool_cget (mempool_t pool, int size);
+void* mempool_geth (mempool_t pool, int size);
+void* mempool_cgeth(mempool_t pool, int size);
+void  mempool_freeh(void* mem);
+
+@
+
+The standard function [[strdup]] mallocs a buffer and copies
+into it an argument string.  It's a convenient function. %'
+It's also often convenient to copy some more general object %'
+from a temporary buffer into dynamically allocated memory.
+The mempool module supports this functionality with
+[[mempool_strdup]] and [[mempool_memdup]].
+
+Note that if a NULL argument is passed to [[mempool_strdup]]
+or [[mempool_memdup]], the return value will be NULL.
+
+<<exported functions>>=
+void* mempool_memdup(mempool_t pool, const void* src, int size);
+void* mempool_strdup(mempool_t pool, const char* src);
+
+@
+
+For debugging purposes, the mempool class supports logging.
+The mempool log file is a global object, not associated with
+any particular pool instance.
+
+<<exported functions>>=
+void mempool_start_log(char* filename);
+void mempool_end_log  ();
+void mempool_flush_log();
+
+@
+
+In the Matlab environment, by default, memory allocated during an
+invocation of a MEX file is automatically freed after
+the call finishes.  It is possible to override this default
+by explicitly requesting that Matlab make the allocated memory
+persistent across calls.  The [[mempool_persist]] function
+causes Matlab to mark all memory in a pool as persistent.
+
+<<exported functions>>=
+void mempool_persist(mempool_t pool);
+
+@ 
+
+Memory pool allocations must be properly \emph{aligned} on most
+systems.  There are some other modules that also care about
+alignment.  See the implementation section for details.
+
+<<exported types>>=
+<<alignment definitions>>
+@ 
+
+
+\section{Implementation}
+
+Besides standard library and memory manipulation routines,
+we will include the SUGAR main header file, which defines
+macros to alias [[malloc]] and [[free]] to the Matlab
+functions [[mxMalloc]] and [[mxFree]].
+
+<<mempool.c>>=
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "mempool.h"
+
+<<types>>
+<<static data>>
+
+<<static functions>>
+<<functions>>
+@ 
+
+
+\subsection{Alignment}
+
+In order to accomodate arbitrary objects, the memory returned
+by allocation requests to a mempool must be properly aligned.
+The [[align_t]] union contains the possible basic types;
+the size of an [[align_t]] structure, indicated by the macro
+[[align_size]], determines exactly how little memory can be
+allocated.
+
+<<alignment definitions>>=
+typedef union {
+    int i;
+    long l;
+    long* lp;
+    void* p;
+    void (*fp)();
+    float f;
+    double d;
+    long double ld;
+} align_t;
+
+#define align_size (sizeof(align_t))
+
+@ 
+
+
+\subsection{Creating and destroying pools}
+
+As mentioned in the interface section, a memory pool's space
+consists of a linked list of \emph{spans}.  Spans are further
+subdivided into \emph{blocks}, which are the smallest units
+guaranteed to start at, and end just before, alignment boundaries.
+The first block in each span is reserved for a link to
+the next span.
+
+The mempool structure tracks the typical number of blocks
+to be allocated in ordinary new spans, the number of blocks
+used in the current span, and the locations of the first and
+current span.  In addition, the first field of the mempool
+structure is a ``magic number'' used for debugging purposes.
+The magic number is used for debugging purposes;
+functions expecting a pool argument can use it to check that
+the user did not accidentally pass in a bogus pointer.
+
+<<types>>=
+#define MEMPOOL_MAGIC_NUMBER 0x1234
+#define ASSERT_VALID_POOL \
+    assert(pool != NULL && pool->magic_number == MEMPOOL_MAGIC_NUMBER)
+
+struct mempool_struct {
+    int magic_number;
+    int blocks_per_span;
+    int blocks_used;
+    align_t* first_span;
+    align_t* current_span;
+};
+
+@
+
+The local [[allocate_span]] function allocates and initializes new
+spans to go into pools list.  The [[blocks_in_span]] argument
+gives the number of blocks required to accomodate an incoming
+request (recall that requests larger than the typical span size
+sometimes happen)
+
+<<static functions>>=
+static align_t* allocate_span(mempool_t pool, int blocks_in_span)
+{
+    align_t* span;
+
+    <<allocate memory for the new span>>
+    <<optionally clear the new span>>
+    <<initialize the span>>
+
+    <<log span allocation>>
+
+    return span;
+}
+
+@
+
+When we allocate the memory for the new span, we want to make
+sure that it is sufficient to accomodate extra-large requests.
+For smaller requests, we default to the standard [[blocks_per_span]].
+Note that there will be one extra block in each span to keep
+the ``next'' pointer.
+
+<<allocate memory for the new span>>=
+if (blocks_in_span < pool->blocks_per_span)
+    blocks_in_span = pool->blocks_per_span;
+span = (align_t*) malloc((1+blocks_in_span) * align_size);
+@ 
+
+If the [[MEMPOOL_CLEAR_DEBUG]] macro is defined, then we zero out
+the new span before proceeding.
+
+<<optionally clear the new span>>=
+#ifdef MEMPOOL_CLEAR
+memset(span, 0, (1+blocks_in_span) * align_size);
+#endif
+@ 
+
+Finally, we check to make sure that the allocation request succeeded,
+and then we initialize block 0 (the next pointer) to [[NULL]].
+
+<<initialize the span>>=
+assert(span != NULL);
+span[0].p = NULL;
+@
+
+[[mempool_create]] allocates and initializes a new pool
+
+<<functions>>=
+mempool_t mempool_create(int span_size)
+{
+    mempool_t pool;
+
+    assert( span_size > 0 );
+    assert( pool = (mempool_t) malloc(sizeof(struct mempool_struct)) );
+
+    <<initialize new pool>>
+    <<log pool creation>>
+
+    return pool;
+}
+
+@
+
+Note that we start off by allocating an initial span, rather than
+allocating a new span on the first memory request.  That makes it
+so that our list logic doesn't have to deal with the ``add to an
+empty list'' case.  Note that the allocation of the new span
+\emph{must} occur after the [[blocks_per_span]] field has been set.
+
+<<initialize new pool>>=
+pool->magic_number = MEMPOOL_MAGIC_NUMBER;
+pool->blocks_per_span = (span_size + align_size-1)/align_size;
+pool->first_span = allocate_span(pool, 0);
+pool->current_span = pool->first_span;
+pool->blocks_used = 0;
+@
+
+The [[mempool_destroy]] function frees the pool structure and all spans.
+It also clears the magic number field, so that future (invalid)
+references to this pool will be caught.
+Additionally, if the [[MEMPOOL_CLEAR_DEBUG]] macro is defined, 
+[[mempool_destroy]] also overwrites all the spans with zeros 
+before deleting them.
+
+<<functions>>=
+void mempool_destroy(mempool_t pool)
+{
+    align_t* next_span;
+
+    ASSERT_VALID_POOL;
+    <<delete all spans in the pool>>
+    pool->magic_number = 0;
+    free(pool);
+
+    <<log pool deletion>>
+}
+
+@
+
+<<delete all spans in the pool>>=
+next_span = pool->first_span;
+while (next_span != NULL) {
+    align_t* dead_span = next_span;
+    next_span = (align_t*) next_span[0].p;
+    <<optionally clear dead span>>
+    free(dead_span);
+}
+@
+
+Recall that there may be spans longer than the standard size of
+[[1 + pool->blocks_per_span]].  In such cases, only the leading
+blocks are cleared.
+
+<<optionally clear dead span>>=
+#ifdef MEMPOOL_CLEAR_DEBUG
+memset(dead_span, 0, (1 + pool->blocks_per_span)*align_size);
+#endif
+@
+
+
+\subsubsection{Basic allocation from the pool}
+
+The most basic allocation function is [[mempool_get]].
+
+<<functions>>=
+void* mempool_get(mempool_t pool, int size)
+{
+    int blocks_requested = (size + align_size-1) / align_size;
+    void* mem;
+
+    ASSERT_VALID_POOL;
+    assert(blocks_requested >= 0);
+
+    <<allocate a new span if necessary>>
+    <<allocate blocks from the current span>>
+
+    <<log allocation from span>>
+
+    return mem;
+}
+
+@ 
+
+The [[mempool_cget]] function is just a convenience function
+that allocates using [[mempool_get]] and then clears the
+returned space.
+
+<<functions>>=
+void* mempool_cget(mempool_t pool, int size)
+{
+    void* mem = mempool_get(pool, size);
+    memset(mem, 0, size);
+    return mem;
+}
+
+@ 
+
+The first free block in a span is always at [[1 + pool->blocks_used]].
+The extra 1 is to accomodate the initial block containing the link
+to the next span.
+
+<<allocate blocks from the current span>>=
+mem = &(pool->current_span[1 + pool->blocks_used]);
+pool->blocks_used += blocks_requested;
+@ 
+
+We allocate a new span only if the request is too big
+to fit into the remaining blocks in our current span.
+Note that if the last span allocated was extra large to accomodate
+a big allocation request, then [[pool->blocks_used > pool->blocks_per_span]],
+and we automatically end up allocating a new span.
+
+<<allocate a new span if necessary>>=
+if (pool->blocks_used + blocks_requested > pool->blocks_per_span) {
+    align_t* new_span = allocate_span(pool, blocks_requested);
+    <<link in new span>>
+}
+@ 
+
+<<link in new span>>=
+pool->current_span[0].p = new_span;
+pool->current_span = new_span;
+pool->blocks_used = 0;
+@ 
+
+
+\subsection{Allocating with handles}
+
+A memory pool handle contains the fields needed to save the state
+of a memory pool (the [[current_span]] and current [[blocks_used]]),
+and also a pointer to the pool with which it is associated.
+The memory pool handle structure also contains a magic number field.
+During a handle allocation, the handle goes in the blocks
+immediately \emph{preceding} the returned pointer.
+The [[MEMPOOL_HANDLE_SIZE]] macro gives the size of the handle
+rounded up to the nearest multiple of the alignment block size.
+
+<<types>>=
+#define MEMPOOL_HANDLE_MAGIC_NUMBER 0xA911
+
+#define MEMPOOL_HANDLE_SIZE \
+   (((sizeof(mempool_handle_t) + align_size-1) / align_size) * align_size)
+
+typedef struct mempool_handle_t {
+    int magic_number;
+    int blocks_used;
+    align_t* current_span;
+    mempool_t pool;
+} mempool_handle_t;
+
+@
+
+<<initialize new handle from current pool state>>=
+new_handle.magic_number = MEMPOOL_HANDLE_MAGIC_NUMBER;
+new_handle.blocks_used  = pool->blocks_used;
+new_handle.current_span = pool->current_span;
+new_handle.pool         = pool;
+@ 
+
+The basic function to allocate with a handle simply allocates
+a somewhat larger chunk of memory than requested using
+[[mempool_get]], puts a handle in the leading blocks of
+that memory, and returns a pointer to the remainder
+
+<<functions>>=
+void* mempool_geth(mempool_t pool, int size)
+{
+    mempool_handle_t new_handle;
+    char* mem;
+
+    ASSERT_VALID_POOL;
+
+    <<initialize new handle from current pool state>>
+    <<allocate memory and tuck handle into leading blocks>>
+
+    <<log handle allocation>>
+
+    return mem;
+}
+
+@ 
+
+<<allocate memory and tuck handle into leading blocks>>=
+mem = (char*) mempool_get(pool, size + MEMPOOL_HANDLE_SIZE);
+*((mempool_handle_t*) mem) = new_handle;
+mem += MEMPOOL_HANDLE_SIZE;
+@ 
+
+As in the basic allocation case, [[mempool_cgeth]] is
+a small convenience wrapper around [[mempool_geth]].
+
+<<functions>>=
+void* mempool_cgeth(mempool_t pool, int size)
+{
+    void* mem = mempool_geth(pool, size);
+    memset(mem, 0, size);
+    return mem;
+}
+
+@ 
+
+The whole point of allocating with a handle is that you
+should be able to roll back the pool to the state recorded
+in the handle.  The [[mempool_freeh]] function performs
+this rollback.
+
+<<functions>>=
+void mempool_freeh(void* mem)
+{
+    mempool_handle_t handle;
+    mempool_t pool;
+    align_t* next_span;
+
+    <<extract and validate handle>>
+    <<free spans from handle onward>>
+    <<restore pool state>>
+
+    <<optionally clear freed space>>
+
+    <<log handle deallocation>>
+}
+
+@ 
+
+Remember that the handle is stored at [[mem - MEMPOOL_HANDLE_SIZE]].
+We want a copy of the handle, rather than just a pointer to it,
+since it may live in a span that will be freed during the rollback
+process.
+
+<<extract and validate handle>>=
+assert(mem != NULL);
+handle = *(mempool_handle_t*) ((char*) mem - MEMPOOL_HANDLE_SIZE);
+pool = handle.pool;
+assert(handle.magic_number == MEMPOOL_HANDLE_MAGIC_NUMBER);
+ASSERT_VALID_POOL;
+@ 
+
+<<free spans from handle onward>>=
+next_span = handle.current_span[0].p;
+while (next_span != NULL) {
+    align_t* dead_span = next_span;
+    next_span = next_span[0].p;
+    <<optionally clear dead span>>
+    free(dead_span);
+}
+@ 
+
+<<restore pool state>>=
+pool->blocks_used  = handle.blocks_used;
+pool->current_span = handle.current_span;
+pool->current_span[0].p = NULL;
+@ 
+
+In addition to all the spans we might have freed,
+there is probably space just freed at the end of the current
+span after rollback.  If the [[MEMPOOL_CLEAR_DEBUG]] flag is
+set, we want to clear that, too.
+
+<<optionally clear freed space>>=
+#ifdef MEMPOOL_CLEAR_DEBUG
+memset(&(pool->current_span[1 + pool->blocks_used]), 0,
+       (pool->blocks_per_span - pool->blocks_used) * align_size);
+#endif
+@ 
+
+
+\subsection{String and buffer duplication}
+
+The [[mempool_memdup]] function consists only of a [[mempool_get]]
+and a [[memcpy]].
+
+<<functions>>=
+void* mempool_memdup(mempool_t pool, const void* src, int size)
+{
+    if (src == NULL)
+        return NULL;
+    else {
+        void* dest = mempool_get(pool, size);
+        memcpy(dest, src, size);
+        return dest;
+    }
+}
+
+@ 
+
+The [[mempool_strdup]] function is a wrapper around [[mempool_memdup]].
+
+<<functions>>=
+void* mempool_strdup(mempool_t pool, const char* src)
+{
+    if (src == NULL)
+        return NULL;
+    return mempool_memdup(pool, src, strlen(src) + 1);
+}
+
+@ 
+
+
+\subsection{Logging}
+
+The [[mempool_log_fp]] pointer tracks the current log file.  By default,
+logging is turned off, and [[mempool_log_fp]] is [[NULL]].
+
+<<static data>>=
+static FILE* mempool_log_fp = NULL;
+@
+
+We are only allowed to start a log if one is not already open,
+and we can only end a log if there is a log to end.  Killing
+the program with an assertion when the log can't be opened
+may seem harsh, but remember that mempool logging will probably
+only be used when debugging.
+
+<<functions>>=
+void mempool_start_log(char* filename)
+{
+    assert(mempool_log_fp == NULL);
+    mempool_log_fp = fopen(filename, "a");
+    assert(mempool_log_fp != NULL);
+    fprintf(mempool_log_fp, "Memory log started (%s)\n", filename);
+}
+
+@ 
+
+<<functions>>=
+void mempool_end_log()
+{
+    assert(mempool_log_fp != NULL);
+    fprintf(mempool_log_fp, "Closing memory log\n");
+    fclose(mempool_log_fp);
+    mempool_log_fp = NULL;
+}
+
+@ 
+
+We may periodically want to ensure the mempool log has been flushed
+to disk, particularly since we're most likely to use logging when
+the program is crashing (and so not getting to the [[mempool_end_log]]
+call.
+
+<<functions>>=
+void mempool_flush_log()
+{
+    assert(mempool_log_fp != NULL);
+    fflush(mempool_log_fp);
+}
+
+@ 
+
+Part of the reason that we don't associate logging with a particular
+pool is that we would also like to log the creation and destruction
+of pool objects.
+
+<<log pool creation>>=
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "Allocated new mempool (%p), span size %d\n",
+            (void*) pool, span_size);
+@ 
+
+<<log pool deletion>>=
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "Destroyed mempool (%p)\n", (void*) pool);
+@ 
+
+<<log span allocation>>=
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "%p: Created new span at %p\n",
+            (void*) pool, (void*) span);
+@ 
+
+<<log allocation from span>>=
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Allocated %d bytes / %d blocks at %p\n",
+            (void*) pool, size, blocks_requested * align_size,
+            mem);
+@ 
+
+<<log handle allocation>>=
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Handle at %p, memory at %p\n",
+            (void*) pool, (void*) (mem - MEMPOOL_HANDLE_SIZE), (void*) mem);
+@ 
+
+<<log handle deallocation>>=
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Rollback to handle at %p\n", (void*) pool,
+            (void*) ((char*) mem - MEMPOOL_HANDLE_SIZE));
+@ 
+

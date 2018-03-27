@@ -1,0 +1,333 @@
+use("std2cvt.net")
+use("jmodels.net")
+
+pi = 3.1415926535897932385
+fabrication = material {
+  Youngsmodulus = ((129.5e9)+(186.5e9))/(2),
+  shearmodulus = ((79.0e9)+(57.5e9))/(2),
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+layer1 = material {
+  parent = fabrication,
+  h = 2e-6,
+  Youngsmodulus = ((129.5e9)+(186.5e9))/(2),
+  shearmodulus = ((79.0e9)+(57.5e9))/(2),
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+layer2 = material {
+  parent = fabrication,
+  h = 1.5e-6,
+  Youngsmodulus = ((129.5e9)+(186.5e9))/(2),
+  shearmodulus = ((79.0e9)+(57.5e9))/(2),
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+d2 = material {
+  parent = fabrication,
+  fluid = 0.75e-6,
+  Youngsmodulus = ((129.5e9)+(186.5e9))/(2),
+  shearmodulus = ((79.0e9)+(57.5e9))/(2),
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+subnet mfcomb (left, middle, right, material, numberfingers, gap, fingerwidth, fingerheight, fingerlength, supportwidth, supportheight, V)
+  local parent = material
+  _currnodes["left"] = left
+  _currnodes["middle"] = middle
+  _currnodes["right"] = right
+  local   fingerrigidlink = (supportwidth)/(2)
+  local   supportrigidlink = (fingerwidth)/(2)
+  local   fingerspacing = ((gap)*(2))+(fingerwidth)
+  for i = 2 , (((numberfingers)-(5))/(2))+(1) do
+      mfbeam3dlinkcorner {_n("a" .. "_" .. (i)), _n("a" .. "_" .. ((i)+(1))); material = parent, l = fingerspacing, w = supportwidth, h = supportheight, L1 = (fingerwidth)/(2), L2 = (fingerwidth)/(2)}
+      mfbeam3dlink {_n("a" .. "_" .. (i)), _n("b" .. "_" .. (i)); material = parent, l = fingerlength, w = fingerwidth, h = fingerheight, oz = (-(pi))/(2), L1 = (supportwidth)/(2)}
+  end
+  for i = (((numberfingers)-(5))/(2))+(4) , (numberfingers)-(2) do
+      mfbeam3dlinkcorner {_n("a" .. "_" .. (i)), _n("a" .. "_" .. ((i)+(1))); material = parent, l = fingerspacing, w = supportwidth, h = supportheight, L1 = (fingerwidth)/(2), L2 = (fingerwidth)/(2)}
+      mfbeam3dlinkcorner {_n("a" .. "_" .. ((i)+(1))), _n("b" .. "_" .. (i)); material = parent, l = fingerlength, w = fingerwidth, h = fingerheight, oz = (-(pi))/(2), L1 = (supportwidth)/(2)}
+  end
+  mfbeam3dlinkcorner {_n("left"), _n("a" .. "_" .. (2)); material = parent, l = fingerspacing, w = supportwidth, h = supportheight, L1 = (fingerwidth)/(2), L2 = (fingerwidth)/(2)}
+  mfbeam3dlink {_n("left"), _n("bleft"); material = parent, l = fingerlength, w = fingerwidth, h = fingerheight, oz = (-(pi))/(2), L1 = (supportwidth)/(2)}
+  mfbeam3dlinkcorner {_n("a" .. "_" .. ((((numberfingers)-(5))/(2))+(2))), _n("middle"); material = parent, l = fingerspacing, w = supportwidth, h = supportheight, L1 = (fingerwidth)/(2), L2 = (fingerwidth)/(2)}
+  mfbeam3dlink {_n("a" .. "_" .. ((((numberfingers)-(5))/(2))+(2))), _n("bml"); material = parent, l = fingerlength, w = fingerwidth, h = fingerheight, oz = (-(pi))/(2), L1 = (supportwidth)/(2)}
+  mfbeam3dlink {_n("middle"), _n("bmiddle"); material = parent, l = fingerlength, w = fingerwidth, h = fingerheight, oz = (-(pi))/(2), L1 = (supportwidth)/(2)}
+  mfbeam3dlinkcorner {_n("middle"), _n("a" .. "_" .. ((((numberfingers)-(5))/(2))+(4))); material = parent, l = fingerspacing, w = supportwidth, h = supportheight, L1 = (fingerwidth)/(2), L2 = (fingerwidth)/(2)}
+  mfbeam3dlink {_n("a" .. "_" .. ((((numberfingers)-(5))/(2))+(4))), _n("bmr"); material = parent, l = fingerlength, w = fingerwidth, h = fingerheight, oz = (-(pi))/(2), L1 = (supportwidth)/(2)}
+  mfbeam3dlinkcorner {_n("a" .. "_" .. ((numberfingers)-(1))), _n("right"); material = parent, l = fingerspacing, w = supportwidth, h = supportheight, L1 = (fingerwidth)/(2), L2 = (fingerwidth)/(2)}
+  mfbeam3dlink {_n("right"), _n("bright"); material = parent, l = fingerlength, w = fingerwidth, h = fingerheight, oz = (-(pi))/(2), L1 = (supportwidth)/(2)}
+  local   fingerforce = (((((8.854e-12)*(2))*(fingerheight))*((V)^(2)))/(gap))/(2)
+  local   L = (((fingerspacing)+(fingerwidth))*((numberfingers)-(1)))-((fingerwidth)/(2))
+  local   P = ((fingerforce)*(numberfingers))/(L)
+  local   F1 = ((P)*(L))/(2)
+  local   F6 = ((P)*((L)^(2)))/(12)
+  local   F7 = ((P)*(L))/(2)
+  local   F12 = (-((P)*((L)^(2))))/(12)
+  mff3d {_n("left"); F = F1, oz = (-(pi))/(2)}
+  mff3d {_n("left"); M = F6, oy = (-(pi))/(2)}
+  mff3d {_n("right"); F = F7, oz = (-(pi))/(2)}
+  mff3d {_n("right"); M = F12, oy = (-(pi))/(2)}
+end
+
+subnet mfperforated (left, right, material, numberholes, w, h, l, whorizontal, wvertical)
+  local parent = material
+  _currnodes["left"] = left
+  _currnodes["right"] = right
+  local   LH = (((l)-(wvertical))/(numberholes))-(wvertical)
+  local   LV = (w)-((whorizontal)*(2))
+  for i = 1 , (numberholes)-(1) do
+      mfbeam3dlinkcorner {_n("a" .. "_" .. (i)), _n("a" .. "_" .. ((i)+(1))); material = parent, l = LH, w = whorizontal, h = h, L1 = (wvertical)/(2), L2 = (wvertical)/(2)}
+      mfbeam3dlinkcorner {_n("b" .. "_" .. (i)), _n("b" .. "_" .. ((i)+(1))); material = parent, l = LH, w = whorizontal, h = h, L1 = (wvertical)/(2), L2 = (wvertical)/(2)}
+      mfbeam3dlink {_n("a" .. "_" .. ((i)+(1))), _n("b" .. "_" .. ((i)+(1))); material = parent, l = LV, w = wvertical, h = h, L1 = (whorizontal)/(2), L2 = (whorizontal)/(2), oz = (-(pi))/(2)}
+  end
+  mfbeam3dlink {_n("a" .. "_" .. (1)), _n("left"); material = parent, l = (LV)/(2), w = wvertical, h = h, L1 = (whorizontal)/(2), L2 = (wvertical)/(2), oz2 = (-(pi))/(2), oz = (-(pi))/(2)}
+  mfbeam3dlink {_n("left"), _n("b" .. "_" .. (1)); material = parent, l = (LV)/(2), w = wvertical, h = h, L1 = (wvertical)/(2), oz1 = (pi)/(2), L2 = (whorizontal)/(2), oz = (-(pi))/(2)}
+  mfbeam3dlinkcorner {_n("a" .. "_" .. (numberholes)), _n("a" .. "_" .. ((numberholes)+(1))); material = parent, l = LH, w = whorizontal, h = h, L1 = (wvertical)/(2), L2 = (wvertical)/(2)}
+  mfbeam3dlinkcorner {_n("b" .. "_" .. (numberholes)), _n("b" .. "_" .. ((numberholes)+(1))); material = parent, l = LH, w = whorizontal, h = h, L1 = (wvertical)/(2), L2 = (wvertical)/(2)}
+  mfbeam3dlink {_n("a" .. "_" .. ((numberholes)+(1))), _n("right"); material = parent, l = (LV)/(2), w = wvertical, h = h, L1 = (whorizontal)/(2), L2 = (wvertical)/(2), oz2 = (pi)/(2), oz = (-(pi))/(2)}
+  mfbeam3dlink {_n("right"), _n("b" .. "_" .. ((numberholes)+(1))); material = parent, l = (LV)/(2), w = wvertical, h = h, L1 = (wvertical)/(2), oz1 = (-(pi))/(2), L2 = (whorizontal)/(2), oz = (-(pi))/(2)}
+end
+
+subnet mfperforatedcomb4 (left, right, material, numberfingers, w, h, whorizontal, wfinger, lfinger, gap, wvertical, L1, L2)
+  local parent = material
+  _currnodes["left"] = left
+  _currnodes["right"] = right
+  local   numberholes = (numberfingers)+(1)
+  local   l = (((((gap)*(2))+(wfinger))+(wfinger))*(numberholes))+(wfinger)
+  local   LH = (((l)-(wvertical))/(numberholes))-(wvertical)
+  local   LV = (w)-((whorizontal)*(2))
+  for i = 1 , (numberholes)-(1) do
+      mfbeam3dlinkcorner {_n("a" .. "_" .. (i)), _n("a" .. "_" .. ((i)+(1))); material = parent, l = LH, w = whorizontal, h = h, L1 = (wvertical)/(2), L2 = (wvertical)/(2)}
+      mfbeam3dlinkcorner {_n("b" .. "_" .. (i)), _n("b" .. "_" .. ((i)+(1))); material = parent, l = LH, w = whorizontal, h = h, L1 = (wvertical)/(2), L2 = (wvertical)/(2)}
+      mfbeam3dlink {_n("a" .. "_" .. ((i)+(1))), _n("b" .. "_" .. ((i)+(1))); material = parent, l = LV, w = wvertical, h = h, L1 = (whorizontal)/(2), L2 = (whorizontal)/(2), oz = (-(pi))/(2)}
+      mfbeam3dlink {_n("b" .. "_" .. ((i)+(1))), _n("c" .. "_" .. ((i)+(1))); material = parent, l = lfinger, w = wfinger, h = h, L1 = (whorizontal)/(2), oz = (-(pi))/(2)}
+  end
+  mfbeam3dlink {_n("a" .. "_" .. (1)), _n("left"); material = parent, l = (LV)/(2), w = wvertical, h = h, L1 = (whorizontal)/(2), L2 = ((wvertical)/(2))+(L1), oz2 = (-(pi))/(2), oz = (-(pi))/(2)}
+  mfbeam3dlink {_n("left"), _n("b" .. "_" .. (1)); material = parent, l = (LV)/(2), w = wvertical, h = h, L1 = ((wvertical)/(2))+(L1), oz1 = (pi)/(2), L2 = (whorizontal)/(2), oz = (-(pi))/(2)}
+  mfbeam3dlink {_n("b" .. "_" .. (1)), _n("c" .. "_" .. (1)); material = parent, l = lfinger, w = wfinger, h = h, L1 = (whorizontal)/(2), oz = (-(pi))/(2)}
+  mfbeam3dlinkcorner {_n("a" .. "_" .. (numberholes)), _n("a" .. "_" .. ((numberholes)+(1))); material = parent, l = LH, w = whorizontal, h = h, L1 = (wvertical)/(2), L2 = (wvertical)/(2)}
+  mfbeam3dlinkcorner {_n("b" .. "_" .. (numberholes)), _n("b" .. "_" .. ((numberholes)+(1))); material = parent, l = LH, w = whorizontal, h = h, L1 = (wvertical)/(2), L2 = (wvertical)/(2)}
+  mfbeam3dlink {_n("a" .. "_" .. ((numberholes)+(1))), _n("right"); material = parent, l = (LV)/(2), w = wvertical, h = h, L1 = (whorizontal)/(2), L2 = (L2)+((wvertical)/(2)), oz2 = (pi)/(2), oz = (-(pi))/(2)}
+  mfbeam3dlink {_n("right"), _n("b" .. "_" .. ((numberholes)+(1))); material = parent, l = (LV)/(2), w = wvertical, h = h, L1 = (L2)+((wvertical)/(2)), oz1 = (-(pi))/(2), L2 = (whorizontal)/(2), oz = (-(pi))/(2)}
+  mfbeam3dlink {_n("b" .. "_" .. ((numberholes)+(1))), _n("c" .. "_" .. ((numberholes)+(1))); material = parent, l = lfinger, w = wfinger, h = h, L1 = (whorizontal)/(2), oz = (-(pi))/(2)}
+end
+
+lowSCS = 7u
+highSCS = 50u
+upperSCS = 5u
+if not v then v = 50 end
+
+if not LARM then LARM = 340u end
+
+if not WPERF then WPERF = 20u end
+
+numberfingers = (70)*(8)
+fingerheight = 50u
+gap = 3u
+fingerforce = ((((((numberfingers)*(8.854e-12))*(2))*(fingerheight))*((v)^(2)))/(gap))/(2)
+mff3d {_n("bridgecenter"); F = fingerforce, oz = (-(pi))/(2)}
+w_plate = 350u
+radius_plate = (w_plate)/(2)
+h_plate = upperSCS
+arcplate = (pi)/(2)
+oz_plate = (pi)/(2)
+w_rim = 50u
+radius_rim = (w_plate)-((w_rim)/(2))
+h_rim = (highSCS)-(upperSCS)
+theta_plate = atan((((h_rim)/(2))+((h_plate)/(2)))/(((w_plate)/(2))-((w_rim)/(2))))
+L_plate = sqrt(((((w_plate)/(2))-((w_rim)/(2)))^(2))+((((h_rim)/(2))+((h_plate)/(2)))^(2)))
+L1_plate = L_plate
+L2_plate = L_plate
+subnet mfplate (plate_left, plate_right, plate_top, material)
+  local parent = material
+  _currnodes["plate_left"] = plate_left
+  _currnodes["plate_right"] = plate_right
+  _currnodes["plate_top"] = plate_top
+  mfsemicircularbeam {_n("plate_bottom"), _n("plate_right"); material = layer1, radius = radius_plate, w = w_plate, h = h_plate, alpha = arcplate, oz = (0)*(oz_plate)}
+  mfsemicircularbeam {_n("plate_right"), _n("plate_top"); material = layer1, radius = radius_plate, w = w_plate, h = h_plate, alpha = arcplate, oz = (1)*(oz_plate)}
+  mfsemicircularbeam {_n("plate_top"), _n("plate_left"); material = layer1, radius = radius_plate, w = w_plate, h = h_plate, alpha = arcplate, oz = (2)*(oz_plate)}
+  mfsemicircularbeam {_n("plate_left"), _n("plate_bottom"); material = layer1, radius = radius_plate, w = w_plate, h = h_plate, alpha = arcplate, oz = (3)*(oz_plate)}
+  mfsemicircularbeam {_n("plate_bottom"), _n("plate_right"); material = layer1, radius = radius_rim, w = w_rim, h = h_rim, alpha = arcplate, oz = (0)*(oz_plate), oy1 = (pi)/(2), oz1 = ((-(pi))/(2))+(theta_plate), L1 = L1_plate, oy2 = theta_plate, oz2 = pi, L2 = L2_plate}
+  mfsemicircularbeam {_n("plate_right"), _n("plate_top"); material = layer1, radius = radius_rim, w = w_rim, h = h_rim, alpha = arcplate, oz = (1)*(oz_plate), oy1 = (pi)/(2), oz1 = ((-(pi))/(2))+(theta_plate), L1 = L1_plate, oy2 = theta_plate, oz2 = pi, L2 = L2_plate}
+  mfsemicircularbeam {_n("plate_top"), _n("plate_left"); material = layer1, radius = radius_rim, w = w_rim, h = h_rim, alpha = arcplate, oz = (2)*(oz_plate), oy1 = (pi)/(2), oz1 = ((-(pi))/(2))+(theta_plate), L1 = L1_plate, oy2 = theta_plate, oz2 = pi, L2 = L2_plate}
+  mfsemicircularbeam {_n("plate_left"), _n("plate_bottom"); material = layer1, radius = radius_rim, w = w_rim, h = h_rim, alpha = arcplate, oz = (3)*(oz_plate), oy1 = (pi)/(2), oz1 = ((-(pi))/(2))+(theta_plate), L1 = L1_plate, oy2 = theta_plate, oz2 = pi, L2 = L2_plate}
+end
+
+mfplate {_n("plate_left"), _n("plate_right"), _n("plate_top"); material = layer1, }
+w_hinge2plate = 20u
+w_hinge = 9u
+h_hinge = highSCS
+h_hinge2plate = highSCS
+l_hingearm = ((340u)-((w_hinge2plate)/(2)))-((w_hinge)/(2))
+l_hingecenter = (30u)/(2)
+l_hinge2plate = 60u
+theta_hinge2plate = atan((((h_hinge2plate)/(2))-((h_plate)/(2)))/((w_plate)/(2)))
+L2_hinge2plate = sqrt((((w_plate)/(2))^(2))+((((h_hinge2plate)/(2))-((h_plate)/(2)))^(2)))
+l_tether = 735u
+h_tether = lowSCS
+w_tether = 12u
+subnet mfhinge1 (plate_left, hinge1_center, hinge1_left, material)
+  local parent = material
+  _currnodes["plate_left"] = plate_left
+  _currnodes["hinge1_center"] = hinge1_center
+  _currnodes["hinge1_left"] = hinge1_left
+  mfbeam3dlink {_n("hinge1_right"), _n("plate_left"); material = layer1, l = l_hinge2plate, w = w_hinge2plate, h = h_hinge2plate, L1 = (w_hinge)/(2), L2 = L2_hinge2plate, oy2 = -(theta_hinge2plate)}
+  mfbeam3dlinkcorner {_n("hinge1_right"), _n("hinge1_rightcorner"); material = layer1, l = l_hingearm, w = w_hinge, h = h_hinge, oz = (pi)/(2), L1 = (w_hinge2plate)/(2), L2 = (w_hinge)/(2)}
+  mfbeam3dlink {_n("hinge1_center"), _n("hinge1_rightcorner"); material = layer1, l = l_hingecenter, w = w_hinge, h = h_hinge, L2 = (w_hinge)/(2)}
+  mfbeam3dlink {_n("hinge1_leftcorner"), _n("hinge1_center"); material = layer1, l = l_hingecenter, w = w_hinge, h = h_hinge, L1 = (w_hinge)/(2)}
+  mfbeam3dlinkcorner {_n("hinge1_leftcorner"), _n("hinge1_left"); material = layer1, l = l_hingearm, w = w_hinge, h = h_hinge, oz = (-(pi))/(2), L1 = (w_hinge)/(2), L2 = (w_hinge2plate)/(2)}
+end
+
+subnet mfhinge2 (plate_right, hinge_center2, hinge_right2, material)
+  local parent = material
+  _currnodes["plate_right"] = plate_right
+  _currnodes["hinge_center2"] = hinge_center2
+  _currnodes["hinge_right2"] = hinge_right2
+  mfbeam3dlink {_n("hinge_left"), _n("plate_right"); material = layer1, l = l_hinge2plate, w = w_hinge2plate, h = h_hinge2plate, L1 = (w_hinge)/(2), L2 = L2_hinge2plate, oy2 = -(theta_hinge2plate), oz = pi}
+  mfbeam3dlinkcorner {_n("hinge_left"), _n("hinge_leftcorner"); material = layer1, l = l_hingearm, w = w_hinge, h = h_hinge, oz = (pi)/(2), L1 = (w_hinge2plate)/(2), L2 = (w_hinge)/(2)}
+  mfbeam3dlink {_n("hinge_leftcorner"), _n("hinge_center2"); material = layer1, l = l_hingecenter, w = w_hinge, h = h_hinge, L1 = (w_hinge)/(2)}
+  mfbeam3dlink {_n("hinge_center2"), _n("hinge_rightcorner"); material = layer1, l = l_hingecenter, w = w_hinge, h = h_hinge, L2 = (w_hinge)/(2)}
+  mfbeam3dlinkcorner {_n("hinge_rightcorner"), _n("hinge_right2"); material = layer1, l = l_hingearm, w = w_hinge, h = h_hinge, oz = (-(pi))/(2), L1 = (w_hinge)/(2), L2 = (w_hinge2plate)/(2)}
+end
+
+mfhinge1 {_n("plate_left"), _n("hinge1_center"), _n("hinge1_left"); material = layer1, }
+mfhinge2 {_n("plate_right"), _n("hinge_center2"), _n("hinge_right2"); material = layer1, }
+mfbeam3dlink {_n("hinge_center2"), _n("bridgeright"); material = layer1, l = l_tether, w = w_tether, h = h_tether, oz = (-(pi))/(2), L1 = ((h_hinge)/(2))-((h_tether)/(2)), oy1 = (pi)/(2), L2 = ((h_hinge)/(2))-((h_tether)/(2)), oy2 = (-(pi))/(2)}
+mfbeam3dlink {_n("hinge1_center"), _n("bridgeleft"); material = layer1, l = l_tether, w = w_tether, h = h_tether, oz = (-(pi))/(2), L1 = ((h_hinge)/(2))-((h_tether)/(2)), oy1 = (pi)/(2), L2 = ((h_hinge)/(2))-((h_tether)/(2)), oy2 = (-(pi))/(2)}
+l_perf1 = 71u
+l_perf2 = (400u)-(l_perf1)
+w_perf = 20u
+w_holevert = 4.6u
+h_perf = upperSCS
+perfholes = 24
+w_holehori = ((w_perf)-(11u))/(2)
+l_perf2hinge = 40u
+w_perf2hinge = 20u
+h_perf2hinge = highSCS
+h_perfoverhang = (highSCS)-(upperSCS)
+w_perfoverhang = w_holehori
+l_perfoverhang = l_perf1
+L_perfoverhang = sqrt(((((w_perf)/(2))-((w_perfoverhang)/(2)))^(2))+((((h_perf)/(2))+((h_perfoverhang)/(2)))^(2)))
+theta_perfoverhang = atan((((w_perf)/(2))-((w_perfoverhang)/(2)))/(((h_perf)/(2))+((h_perfoverhang)/(2))))
+subnet mfperforatedbeam1 (hinge1_left, material)
+  local parent = material
+  _currnodes["hinge1_left"] = hinge1_left
+  mfbeam3dlink {_n("perf_right"), _n("hinge1_left"); material = layer1, l = l_perf2hinge, w = w_perf2hinge, h = h_perf2hinge, L2 = (w_hinge)/(2), L1 = ((h_perf2hinge)/(2))-((h_perf)/(2)), oy1 = (pi)/(2)}
+  mfperforated {_n("perf_middle"), _n("perf_right"); material = layer1, numberholes = (perfholes)-(20), w = w_perf, h = h_perf, l = l_perf1, whorizontal = w_holehori, wvertical = w_holevert}
+  mfperforated {_n("perf_left"), _n("perf_middle"); material = layer1, numberholes = (perfholes)-(4), w = w_perf, h = h_perf, l = l_perf2, whorizontal = w_holehori, wvertical = w_holevert}
+  mfbeam3dlink {_n("perf_middle"), _n("perf_right"); material = layer1, l = l_perfoverhang, h = h_perfoverhang, w = w_perfoverhang, L1 = L_perfoverhang, oz1 = -(theta_perfoverhang), oy1 = (pi)/(2), L2 = L_perfoverhang, oz2 = theta_perfoverhang, oy2 = (-(pi))/(2)}
+  mfbeam3dlink {_n("perf_middle"), _n("perf_right"); material = layer1, l = l_perfoverhang, h = h_perfoverhang, w = w_perfoverhang, L1 = L_perfoverhang, oz1 = theta_perfoverhang, oy1 = (pi)/(2), L2 = L_perfoverhang, oz2 = -(theta_perfoverhang), oy2 = (-(pi))/(2)}
+  mfanchor {_n("perf_left"); material = layer1, l = 50u, h = upperSCS, w = 100u, oz = pi}
+end
+
+subnet mfperforatedbeam2 (hinge_right2, material)
+  local parent = material
+  _currnodes["hinge_right2"] = hinge_right2
+  mfbeam3dlink {_n("hinge_right2"), _n("perf_left"); material = layer1, l = l_perf2hinge, w = w_perf2hinge, h = h_perf2hinge, L1 = (w_hinge)/(2), L2 = ((h_perf2hinge)/(2))-((h_perf)/(2)), oy2 = (-(pi))/(2)}
+  mfperforated {_n("perf_left"), _n("perf_middle"); material = layer1, numberholes = (perfholes)-(20), w = w_perf, h = h_perf, l = l_perf1, whorizontal = w_holehori, wvertical = w_holevert}
+  mfperforated {_n("perf_middle"), _n("perf_right"); material = layer1, numberholes = (perfholes)-(4), w = w_perf, h = h_perf, l = l_perf2, whorizontal = w_holehori, wvertical = w_holevert}
+  mfbeam3dlink {_n("perf_left"), _n("perf_middle"); material = layer1, l = l_perfoverhang, h = h_perfoverhang, w = w_perfoverhang, L1 = L_perfoverhang, oz1 = -(theta_perfoverhang), oy1 = (pi)/(2), L2 = L_perfoverhang, oz2 = theta_perfoverhang, oy2 = (-(pi))/(2)}
+  mfbeam3dlink {_n("perf_left"), _n("perf_middle"); material = layer1, l = l_perfoverhang, h = h_perfoverhang, w = w_perfoverhang, L1 = L_perfoverhang, oz1 = theta_perfoverhang, oy1 = (pi)/(2), L2 = L_perfoverhang, oz2 = -(theta_perfoverhang), oy2 = (-(pi))/(2)}
+  mfanchor {_n("perf_right"); material = layer1, l = 50u, h = upperSCS, w = 100u}
+end
+
+mfperforatedbeam1 {_n("hinge1_left"); material = layer1, }
+mfperforatedbeam2 {_n("hinge_right2"); material = layer1, }
+l_bridge = (((((w_tether)/(2))+(l_hingecenter))+(w_hinge))+(l_hinge2plate))+(w_plate)
+h_bridge = 50u
+w_bridge = 30u
+mfbeam3dlink {_n("bridgeleft"), _n("bridgecenter"); material = layer1, l = l_bridge, w = w_bridge, h = h_bridge, L1 = (-(w_tether))/(2)}
+mfbeam3dlink {_n("bridgecenter"), _n("bridgeright"); material = layer1, l = l_bridge, w = w_bridge, h = h_bridge, L2 = (-(w_tether))/(2)}
+perfholes = 6
+w_perf = 30u
+h_perf = highSCS
+w_horizontal = 10u
+w_vertical = 8u
+l_frontperf = 100u
+l_endperf = 140u
+Lcomb = (w_bridge)/(2)
+w_finger = 3.2u
+l_finger = 30u
+gap = 3u
+numberfingers = 70
+w_perf = 30u
+whorizontal = ((w_perf)-(12u))/(2)
+h_perf = highSCS
+w_vertical = 6u
+V = 0
+subnet mfcombarray (comb1, comb4, material)
+  local parent = material
+  _currnodes["comb1"] = comb1
+  _currnodes["comb4"] = comb4
+  mfperforated {_n("bridgecenter"), _n("comb1"); material = layer1, numberholes = perfholes, w = w_perf, h = h_perf, l = l_frontperf, whorizontal = w_horizontal, wvertical = w_vertical, oz = (-(pi))/(2)}
+  mfperforatedcomb4 {_n("leftcomb1"), _n("comb1"); material = layer1, numberfingers = numberfingers, w = w_perf, h = h_perf, whorizontal = whorizontal, wfinger = w_finger, lfinger = l_finger, gap = gap, wvertical = w_vertical, L1 = 0, L2 = Lcomb}
+  mfperforatedcomb4 {_n("comb1"), _n("rightcomb1"); material = layer1, numberfingers = numberfingers, w = w_perf, h = h_perf, whorizontal = whorizontal, wfinger = w_finger, lfinger = l_finger, gap = gap, wvertical = w_vertical, L1 = Lcomb, L2 = 0}
+  local   l_perf = 140u
+  mfperforated {_n("comb1"), _n("comb2"); material = layer1, numberholes = perfholes, w = w_perf, h = h_perf, l = l_perf, whorizontal = w_horizontal, wvertical = w_vertical, oz = (-(pi))/(2)}
+  mfperforatedcomb4 {_n("leftcomb2"), _n("comb2"); material = layer1, numberfingers = numberfingers, w = w_perf, h = h_perf, whorizontal = whorizontal, wfinger = w_finger, lfinger = l_finger, gap = gap, wvertical = w_vertical, L1 = 0, L2 = Lcomb}
+  mfperforatedcomb4 {_n("comb2"), _n("rightcomb2"); material = layer1, numberfingers = numberfingers, w = w_perf, h = h_perf, whorizontal = whorizontal, wfinger = w_finger, lfinger = l_finger, gap = gap, wvertical = w_vertical, L1 = Lcomb, L2 = 0}
+  mfperforated {_n("comb2"), _n("comb3"); material = layer1, numberholes = perfholes, w = w_perf, h = h_perf, l = l_perf, whorizontal = w_horizontal, wvertical = w_vertical, oz = (-(pi))/(2)}
+  mfperforatedcomb4 {_n("leftcomb3"), _n("comb3"); material = layer1, numberfingers = numberfingers, w = w_perf, h = h_perf, whorizontal = whorizontal, wfinger = w_finger, lfinger = l_finger, gap = gap, wvertical = w_vertical, L1 = 0, L2 = Lcomb}
+  mfperforatedcomb4 {_n("comb3"), _n("rightcomb3"); material = layer1, numberfingers = numberfingers, w = w_perf, h = h_perf, whorizontal = whorizontal, wfinger = w_finger, lfinger = l_finger, gap = gap, wvertical = w_vertical, L1 = Lcomb, L2 = 0}
+  mfperforated {_n("comb3"), _n("comb4"); material = layer1, numberholes = perfholes, w = w_perf, h = h_perf, l = l_perf, whorizontal = w_horizontal, wvertical = w_vertical, oz = (-(pi))/(2)}
+  mfperforatedcomb4 {_n("leftcomb4"), _n("comb4"); material = layer1, numberfingers = numberfingers, w = w_perf, h = h_perf, whorizontal = whorizontal, wfinger = w_finger, lfinger = l_finger, gap = gap, wvertical = w_vertical, L1 = 0, L2 = Lcomb}
+  mfperforatedcomb4 {_n("comb4"), _n("rightcomb4"); material = layer1, numberfingers = numberfingers, w = w_perf, h = h_perf, whorizontal = whorizontal, wfinger = w_finger, lfinger = l_finger, gap = gap, wvertical = w_vertical, L1 = Lcomb, L2 = 0}
+end
+
+mfperforated {_n("bridgecenter"), _n("comb1"); material = layer1, numberholes = perfholes, w = w_perf, h = h_perf, l = l_frontperf, whorizontal = w_horizontal, wvertical = w_vertical, oz = (-(pi))/(2)}
+mfcombarray {_n("comb1"), _n("comb4"); material = layer1, }
+mfperforated {_n("comb4"), _n("comb5"); material = layer1, numberholes = perfholes, w = w_perf, h = h_perf, l = l_endperf, whorizontal = w_horizontal, wvertical = w_vertical, oz = (-(pi))/(2)}
+l_predisp = 1100u
+w_predisp = 6.5u
+h_predisp = highSCS
+y2_disp = -(25u)
+displink = 39u
+mfpredisplacedbeam4 {_n("bridgecenter"), _n("disp1"); material = layer1, l = l_predisp, w = w_predisp, h = h_predisp, qox1 = 0, qoy1 = 0, qoz1 = 0, qx2 = 0, qy2 = y2_disp, qz2 = 0, qox2 = 0, qoy2 = 0, qoz2 = 0, L1 = displink, oz1 = ((-(pi))/(2))+((pi)/(8))}
+mfanchor {_n("disp1"); material = layer1, l = 50u, h = highSCS, w = 100u}
+mfanchor {_n("disp1"); material = layer1, l = (highSCS)/(2), h = 1u, w = 100u, oy = (pi)/(2)}
+mfanchor {_n("disp1"); material = layer1, l = (highSCS)/(2), h = 1u, w = 100u, oy = (-(pi))/(2)}
+mfpredisplacedbeam4 {_n("comb5"), _n("disp2"); material = layer1, l = l_predisp, w = w_predisp, h = h_predisp, qox1 = 0, qoy1 = 0, qoz1 = 0, qx2 = 0, qy2 = y2_disp, qz2 = 0, qox2 = 0, qoy2 = 0, qoz2 = 0, L1 = displink, oz1 = ((pi)/(2))-((pi)/(8))}
+mfanchor {_n("disp2"); material = layer1, l = 50u, h = highSCS, w = 100u}
+mfanchor {_n("disp2"); material = layer1, l = (highSCS)/(2), h = 1u, w = 100u, oy = (pi)/(2)}
+mfanchor {_n("disp2"); material = layer1, l = (highSCS)/(2), h = 1u, w = 100u, oy = (-(pi))/(2)}

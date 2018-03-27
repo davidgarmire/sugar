@@ -1,0 +1,68 @@
+
+\subsection{Interface}
+
+The standard netlist include file [[std.net]] adds wrappers for
+the basic model functions.  This is also the right place to put
+commonly-used composite model functions.
+
+For models that require a material parameter, our convention
+is to add the material identifier as an additional ``positional''
+parameter to the wrapper function, after the node numbers.
+For example, to create a two-dimensional beam in the [[p1]] process,
+we would write
+\begin{verbatim}
+  beam2d {A, B, p1; w=2u}
+\end{verbatim}
+For contrast, the corresponding call to [[element]] would be
+\begin{verbatim}
+  element {A, B; model="beam2d", material=p1, w=2u}
+\end{verbatim}
+
+
+\subsection{Implementation}
+
+<<std.net>>=
+use("xformstack.lua")
+use("relpos.lua")
+use("subnetize.lua")
+
+<<model wrappers>>
+@ 
+
+The [[beam2d]] wrapper adds relative position information
+if the length parameter [[l]] is defined.  The [[beam2d]]
+function is ``subnetized,'' so specifying [[ox]], [[oy]],
+and [[oz]] results in a rotated beam (a la SUGAR 2.0).
+
+<<model wrappers>>=
+subnet beam2d(A, B, material, l, w, h)
+  if l then
+    relpos_add(A, B, top_xform({l, 0, 0}))
+  end
+  element {A, B; model="beam2d", material=material, l=l, w=w, h=h}
+end
+
+@
+
+The semantics of the [[force]] wrapper are not the same
+as those of the SUGAR 2.0 force.
+Perhaps the [[force]] wrapper should also be ``subnetized''?
+Alternatively, we might add a separate wrapper (specifically
+to ease porting SUGAR 2.0 netlists) that applies a force along 
+a specified axis.
+
+<<model wrappers>>=
+subnet force()
+  args.model    = "force";
+  element(args);
+end
+
+@ 
+
+<<model wrappers>>=
+subnet anchor(A, material, l, w, h)
+  element {A; model="anchor", material=material, l=l, w=w, h=h}
+end
+
+@ 
+

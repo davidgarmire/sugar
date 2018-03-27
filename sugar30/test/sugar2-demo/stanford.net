@@ -1,0 +1,66 @@
+uses mumps.net
+uses stdlib.net
+
+%Test design by Olav's group at Stanford.
+%
+%The following commands were used to vertically actuate a plate 
+%supported by a frame.
+%The output gives the deflection of node g of the plate and node
+%b of the frame.
+%Node g deflects about 1um for a voltage of 58 volts & 4um gap.
+%
+%COMMANDS:
+%format compact; format short g;
+%net=cho_load('stanford.m');
+%dq=cho_dc(net);
+%figure(1);
+%cho_display(net,dq);
+%g=dq(lookup_coord(net,'g','z')),b=dq(lookup_coord(net,'b','z'))
+%
+%DEPICTION:
+%
+%     f----------a-----------b <--nodes
+%     |          |           |
+%     |          |           |
+%     |          |           | <---beams
+%     |    +-----g-----+     |
+%     |    |///////////|     |
+%     |    |///////////|     |
+%     |    |///plate///|     |
+%     |    |///////////|     |
+%     |    |///////////|     |
+%     |    +-----h-----+     |
+%     |          |           |
+%     |          |           |
+%     |          |           |
+%     e----------d-----------c
+
+
+%frame
+beam3de p1 [a b] [l=100u w=10u R=100]
+beam3de p1 [b c] [l=200u w=10u R=100 oz=-pi/2]
+beam3de p1 [c d] [l=100u w=10u R=100 oz=pi]
+beam3de p1 [d e] [l=100u w=10u R=100 oz=pi]
+beam3de p1 [e f] [l=200u w=10u R=100 oz=pi/2]
+beam3de p1 [f a] [l=100u w=10u R=100 oz=0]
+
+%anchors
+anchor  p1 [f] [l=10u w=10u h=10u R=100 oy=pi/2]
+anchor  p1 [c] [l=10u w=10u h=10u R=100 oy=pi/2]
+
+%gap
+gap3de  p1 [g h i j] [l=100u w1=2u w2=2u gap=4u h=100u 
+                      R1=100 R2=100 oz=-pi/2 ox=pi/2]
+anchor  p1 [i] [l=10u h=10u w=10u R=100 oy=pi/2]
+eground *  [i] []
+anchor  p1 [j] [l=10u w=10u h=10u R=100 oy=pi/2]
+eground *  [j] []
+
+%gap springs
+beam3de p1 [a g] [l=50u w=3u R=1000 oz=-pi/2]
+beam3de p1 [h d] [l=50u w=3u R=1000 oz=-pi/2]
+
+%voltage source
+Vsrc    *  [e gnd] [V=58 sv=0.1 sph=0]
+eground *  [gnd] []
+

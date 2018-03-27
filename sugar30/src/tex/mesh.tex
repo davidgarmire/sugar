@@ -1,0 +1,792 @@
+
+\section{Introduction}
+
+The mesh module describes and manipulates the basic mesh data
+structure.  This module is only responsible for keeping track
+of and providing access to the data structures, and does
+\emph{not} handle any particularly sophisticated functions.
+
+There are three main users of this module:
+\begin{itemize}
+ \item Mesh generation routines
+ \item Model initialization routines
+ \item Routines to process the constructed mesh
+\end{itemize}
+
+
+\section{Interface}
+
+\nwfilename{mesh.nw}\nwbegincode{1}\sublabel{NWmes7-mes6-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-mes6-1}}}\moddef{mesh.h~{\nwtagstyle{}\subpageref{NWmes7-mes6-1}}}\endmoddef
+#ifndef MESH_H
+#define MESH_H
+
+#include "mempool.h"
+#include "modelmgr.h"
+
+typedef struct mesh_struct* mesh_t;
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NWmes7-expE-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}\RA{}
+
+#endif /* MESH_H */
+\nwnotused{mesh.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\subsection{Types}
+
+A node in the mesh is described by a {\tt{}mesh{\char95}node{\char95}t} structure.
+Nodes have names and positions, but that's about it.  A node may %'
+be anonymous (when the {\tt{}name} field is NULL).  There may also
+be nodes whose position is unimportant.  In that case, the default
+location of the node is at the origin.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmes7-expE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expE-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NWmes7-expE-1}}}\endmoddef
+typedef struct mesh_node_t \{
+    const char* name;
+    double x[3];
+\} mesh_node_t;
+
+\nwalsodefined{\\{NWmes7-expE-2}}\nwused{\\{NWmes7-mes6-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+In C++, ``material'' and ``element'' would be abstract base classes.
+In Java, they would probably be interfaces.  In C, we require a bit
+more typing to achieve the same effect.  Material and element models are
+defined by function tables (see {\tt{}modelmgr} for details).  Particular
+instances of materials and elements are defined by a function table plus
+some data for the particular instance.  The semantics of the data
+describing each instance is known only to the model writer.
+
+In addition to the basic mesh object types, we define one more type
+for convenience: a tagged union type with a label to represent
+named parameters.  Types are characters strings ({\tt{}type\ ==\ 's'});
+numbers ({\tt{}type\ ==\ 'd'}); and matrices ({\tt{}type\ ==\ 'm'}).
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmes7-expE-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expE-2}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NWmes7-expE-1}}}\plusendmoddef
+enum \{
+    MESH_PARAM_NUMBER,
+    MESH_PARAM_STRING,
+    MESH_PARAM_MATRIX
+\};
+
+typedef struct mesh_param_t \{
+    int tag;
+    const char* name;
+    union \{
+        double d;
+        const char* s;
+        struct \{
+            int m, n;
+            double* data;
+        \} m;
+    \} val;
+\} mesh_param_t;
+
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{Functions}
+
+The {\tt{}mesh{\char95}create} and {\tt{}mesh{\char95}destroy} functions respectively
+create and destroy mesh objects.
+The {\tt{}mesh{\char95}create} function takes a pointer to a model manager
+(see the {\tt{}modelmgr} file).
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmes7-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\endmoddef
+mesh_t mesh_create(model_mgr_t model_mgr);
+void   mesh_destroy(mesh_t self);
+
+\nwalsodefined{\\{NWmes7-expI-2}\\{NWmes7-expI-3}\\{NWmes7-expI-4}\\{NWmes7-expI-5}\\{NWmes7-expI-6}\\{NWmes7-expI-7}\\{NWmes7-expI-8}\\{NWmes7-expI-9}\\{NWmes7-expI-A}\\{NWmes7-expI-B}\\{NWmes7-expI-C}}\nwused{\\{NWmes7-mes6-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+Each mesh is allocated on a memory pool, which can be accessed via
+the {\tt{}mesh{\char95}pool} function.  Model functions should allocate memory
+for local storage from this pool.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmes7-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+mempool_t mesh_pool(mesh_t self);
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+A mesh can have associated handlers for errors and warnings.
+A handler consists of a function pointer and a pointer
+to data needed by the handler.  The default handler for a
+warning simply prints an error message to the standard output;
+the default error handler is simpler, but it additionally
+aborts the program.  The default behavior can be stored by
+passing in a NULL function.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmes7-expI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+void mesh_set_handlers(mesh_t self,
+                       void (*error_handler)  (void* arg, const char* msg),
+                       void (*warning_handler)(void* arg, const char* msg),
+                       void* arg);
+void mesh_error       (mesh_t self, const char* msg);
+void mesh_warning     (mesh_t self, const char* msg);
+
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+The {\tt{}mesh{\char95}add{\char95}param{\char95}string} and {\tt{}mesh{\char95}add{\char95}param{\char95}number} functions
+add named string and number parameters to the list of parameters
+used by the next material or element.  The parameter list is
+cleared after any call to {\tt{}mesh{\char95}add{\char95}element} or {\tt{}mesh{\char95}add{\char95}material}.
+
+The {\tt{}mesh{\char95}add{\char95}param{\char95}node} adds to the list of nodes used by the next
+element.  The node list is cleared after any call to {\tt{}mesh{\char95}add{\char95}element}.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmes7-expI-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+void mesh_add_param_string(mesh_t self, const char* name, const char* s);
+void mesh_add_param_number(mesh_t self, const char* name, double d);
+void mesh_add_param_matrix(mesh_t self, const char* name, int m, int n,
+                           double* data);
+void mesh_add_param_node  (mesh_t self, int node_id);
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+The current list of named parameters and node identifiers can
+later be accessed through {\tt{}mesh{\char95}param}, {\tt{}mesh{\char95}param{\char95}byname},
+and {\tt{}mesh{\char95}param{\char95}node}.  {\tt{}mesh{\char95}num{\char95}params} and {\tt{}mesh{\char95}num{\char95}param{\char95}nodes}
+will give the number of named parameters and nodes, respectively.
+The arrays of named parameters and element nodes use zero-based
+indexing.  The functions to access the current parameter lists will
+primarily be of interest to model function writers.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmes7-expI-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-5}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+mesh_param_t* mesh_param       (mesh_t self, int index);
+mesh_param_t* mesh_param_byname(mesh_t self, const char* name);
+int           mesh_param_node  (mesh_t self, int index);
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmes7-expI-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-6}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+int mesh_num_params     (mesh_t self);
+int mesh_num_param_nodes(mesh_t self);
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+After a mesh generation error, we may be left with unprocessed
+arguments not cleared from the stack.  The current solution is
+the {\tt{}mesh{\char95}params{\char95}clear} routine; a better future solution might
+be to separate the argument stack handler into its own module
+and independent data structure.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmes7-expI-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-7}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+void mesh_params_clear(mesh_t self);
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+Often, we know what type the parameters \emph{should} be,
+and it is an error if we see anything else.  The
+{\tt{}mesh{\char95}param{\char95}string}, {\tt{}mesh{\char95}param{\char95}number}, and
+{\tt{}mesh{\char95}param{\char95}int} functions report a ``parameter missing''
+error if the requested parameter is unavailable and a
+``wrong type'' error if the parameter is invalid.  If
+the parameter is legitimate, they return the value.
+
+The {\tt{}mesh{\char95}param{\char95}material} function takes a material identifier,
+checks its validity (is it an in-range integer?) and returns a
+pointer to the material.  Note that the pointer is \emph{only} valid
+until a new material is added, since the data structure in which
+the materials are stored may be shifted around dynamically.
+
+The mesh argument is provided only for its error handling
+routines.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmes7-expI-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-8}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+const char*      mesh_param_string  (mesh_t self, mesh_param_t* param);
+double           mesh_param_number  (mesh_t self, mesh_param_t* param);
+int              mesh_param_int     (mesh_t self, mesh_param_t* param);
+material_t*      mesh_param_material(mesh_t self, mesh_param_t* param);
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+The {\tt{}mesh{\char95}add{\char95}node} function adds a node to the global list.
+The return value is the identifier for that node.
+The {\tt{}mesh{\char95}add{\char95}element} and {\tt{}mesh{\char95}add{\char95}material} add to the list of
+elements and materials used in the mesh.  Both functions return
+identifiers for the newly created objects.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmes7-expI-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-9}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+int mesh_add_node    (mesh_t self, const char* name, 
+                      double x, double y, double z);
+int mesh_add_element (mesh_t self, const char* model);
+int mesh_add_material(mesh_t self, const char* model);
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The {\tt{}mesh{\char95}node}, {\tt{}mesh{\char95}element}, and {\tt{}mesh{\char95}material} functions
+retrieve the nodes, elements, and material objects by their
+identifiers.  Note that the pointers returned are \emph{not} guaranteed
+to remain valid as new entries are added into the mesh.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmes7-expI-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-A}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+mesh_node_t*  mesh_node    (mesh_t self, int id);
+element_t*    mesh_element (mesh_t self, int id);
+material_t*   mesh_material(mesh_t self, int id);
+
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+The {\tt{}mesh{\char95}num{\char95}nodes}, {\tt{}mesh{\char95}num{\char95}elements}, and {\tt{}mesh{\char95}num{\char95}materials}
+functions return the number of nodes, elements, and materials present
+in the mesh.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmes7-expI-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-B}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+int mesh_num_nodes    (mesh_t self);
+int mesh_num_elements (mesh_t self);
+int mesh_num_materials(mesh_t self);
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+The {\tt{}mesh{\char95}vars{\char95}mgr} and {\tt{}mesh{\char95}assembler} getter functions return
+the variable manager and assembler objects owned by the mesh.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmes7-expI-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-expI-C}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmes7-expI-1}}}\plusendmoddef
+struct vars_mgr_struct* mesh_vars_mgr(mesh_t self);
+struct assembler_struct* mesh_assembler(mesh_t self);
+\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWmes7-mes6.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-mes6.2-1}}}\moddef{mesh.c~{\nwtagstyle{}\subpageref{NWmes7-mes6.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "mempool.h"
+#include "hash.h"
+#include "mesh.h"
+#include "vars.h"
+#include "assemble.h"
+#include "dynarray.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWmes7-typ5-1}}\RA{}
+\LA{}constants~{\nwtagstyle{}\subpageref{NWmes7-con9-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWmes7-staG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}\RA{}
+\nwnotused{mesh.c}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWmes7-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmes7-typ5-1}}}\endmoddef
+struct mesh_struct \{
+    \LA{}\code{}mesh{\char95}t\edoc{} data~{\nwtagstyle{}\subpageref{NWmes7-**mF-1}}\RA{}
+\};
+
+\nwused{\\{NWmes7-mes6.2-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+
+\subsection{Mesh data structure}
+
+The main point of the mesh object is to track the nodes, elements,
+and materials that make up the device description.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWmes7-**mF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-**mF-1}}}\moddef{\code{}mesh{\char95}t\edoc{} data~{\nwtagstyle{}\subpageref{NWmes7-**mF-1}}}\endmoddef
+dynarray_t nodes;
+dynarray_t elements;
+dynarray_t materials;
+\nwalsodefined{\\{NWmes7-**mF-2}\\{NWmes7-**mF-3}\\{NWmes7-**mF-4}\\{NWmes7-**mF-5}\\{NWmes7-**mF-6}}\nwused{\\{NWmes7-typ5-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+The {\tt{}param{\char95}nodes} and {\tt{}params} entries are used as storage
+for the list of node identifiers and named parameters to be passed
+to an element or a material.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWmes7-**mF-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-**mF-2}}}\moddef{\code{}mesh{\char95}t\edoc{} data~{\nwtagstyle{}\subpageref{NWmes7-**mF-1}}}\plusendmoddef
+dynarray_t param_nodes;
+dynarray_t params;
+\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+We keep around a pool object to give the models a place to allocate
+their local data.  We also keep around a string tables so that we
+don't have to store ``Youngsmodulus'' more than once. %'
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWmes7-**mF-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-**mF-3}}}\moddef{\code{}mesh{\char95}t\edoc{} data~{\nwtagstyle{}\subpageref{NWmes7-**mF-1}}}\plusendmoddef
+mempool_t pool;
+hash_t strings;
+\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWmes7-**mF-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-**mF-4}}}\moddef{\code{}mesh{\char95}t\edoc{} data~{\nwtagstyle{}\subpageref{NWmes7-**mF-1}}}\plusendmoddef
+model_mgr_t model_mgr;
+\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+The information for the current error handler consists of three
+variables: a function for reporting errors, another for reporting 
+warnings, and an opaque data pointer so that the error handlers
+have something to do when they report.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWmes7-**mF-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-**mF-5}}}\moddef{\code{}mesh{\char95}t\edoc{} data~{\nwtagstyle{}\subpageref{NWmes7-**mF-1}}}\plusendmoddef
+void (*error_handler)(void* arg, const char* msg);
+void (*warning_handler)(void* arg, const char* msg);
+void* handler_arg;
+\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+Variable index assignment is handled by a separate object (a
+{\tt{}vars{\char95}mgr{\char95}t}), but we keep a pointer to that object with the
+mesh information.  We can access the object with a simple
+getter function.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWmes7-**mF-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-**mF-6}}}\moddef{\code{}mesh{\char95}t\edoc{} data~{\nwtagstyle{}\subpageref{NWmes7-**mF-1}}}\plusendmoddef
+vars_mgr_t vars_mgr;
+assembler_t assembler;
+\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWmes7-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\endmoddef
+vars_mgr_t mesh_vars_mgr(mesh_t self)
+\{
+    return self->vars_mgr;
+\}
+
+assembler_t mesh_assembler(mesh_t self)
+\{
+    return self->assembler;
+\}
+
+\nwalsodefined{\\{NWmes7-fun9-2}\\{NWmes7-fun9-3}\\{NWmes7-fun9-4}\\{NWmes7-fun9-5}\\{NWmes7-fun9-6}\\{NWmes7-fun9-7}\\{NWmes7-fun9-8}\\{NWmes7-fun9-9}\\{NWmes7-fun9-A}\\{NWmes7-fun9-B}\\{NWmes7-fun9-C}\\{NWmes7-fun9-D}\\{NWmes7-fun9-E}\\{NWmes7-fun9-F}\\{NWmes7-fun9-G}\\{NWmes7-fun9-H}\\{NWmes7-fun9-I}\\{NWmes7-fun9-J}\\{NWmes7-fun9-K}\\{NWmes7-fun9-L}\\{NWmes7-fun9-M}\\{NWmes7-fun9-N}}\nwused{\\{NWmes7-mes6.2-1}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+
+The default sizes of the various tables and initial array capacities
+are off the top of my head.  A mesh with 128 nodes and elements sounds
+like a reasonable size for something small; ditto with 16 materials.
+And we probably won't have many single elements with nearly 27 %'
+nodes (the number of nodes in a 3-d second-order Lagrangian brick),
+nor anything with 64 parameters.  Note, though, that the data structures
+we're using will work fine even if something larger than the specified %'
+capacity is used.  They will just have to grow.
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWmes7-con9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-con9-1}}}\moddef{constants~{\nwtagstyle{}\subpageref{NWmes7-con9-1}}}\endmoddef
+#define NODES_SIZ      128
+#define ELEMENT_SIZ    128
+#define MATERIAL_SIZ   16
+#define ELT_NODES_SIZ  27
+#define PARAMS_SIZ     64
+#define STRINGS_SIZ    500
+
+\nwused{\\{NWmes7-mes6.2-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWmes7-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+mesh_t mesh_create(model_mgr_t model_mgr)
+\{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    mesh_t    self = (mesh_t) mempool_get(pool, sizeof(struct mesh_struct));
+
+    self->nodes     = dynarray_create(sizeof(mesh_node_t), NODES_SIZ);
+    self->elements  = dynarray_create(sizeof(element_t*),  ELEMENT_SIZ);
+    self->materials = dynarray_create(sizeof(material_t*), MATERIAL_SIZ);
+
+    self->param_nodes = dynarray_create(sizeof(int), ELT_NODES_SIZ);
+    self->params = dynarray_create(sizeof(mesh_param_t), PARAMS_SIZ);
+
+    self->pool      = pool;
+    self->strings   = hstrings_pcreate(pool, STRINGS_SIZ);
+    self->model_mgr = model_mgr;
+
+    mesh_set_handlers(self, NULL, NULL, NULL);
+
+    self->vars_mgr  = vars_create(self);
+    self->assembler = assemble_create(self);
+
+    return self;
+\}
+
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWmes7-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+void mesh_destroy(mesh_t self)
+\{
+    int i, n;
+
+    assemble_destroy(self->assembler);
+    vars_destroy(self->vars_mgr);
+
+    \LA{}destroy element data~{\nwtagstyle{}\subpageref{NWmes7-desK-1}}\RA{}
+
+    \LA{}destroy material data~{\nwtagstyle{}\subpageref{NWmes7-desL-1}}\RA{}
+
+    dynarray_destroy(self->params);
+    dynarray_destroy(self->param_nodes);
+
+    dynarray_destroy(self->materials);
+    dynarray_destroy(self->elements);
+    dynarray_destroy(self->nodes);
+
+    mempool_destroy(self->pool);
+\}
+
+\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWmes7-desK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-desK-1}}}\moddef{destroy element data~{\nwtagstyle{}\subpageref{NWmes7-desK-1}}}\endmoddef
+n = mesh_num_elements(self);
+for (i = 1; i <= n; ++i)
+    element_destroy( mesh_element(self, i) );
+\nwused{\\{NWmes7-fun9-3}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWmes7-desL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-desL-1}}}\moddef{destroy material data~{\nwtagstyle{}\subpageref{NWmes7-desL-1}}}\endmoddef
+n = mesh_num_materials(self);
+for (i = 1; i <= n; ++i)
+    material_destroy( mesh_material(self, i) );
+\nwused{\\{NWmes7-fun9-3}}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NWmes7-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+mempool_t mesh_pool(mesh_t self)
+\{
+    return self->pool;
+\}
+
+\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+
+\subsection{Error handlers}
+
+The only really noteworthy thing about setting the handlers is the
+case when a NULL argument is passed in to indicate that we want
+to use the default handler.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NWmes7-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+void mesh_set_handlers(mesh_t self,
+                       void (*error_handler)(void* arg, const char* msg),
+                       void (*warning_handler)(void* arg, const char* msg),
+                       void* arg)
+\{
+    self->error_handler = 
+        (error_handler == NULL) ? default_error_handler : error_handler;
+    self->warning_handler = 
+        (error_handler == NULL) ? default_warning_handler : warning_handler;
+    self->handler_arg = arg;
+\}
+
+\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+Generating a warning or an error is simply a matter of calling the
+current handler.
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NWmes7-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+void mesh_error(mesh_t self, const char* msg)
+\{
+    (self->error_handler)(self->handler_arg, msg);
+\}
+
+void mesh_warning(mesh_t self, const char* msg)
+\{
+    (self->warning_handler)(self->handler_arg, msg);
+\}
+
+\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+By default, we print the error or warning message to the standard
+error stream, then abort on error or return on warning.
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NWmes7-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmes7-staG-1}}}\endmoddef
+static void default_error_handler(void* arg, const char* msg)
+\{
+    fprintf(stderr, "%s\\n", msg);
+    abort();
+\}
+
+static void default_warning_handler(void* arg, const char* msg)
+\{
+    fprintf(stderr, "%s\\n", msg);
+\}
+
+\nwused{\\{NWmes7-mes6.2-1}}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+
+\subsection{Parameters}
+
+The {\tt{}mesh{\char95}add{\char95}param{\char95}string} and {\tt{}mesh{\char95}add{\char95}param{\char95}number} functions simply
+append new parameters to the {\tt{}params} array.  Note that any new strings
+that we might need to keep around (like names of parameters or string
+parameter values) are immediately copied into the string table.
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NWmes7-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+void mesh_add_param_number(mesh_t self, const char* name, double d)
+\{
+    mesh_param_t param;
+    param.name  = hstrings_add(self->strings, name);
+    param.tag   = MESH_PARAM_NUMBER;
+    param.val.d = d;
+    dynarray_append(self->params, &param);
+\}
+
+\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NWmes7-fun9-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+void mesh_add_param_string(mesh_t self, const char* name, const char* s)
+\{
+    mesh_param_t param;
+    param.name  = hstrings_add(self->strings, name);
+    param.tag   = MESH_PARAM_STRING;
+    param.val.s = hstrings_add(self->strings, s);
+    dynarray_append(self->params, &param);
+\}
+
+\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NWmes7-fun9-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+void mesh_add_param_matrix(mesh_t self, const char* name, int m, int n,
+                           double* data)
+\{
+    mesh_param_t param;
+    param.name = hstrings_add(self->strings, name);
+    param.tag  = MESH_PARAM_MATRIX;
+    param.val.m.m = m;
+    param.val.m.n = n;
+    param.val.m.data = mempool_memdup(self->pool, data, m*n * sizeof(double));
+    dynarray_append(self->params, &param);
+\}
+
+\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+The {\tt{}mesh{\char95}add{\char95}param{\char95}node} function is very similar in nature to the
+other {\tt{}mesh{\char95}add{\char95}param} functions, but it addes nodes rather than named
+parameters.  The order in which nodes are added matters, obviously.
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NWmes7-fun9-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+void mesh_add_param_node(mesh_t self, int node_id)
+\{
+    if (node_id <= 0 || node_id > mesh_num_nodes(self))
+        mesh_error(self, "Invalid node identifier");
+    dynarray_append(self->param_nodes, &node_id);
+\}
+
+\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+The {\tt{}mesh{\char95}param} and {\tt{}mesh{\char95}param{\char95}node} functions are little
+more than wrappers around {\tt{}dynarray{\char95}get}.
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NWmes7-fun9-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+mesh_param_t* mesh_param(mesh_t self, int index)
+\{
+    return dynarray_get(self->params, index);
+\}
+
+int mesh_param_node(mesh_t self, int index)
+\{
+    int* n = (int*) dynarray_get(self->param_nodes, index);
+    return (n == NULL) ? 0 : *n;
+\}
+
+\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+The {\tt{}mesh{\char95}param{\char95}byname} runs through the parameters and checks if
+any have matching name.  We do not currently check if either the 
+name argument to the function or the names of the parameters in the 
+array are NULL.  If there is no match for the name, we return NULL.
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NWmes7-fun9-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+mesh_param_t* mesh_param_byname(mesh_t self, const char* name)
+\{
+    mesh_param_t* params = (mesh_param_t*) dynarray_data(self->params);
+    int n = dynarray_count(self->params);
+    int i;
+    for (i = 0; i < n; ++i) \{
+        if (strcmp(params[i].name, name) == 0)
+            return &(params[i]);
+    \}
+    return NULL;
+\}
+
+\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NWmes7-fun9-D}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-D}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+int mesh_num_params(mesh_t self)
+\{
+    return dynarray_count(self->params);
+\}
+
+int mesh_num_param_nodes(mesh_t self)
+\{
+    return dynarray_count(self->param_nodes);
+\}
+
+\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NWmes7-fun9-E}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-E}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+void mesh_params_clear(mesh_t self)
+\{
+    dynarray_set_count(self->params, 0);
+    dynarray_set_count(self->param_nodes, 0);
+\}
+
+\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+The parameter conversion routines {\tt{}mesh{\char95}param{\char95}string},
+{\tt{}mesh{\char95}param{\char95}number}, and {\tt{}mesh{\char95}param{\char95}int} check parameter
+validity and then pull out the desired value.  Ideally, this
+routine would provide a little more information in its error
+messages (like what the name of the parameter is).  I should
+probably switch over to using variable argument list error
+reporting routines that call {\tt{}vfprintf} (for instance),
+or add a {\tt{}mesh{\char95}message} routine in addition to {\tt{}mesh{\char95}error}
+and {\tt{}mesh{\char95}warning} so that I could assemble the error messages
+before calling {\tt{}mesh{\char95}error}.  Either way, it would then be
+possible to have a little more flexibility in the error messages.
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NWmes7-fun9-F}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-F}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+const char* mesh_param_string(mesh_t self, mesh_param_t* param)
+\{
+    if (param == NULL) \{
+        mesh_error(self, "Missing parameter");
+        return NULL;
+    \} else if (param->tag != MESH_PARAM_STRING) \{
+        mesh_error(self, "Parameter should be a string");
+        return NULL;
+    \} else
+        return param->val.s;
+\}
+
+\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NWmes7-fun9-G}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-G}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+double mesh_param_number(mesh_t self, mesh_param_t* param)
+\{
+    if (param == NULL) \{
+        mesh_error(self, "Missing parameter");
+        return 0;
+    \} else if (param->tag != MESH_PARAM_NUMBER) \{
+        mesh_error(self, "Parameter should be numeric");
+        return 0;
+    \} else 
+        return param->val.d;
+\}
+
+\nwendcode{}\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}\nwbegincode{87}\sublabel{NWmes7-fun9-H}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-H}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+int mesh_param_int(mesh_t self, mesh_param_t* param)
+\{
+    double v = mesh_param_number(self, param);
+    if (v != (int) v)
+        mesh_error(self, "Number is not an integer");
+    return (int) v;
+\}
+
+\nwendcode{}\nwbegindocs{88}\nwdocspar
+
+The {\tt{}mesh{\char95}param{\char95}material} function just checks that the material
+identifier is in range and, if so, passes the pointer onward.
+We might be friendly here and allow the possibility of a name lookup
+as well; that is, if the parameter was a string, we would check
+to see if any of the available materials had a name that matched that
+string.
+
+\nwenddocs{}\nwbegincode{89}\sublabel{NWmes7-fun9-I}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-I}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+material_t* mesh_param_material(mesh_t self, mesh_param_t* param)
+\{
+    int material_id = mesh_param_int(self, param);
+    if (material_id <= 0 || material_id > mesh_num_materials(self)) \{
+        mesh_error(self, "Invalid material identifier");
+        return NULL;
+    \} else
+        return mesh_material(self, material_id);
+\}
+
+\nwendcode{}\nwbegindocs{90}\nwdocspar
+
+
+\subsection{Accessing nodes, elements, and materials}
+
+The functions to add to the list of nodes, elements, and materials
+also only do a little more than append to dynamic arrays.  The identifiers
+are the array indices plus one.  We clear the parameter array
+after initializing a new element or material, and we clear the element
+nodes array after initializing a new element.  Note also that we make
+a duplicate of element and material model names to keep in the string table.
+
+\nwenddocs{}\nwbegincode{91}\sublabel{NWmes7-fun9-J}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-J}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+int mesh_add_node(mesh_t self, const char* name, double x, double y, double z)
+\{
+    mesh_node_t node;
+    node.name = hstrings_add(self->strings, name);
+    node.x[0] = x;
+    node.x[1] = y;
+    node.x[2] = z;
+    dynarray_append(self->nodes, &node);
+    return dynarray_count(self->nodes);
+\}
+
+\nwendcode{}\nwbegindocs{92}\nwdocspar
+
+\nwenddocs{}\nwbegincode{93}\sublabel{NWmes7-fun9-K}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-K}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+int mesh_add_element(mesh_t self, const char* model)
+\{
+    element_t* element;
+    model = hstrings_add(self->strings, model);
+    element = element_init(self->model_mgr, self, model);
+    dynarray_set_count(self->params, 0);
+    dynarray_set_count(self->param_nodes, 0);
+    dynarray_append(self->elements, &element);
+    return dynarray_count(self->elements);
+\}
+
+\nwendcode{}\nwbegindocs{94}\nwdocspar
+
+\nwenddocs{}\nwbegincode{95}\sublabel{NWmes7-fun9-L}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-L}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+int mesh_add_material(mesh_t self, const char* model)
+\{
+    material_t* material;
+    model = hstrings_add(self->strings, model);
+    material = material_init(self->model_mgr, self, model);
+    dynarray_set_count(self->params, 0);
+    dynarray_append(self->materials, &material);
+    return dynarray_count(self->materials);
+\}
+
+\nwendcode{}\nwbegindocs{96}\nwdocspar
+
+The functions {\tt{}mesh{\char95}node}, {\tt{}mesh{\char95}element}, and {\tt{}mesh{\char95}material}
+are little more than wrappers around the corresponding {\tt{}dynarray}
+functions.  Note that a zero or negative index in any case will trigger
+a failed assertion, since the {\tt{}dynarray} module does not permit
+negative indices.
+
+\nwenddocs{}\nwbegincode{97}\sublabel{NWmes7-fun9-M}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-M}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+mesh_node_t* mesh_node(mesh_t self, int node_id)
+\{
+    return dynarray_get(self->nodes, node_id-1);
+\}
+
+element_t* mesh_element(mesh_t self, int element_id)
+\{
+    return *(element_t**) dynarray_get(self->elements, element_id-1);
+\}
+
+material_t* mesh_material(mesh_t self, int material_id)
+\{
+    return *(material_t**) dynarray_get(self->materials, material_id-1);
+\}
+
+\nwendcode{}\nwbegindocs{98}\nwdocspar
+
+Similarly, the {\tt{}mesh{\char95}num{\char95}nodes}, {\tt{}mesh{\char95}num{\char95}elements}, and
+{\tt{}mesh{\char95}num{\char95}materials} functions are simply wrappers around
+the {\tt{}dynarray{\char95}count} function.
+
+\nwenddocs{}\nwbegincode{99}\sublabel{NWmes7-fun9-N}\nwmargintag{{\nwtagstyle{}\subpageref{NWmes7-fun9-N}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmes7-fun9-1}}}\plusendmoddef
+int mesh_num_nodes(mesh_t self)
+\{
+    return dynarray_count(self->nodes);
+\}
+
+int mesh_num_elements(mesh_t self)
+\{
+    return dynarray_count(self->elements);
+\}
+
+int mesh_num_materials(mesh_t self)
+\{
+    return dynarray_count(self->materials);
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{constants}{NWmes7-con9-1}{\nwixu{NWmes7-mes6.2-1}\nwixd{NWmes7-con9-1}}}%
+\nwixlogsorted{c}{{destroy element data}{NWmes7-desK-1}{\nwixu{NWmes7-fun9-3}\nwixd{NWmes7-desK-1}}}%
+\nwixlogsorted{c}{{destroy material data}{NWmes7-desL-1}{\nwixu{NWmes7-fun9-3}\nwixd{NWmes7-desL-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWmes7-expI-1}{\nwixu{NWmes7-mes6-1}\nwixd{NWmes7-expI-1}\nwixd{NWmes7-expI-2}\nwixd{NWmes7-expI-3}\nwixd{NWmes7-expI-4}\nwixd{NWmes7-expI-5}\nwixd{NWmes7-expI-6}\nwixd{NWmes7-expI-7}\nwixd{NWmes7-expI-8}\nwixd{NWmes7-expI-9}\nwixd{NWmes7-expI-A}\nwixd{NWmes7-expI-B}\nwixd{NWmes7-expI-C}}}%
+\nwixlogsorted{c}{{exported types}{NWmes7-expE-1}{\nwixu{NWmes7-mes6-1}\nwixd{NWmes7-expE-1}\nwixd{NWmes7-expE-2}}}%
+\nwixlogsorted{c}{{functions}{NWmes7-fun9-1}{\nwixu{NWmes7-mes6.2-1}\nwixd{NWmes7-fun9-1}\nwixd{NWmes7-fun9-2}\nwixd{NWmes7-fun9-3}\nwixd{NWmes7-fun9-4}\nwixd{NWmes7-fun9-5}\nwixd{NWmes7-fun9-6}\nwixd{NWmes7-fun9-7}\nwixd{NWmes7-fun9-8}\nwixd{NWmes7-fun9-9}\nwixd{NWmes7-fun9-A}\nwixd{NWmes7-fun9-B}\nwixd{NWmes7-fun9-C}\nwixd{NWmes7-fun9-D}\nwixd{NWmes7-fun9-E}\nwixd{NWmes7-fun9-F}\nwixd{NWmes7-fun9-G}\nwixd{NWmes7-fun9-H}\nwixd{NWmes7-fun9-I}\nwixd{NWmes7-fun9-J}\nwixd{NWmes7-fun9-K}\nwixd{NWmes7-fun9-L}\nwixd{NWmes7-fun9-M}\nwixd{NWmes7-fun9-N}}}%
+\nwixlogsorted{c}{{mesh.c}{NWmes7-mes6.2-1}{\nwixd{NWmes7-mes6.2-1}}}%
+\nwixlogsorted{c}{{mesh.h}{NWmes7-mes6-1}{\nwixd{NWmes7-mes6-1}}}%
+\nwixlogsorted{c}{{\code{}mesh{\char95}t\edoc{} data}{NWmes7-**mF-1}{\nwixu{NWmes7-typ5-1}\nwixd{NWmes7-**mF-1}\nwixd{NWmes7-**mF-2}\nwixd{NWmes7-**mF-3}\nwixd{NWmes7-**mF-4}\nwixd{NWmes7-**mF-5}\nwixd{NWmes7-**mF-6}}}%
+\nwixlogsorted{c}{{static functions}{NWmes7-staG-1}{\nwixu{NWmes7-mes6.2-1}\nwixd{NWmes7-staG-1}}}%
+\nwixlogsorted{c}{{types}{NWmes7-typ5-1}{\nwixu{NWmes7-mes6.2-1}\nwixd{NWmes7-typ5-1}}}%
+\nwbegindocs{100}\nwdocspar
+\nwenddocs{}

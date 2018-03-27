@@ -1,0 +1,587 @@
+% -*- mode: Noweb; noweb-code-mode: c-mode -*-
+% Copyright 1991 by Norman Ramsey.  All rights reserved.
+% See file COPYRIGHT for more information.
+\section{Converting a {\tt noweb} file to tool markup}
+\subsection{Main program}
+This is the initial filter in the pipeline.
+Syntax from {\tt markup.ow}.
+Output may contain [[
+        @[begin|end] [code|docs] nnn ...
+        @text <line of text>
+        @quote
+        @endquote
+        @defn <module name>
+        @use <module name>
+        @nl
+        @file <filename>
+        @line nnn
+        @index [defn|use] <indexed string>
+        @index nl       
+        @literal <literal text for weave or other tool>
+]]
+Here's the code that writes the output.
+We have one function to print the state, which takes care of
+[[@begin]] and [[@end]] and remembering what kind of chunk we have.
+Another function prints [[@name value]] pairs.
+If the [[value]] has a trailing newline, the pair is followed by [[@nl]].
+
+If the only way index entries were created was by tools, life would be easy.
+Permitting index definitions in the input causes two complications.
+First, it introduces newlines that don't belong to any chunk, but that must be counted.
+Second, it introduces a special state, [[CodeIndex]]
+in which a code chunk is about to be terminated
+but won't be until there are no more index definitions.
+<<state and printing definitions>>=
+typedef enum state {Code=1, Docs=2, CodeIndex=3} State;
+typedef enum mark {Begin=1, End=2} Mark;
+typedef enum index {Defn=1, Use=2, Newline=3} Index;
+
+static char *states[]  = { "bad state", "code", "docs", "code" };
+static char *marks[]   = { "bad mark", "begin", "end" };
+static char *indices[] = { "bad index", "defn", "use", "nl" };
+static char low_at_sign = '@';
+
+static void print_state(FILE *out, Mark be, State state, int count) {
+    fprintf(out, "%c%s %s %d\n", low_at_sign, marks[be], states[state], count);
+}
+
+static void print_index(FILE *out, Index idx, char *arg) {
+    if (arg)
+        fprintf(out, "%cindex %s %s\n", low_at_sign, indices[idx], arg);
+    else
+        fprintf(out, "%cindex %s\n",    low_at_sign, indices[idx]);
+}
+
+static void print_pair(FILE *out, char *name, char *value) {
+    if (value) {
+        int last=strlen(value)-1;
+        if (last>=0 && value[last]=='\n')
+            fprintf(out, "%c%s %s%cnl\n", low_at_sign, name, value, low_at_sign);
+        else
+            fprintf(out, "%c%s %s\n", low_at_sign, name, value);
+    } else
+        fprintf(out, "%c%s\n", low_at_sign, name);
+}
+<<*>>=
+static char rcsid[] = "$Id: markmain.nw,v 1.3 2002/04/05 09:49:35 strive Exp $";
+static char rcsname[] = "$Name:  $";
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <ctype.h>
+#include <assert.h>
+#include "errors.h"
+#include "markup.h"
+#include "getline.h"
+#include "columns.h"
+
+<<state and printing definitions>>
+
+void markup (FILE* in, FILE *out, char *filename) {
+    State state = Docs;         /* what we are reading */
+    int quoting = 0;            /* currently quoting code? */
+    int count = 0;              /* number of current chunk, from 0 */
+    int missing_newline;        /* was last line missing a trailing \n? */
+    int lineno = 0;             /* number of lines read */
+    int last_open_quote;        /* line number of last unmatched open quote */
+
+    char *line;                 /* part of line up to mark (or end) */
+    char *mark;                 /* potentially marked part of line */
+#define MAX_MODNAME 255
+    char modname[MAX_MODNAME+1] = ""; /* name of module currently being read, 
+                                         [[""]] if no module is being read */ 
+
+    <<copy all lines from [[in]] to [[out]], adding markup>>
+}
+@ 
+A {\em noweb } file consists of a sequence of
+{\em chunks,} which may appear in any order.
+{\em noweb} supports two kinds of chunks: documentation chunks and code chunks.
+Documentation chunks begin with an at sign (@) at the beginning of a line,
+followed by a space 
+(or with an at sign on a line by itself).
+They have no names.
+Code chunks begin with
+$$\hbox{\tt@<<{\em chunk name\/}@>>=}$$
+on a line by itself.
+The left double angle bracket ({\tt @<<}) must be in the first column.
+Chunks are terminated by the beginning of another chunk, or by end of file.
+If the first line in the file does not signal the beginning of a documentation
+or code chunk, the first chunk is assumed to be a documentation chunk.
+
+We implement this by just looping through the document, looking for the
+beginnings of chunks.
+We use [[state]] to keep track of what's ending.
+We add a little extra markup for file name and module names
+Starting code and starting documentation are notably different: 
+code is started by a module definition, which must appear on a line by itself.
+Documentation is started by a character sequence, 
+and arbitrary documentation text can follow on the same line.
+<<copy all lines from [[in]] to [[out]], adding markup>>=
+print_pair(out, "file", filename);
+print_state(out, Begin, state, count);
+while ((line = getline_expand(in)) != NULL) {
+    lineno++;
+    <<remember if a newline was missing from the last line>>
+    if (starts_code(line, filename, lineno)) {
+        <<complain and correct unmatched open quote, if any>>
+        print_state(out, End, state, count);
+        count++;
+        state = Code;
+        print_state(out, Begin, state, count);
+        getmodname(modname,MAX_MODNAME,line);
+        print_pair(out,"defn",modname);
+        print_pair(out,"nl",0);     /* could be implicit but this is better */
+    } else if (is_def(line)) {
+        <<emit index definitions and index newline>>
+        if (state == Code)
+            state = CodeIndex;
+    } else {
+        if (starts_doc(line) || state == CodeIndex) {
+            <<complain and correct unmatched open quote, if any>>
+            print_state(out, End, state, count);
+            count++;
+            state = Docs;       /* always reading docs after a stop */
+            print_state(out, Begin, state, count);
+            if (starts_doc(line))
+                line = first_doc_line(line);
+        }
+        {   <<declarations for conversion engine>>
+            <<macro definitions for conversion engine>>
+            <<initialize conversion engine>>
+            <<if the line begins with two [[ESC]]s, append one>>
+            if (state == Code || quoting) 
+                goto convert_code;
+            else
+                goto convert_docs;
+            <<conversion state machine>>
+          done_converting: 
+            (void)0;
+        }
+    }
+}
+<<complain and correct unmatched open quote, if any>>
+<<add a trailing newline if one was missing>>
+print_state(out, End, state, count);
+@
+We make it safe to assume henceforth that every chunk ends with newline,
+even if the file didn't end with newline.
+If the file didn't end with newline, we add a newline to the last line
+before printing the final [[@end]].
+<<remember if a newline was missing from the last line>>=
+missing_newline = line[strlen(line)-1] != '\n';
+<<add a trailing newline if one was missing>>=
+if (missing_newline) print_pair(out, "nl",0);
+@
+The conversion engine copies the input [[line]] to the output [[buf]],
+using the pointers [[s]] on the left for the destination and [[t]] on the
+right for the source.  [[c]] holds the current input character, and [[p]]
+points to the current piece of text about to be emitted.
+<<declarations for conversion engine>>=
+char *p, *s, *t, c;
+static char *buf;
+static int buflen = 0;
+<<initialize conversion engine>>=
+<<make [[buf]] big enough to hold all of [[line]], plus two more characters>>
+p = s = buf+2;
+t = line;
+c = *t++;
+@ 
+Using [[@@]] in the first column to escape an at sign was added after
+the state machine was designed, in response to a plea from Dirk
+Verworner:
+\begin{quote}
+We at the Humboldt-University of Berlin use your
+{\tt noweb} programs for our project.
+We've a simple description language, which sometimes an at sign
+on a line by itself requires.
+So I've a problem.
+\end{quote}
+It might be that I ought to add a special beginning-of-line state to
+the state machine, so that we could recognize with there, but I'd have
+to replicate it for both code and documentation.
+Because I only pay the cost once per input line, I don't mind using
+the following Band-Aid:
+<<if the line begins with two [[ESC]]s, append one>>=
+if (c == ESC && *t == ESC) { *s++ = ESC; c = *++t; ++t; }
+@ 
+To convert documentation lines, we have to track the quoting brackets.
+Within quoting brackets, we use the same engine as for within code lines
+(except for our treatment of square brackets).
+We have the state machine from hell.  We can have ordinary text, quoted text in 
+[[[[...]]]], or a use in [[[[<<...>>]]]].  
+Ordinary text and quoted text can span lines, but uses can't.
+So, the four main states of our lexer are:
+\begin{quote}
+\begin{tabular}{ll}
+\tt t&Ordinary text\\
+\tt c&Code text\\
+\tt u&A use\\
+\tt uc&Quoted code within a use\\
+\end{tabular}
+\end{quote}
+That last state covers the case where we have [[[[<<...[[...]]...>>]]]].
+BTW, it's no coincidence that if we've just consumed a newline (i.e., we're at the 
+start of a line), we must be in one of those four states.
+Moreover, since a newline in states [[u]] and [[uc]] means it's not really a use%
+\footnote{Because uses may not span lines.}, 
+those states fall back to state [[c]] (while prepending the opening [[<<]] that 
+appeared to signal a use).
+So [[c]] and  [[t]] are the major states.  When scanning documentation,
+they correspond to [[quoting]] and [[!quoting]].
+@ 
+% l2h substitution chi X
+By the way, one reason for writing a state machine by hand instead of using a 
+lexer generator is so I can test the machine using the wonderful $\chi$ATAC tool 
+developed by Bob Horgan, Saul London, and Hira Agrawal.  For more information
+send email to {\tt jrh@bellcore.com}.
+@
+We don't have to treat a newline specially, because [[print_pair]] inserts
+[[@nl]] if needed.
+<<emit text and goto [[done_converting]] if at end of line>>=
+if (c == '\0') {
+  <<emit [[p]] to [[s]] as text>>
+  goto done_converting;
+}
+@ 
+Markup is defined as follows:
+\begin{quote}
+\begin{tabular}{ll}
+\tt LA1 LA2&open a chunk\\
+\tt RA1 RA2&close a chunk\\
+\tt LS1 LS2&open a quote\\
+\tt RS1 RS2&close a quote\\
+\tt ESC&quotes the sequences above\\
+\end{tabular}
+\end{quote}
+By default we use angles for chunks and squares for quotes, at sign for escape:
+<<macro definitions for conversion engine>>=
+#define LA1 '<'
+#define LA2 '<'
+#define RA1 '>'
+#define RA2 '>'
+#define LS1 '['
+#define LS2 '['
+#define RS1 ']'
+#define RS2 ']'
+#define ESC '@'
+@
+Usually when we change state we advance the input pointer.
+Sometimes we also copy the current character.
+<<macro definitions for conversion engine>>=
+#define next(L) do {           c = *t++; goto L; } while (0)
+#define copy(L) do { *s++ = c; c = *t++; goto L; } while (0)
+@
+Normally we don't check assertions in the lexer.
+To check them, we would [[#define lexassert assert]].
+<<macro definitions for conversion engine>>=
+#define lexassert(E) ((void)0)
+@
+From here on I intercalate the code that implements the state machine with the
+dot code that draws a picture of it.
+The picture can be found in file {\tt markup.ps}; it's too big to be useful as 
+part of this document.
+The arcs in the picture are labelled with {\it char}/{\it output}, but the
+output may be omitted.
+In the code, we see
+[[goto]] when the picture has a [[-]] sign (denoting character not
+consumed), [[next]] when we're emitting some literal, and [[copy]] when
+we emit [[c]] (the next character).
+<<dot arcs>>=
+t -> at [label="@"]
+t -> la [label="<"]
+t -> ls [label="["]
+t -> t  [label="c/c"]
+<<conversion state machine>>=
+convert_docs:
+t: lexassert(state == Docs && !quoting);
+   if (c == ESC) next(at);
+   if (c == LA1) next(la);
+   if (c == LS1) next(ls);
+   <<emit text and goto [[done_converting]] if at end of line>>
+   copy(t);
+<<dot arcs>>=
+at -> atls [label="["]
+at -> atla [label="<"]
+at -> atrs [label="]"]
+at -> atra [label=">"]
+at -> t    [label="c-/@"]
+<<conversion state machine>>=
+at: if (c == LA1) next(atla);
+    if (c == LS1) next(atls);
+    if (c == RA1) next(atra);
+    if (c == RS1) next(atrs);
+    *s++ = ESC; goto t;
+<<dot arcs>>=
+atls -> t [label="[/[["]
+atls -> t [label="c-/@["]
+<<conversion state machine>>=
+atls: if (c == LS2) { *s++ = LS1; *s++ = LS2; next(t); }
+     *s++ = ESC; *s++ = LS1; goto t;
+<<dot arcs>>=
+atla -> t [label="</<<"]
+atla -> t [label="c-/@<"]
+<<conversion state machine>>=
+atla: if (c == LA2) { *s++ = LA1; *s++ = LA2; next(t); }
+      *s++ = ESC; *s++ = LA1; goto t;
+<<dot arcs>>=
+atrs -> t [label="]/]]"]
+atrs -> t [label="c-/@]"]
+<<conversion state machine>>=
+atrs: if (c == RS2) { *s++ = RS1; *s++ = RS2; next(t); }
+     *s++ = ESC; *s++ = RS1; goto t;
+<<dot arcs>>=
+atra -> t [label=">/>>"]
+atra -> t [label="c-/@>"]
+<<conversion state machine>>=
+atra: if (c == RA2) { *s++ = RA1; *s++ = RA2; next(t); }
+      *s++ = ESC; *s++ = RA1; goto t;
+<<dot arcs>>=
+la  -> t [label="</<< (error)"]
+la  -> t [label="c-/<"]
+<<conversion state machine>>=
+la: if (c == LA2) {
+      <<complain of unescaped @<< in documentation>>
+      *s++ = LA1; *s++ = LA2; next(t);
+    }
+    *s++ = LA1; goto t;
+@
+When we've seen [[[[]], we don't yet know whether it's the start of
+a quote or the start of a use---but we can emit the text so far.
+<<dot arcs>>=
+ls  -> c [label="[ (emit text; quote)"]
+ls  -> t [label="c-/["]
+<<conversion state machine>>=
+ls: lexassert(state == Docs);
+    if (c == LS2) {
+      <<emit [[p]] to [[s]] as text>>
+      quoting = 1; last_open_quote = lineno; print_pair(out, "quote", 0); 
+      next(c);
+    }
+    *s++ = LS1;
+    goto t;
+@
+Here's the ordinary quote state.
+<<dot arcs>>=
+/*{ rank=same cat catla catra }*/
+c -> crs [label="] (docs only)"]
+c -> cla [label="<"]
+c -> cat [label="@"]
+c -> c   [label="c/c"]
+<<conversion state machine>>=
+convert_code:
+c: lexassert(state == Code || quoting);
+   if (c == RS1 && quoting) next(crs);
+   if (c == LA1) next(cla);
+   if (c == ESC) next(cat);
+   <<emit text and goto [[done_converting]] if at end of line>>
+   copy(c);
+@
+In code, quoting square brackets is neither necessary nor permitted.
+<<dot arcs>>=
+cat -> catla [label="<"]
+cat -> catra [label=">"]
+cat -> c     [label="c-/@"]
+<<conversion state machine>>=
+cat: if (c == LA1) next(catla);
+     if (c == RA1) next(catra);
+     *s++ = ESC; goto c;
+<<dot arcs>>=
+catla -> c [label="</<<"]
+catla -> c [label="c-/@<"]
+<<conversion state machine>>=
+catla: if (c == LA2) { *s++ = LA1; *s++ = LA2; next(c); }
+       *s++ = ESC; *s++ = LA1; goto c;
+<<dot arcs>>=
+catra -> c [label=">/>>"]
+catra -> c [label="c-/@>"]
+<<conversion state machine>>=
+catra: if (c == RA2) { *s++ = RA1; *s++ = RA2; next(c); }
+       *s++ = ESC; *s++ = RA1; goto c;
+@
+We can't end the quote until we've consumed all the closing [[]]]'s.
+<<dot arcs>>=
+crs -> ce [label="]"]
+crs -> c [label="c-/]"]
+<<conversion state machine>>=
+crs: if (c == RS2) next(ce);
+     *s++ = RS1; goto c;
+<<dot arcs>>=
+ce -> ce [label="]/]"]
+ce -> t  [label="c- (emit text; endquote)"]
+<<conversion state machine>>=
+ce: lexassert(quoting);
+    if (c == RS2) copy(ce);
+    quoting = 0; <<emit [[p]] to [[s]] as text>> print_pair(out, "endquote", 0);
+    goto t;
+@
+Now's here where we might be seeing a use.
+<<dot arcs>>=
+cla -> u [label="< (emit text)"]
+cla -> c [label="c-/<"]
+<<conversion state machine>>=
+cla: if (c == LA2) { <<emit [[p]] to [[s]] as text>> next(u); }
+     *s++ = LA1; goto c;
+@
+When processing a use, we make sure [[[[...]]]] hide any closing angle brackets.
+<<dot arcs>>=
+u -> uls [label="[/["]
+u -> urs [label="] (docs only)"]
+u -> ura [label=">"]
+u -> c   [label="eol- (prepend <<)"]
+u -> u   [label="c/c"]
+<<conversion state machine>>=
+u: lexassert(state == Code || quoting);
+   if (c == LS1) copy(uls);
+   if (c == RS1 && quoting) next(urs);
+   if (c == RA1) next(ura);
+   if (c == '\0') { /* premature end --- it's not a use after all */
+     <<prepend opening angles to [[p]]>>
+     goto c;
+   }
+   copy(u);
+<<dot arcs>>=
+urs -> ce [label="] (not use; prepend <<)"]
+urs -> u  [label="c-/]"]
+<<conversion state machine>>=
+urs: lexassert(quoting);
+     if (c == RS2) { /* premature end --- it's not a use after all */
+       <<prepend opening angles to [[p]]>>
+       next(ce); 
+     }
+     *s++ = RS1; goto u;
+<<dot arcs>>=
+uls -> uc [label="[/["]
+uls -> u  [label="c-"]
+<<conversion state machine>>=
+uls: if (c == LS2) copy(uc);
+     goto u;
+<<dot arcs>>=
+uc -> ucrs [label="]/]"]
+uc -> c   [label="eol- (prepend <<)"]
+uc -> uc  [label="c/c"]
+<<conversion state machine>>=
+uc: lexassert(quoting || state == Code);
+    if (c == RS1) copy(ucrs);
+    if (c == '\0') {
+      <<prepend opening angles to [[p]]>>
+      goto c;
+    }
+    copy(uc);
+<<dot arcs>>=
+ucrs -> uce [label="]/]"]
+ucrs -> uc [label="c-"]
+<<conversion state machine>>=
+ucrs: if (c == RS2) copy(uce);
+      goto uc;
+<<dot arcs>>=
+uce -> uce [label="]/]"]
+uce -> u  [label="c-"]
+<<conversion state machine>>=
+uce: if (c == RS2) copy(uce);
+     goto u;
+<<dot arcs>>=
+ura -> c [label="> (emit use)"]
+ura -> u [label="c-/>"]
+<<conversion state machine>>=
+ura: if (c == RA2) { <<emit [[p]] to [[s]] as use>> next(c); }
+     *s++ = RA1; goto u;
+<<markup.dot>>=
+digraph lexer {
+  rotate=90
+  size="10,7.5"
+  ratio=fill
+  rankdir=LR
+  node [shape=circle]
+  <<dot arcs>>
+}
+@
+<<prepend opening angles to [[p]]>>=
+lexassert(p == buf + 2);
+p -= 2;
+p[0] = LA1;
+p[1] = LA2;
+<<make [[buf]] big enough to hold all of [[line]], plus two more characters>>=
+if (buf == NULL)
+  checkptr(buf = (char *) malloc(buflen = 128));
+if (buflen < strlen(line) + 1 + 2) {
+  while (buflen < strlen(line) + 1 + 2) 
+    buflen *= 2;
+  checkptr(buf = (char *) realloc(buf, buflen));
+}
+<<emit [[p]] to [[s]] as text>>=
+if (s > p) {
+  *s = 0;
+  print_pair(out, "text", p);
+}
+s = p = buf + 2;
+@ emit the empty use regardless
+<<emit [[p]] to [[s]] as use>>=
+*s = 0;
+print_pair(out, "use", p);
+s = p = buf + 2;
+@
+<<complain of unescaped @<< in documentation>>=
+errorat(filename, lineno, Error, "unescaped @<< in documentation chunk");
+@
+<<emit index definitions and index newline>>=
+line = remove_def_marker(line);
+while (*line && isspace(*line)) line++;
+while (*line) {
+  char tmp;
+  char *s = line+1;
+  while (*s && !isspace(*s)) s++;
+  tmp = *s; *s = 0;
+  print_index(out, Defn, line);
+  *s = tmp;
+  while (isspace(*s)) s++;
+  line = s;
+}
+print_index(out, Newline, 0);
+<<complain and correct unmatched open quote, if any>>=
+if (quoting) {
+    errorat(filename, last_open_quote, Warning, "open quote `[[' never closed");
+    quoting = 0;
+}
+@
+Finally, we give the main program, which opens each file and passes it
+to [[markup]].
+Like many main programs, it's based on K \& R [[cat]].
+<<*>>=
+main(int argc, char **argv) {
+    FILE *fp;
+    int i;
+
+    progname = argv[0];	
+    for (i = 1; i < argc && argv[i][0] == '-' && argv[i][1] != 0; i++)
+        switch(argv[i][1]) {
+            case 't': <<handle [[-t]]>> break;
+            default : errormsg(Error, "%s: unknown option -%c", progname, argv[i][1]);
+                      break;
+        }
+    if (i < argc)
+        for (; i < argc; i++) {
+            if (!strcmp(argv[i], "-")) {
+                markup(stdin,stdout,"");
+            } else 
+                if ((fp=fopen(argv[i],"r"))==NULL) {
+                    errormsg(Error, "%s: couldn't open file %s", progname, argv[i]);
+                    fprintf(stdout, "@fatal couldn't open file %s\n", argv[i]);
+                } else {
+                    markup(fp,stdout,argv[i]);
+                    fclose(fp);
+                }
+        }
+    else
+        markup(stdin,stdout,"");
+    nowebexit(NULL);
+    return errorlevel;          /* slay warning */
+}
+@
+<<handle [[-t]]>>=
+if (isdigit(argv[i][2]))
+    tabsize = atoi(argv[i]+2);
+else if (argv[i][2]==0)
+    tabsize = 0;                /* no tabs */
+else 
+    errormsg(Error, "%s: ill-formed option %s", progname, argv[i]);

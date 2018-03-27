@@ -1,0 +1,524 @@
+
+\section{Introduction}
+
+\subsection{Interface}
+
+The two-dimensional beam model {\tt{}beam2d} is a small-deflection 
+Euler-Bernoulli beam model with damping from the fluid layer between
+the fabrication layer and the substrate.
+
+The model is characterized by
+\begin{itemize}
+ \item {\tt{}w} = beam width (in-plane)
+ \item {\tt{}h} = beam height (out-of-plane)
+ \item {\tt{}density} = mass density of the fabrication layer
+ \item {\tt{}Youngsmodulus} = Young's modulus of the material %'
+\end{itemize}
+
+The parameters {\tt{}h}, {\tt{}density}, 
+and {\tt{}Youngsmodulus} are typically specified by the material.
+
+The nodal variables are displacements in the $x$ and $y$ directions
+and rotation about the $z$ axis.
+
+
+\subsection{Model description}
+
+The derivation of the Euler-Bernoulli beam model is described in 
+Reddy~\cite{Redd93}, section 4, or in various other finite element 
+or civil/mechanical engineering structures books.  
+The axial and transverse deflections
+are decoupled (which is part of why this is appropriate only for
+small deflections).  The displacement field is approximated using
+a standard Galerkin approximation.  The only place our model deviates
+from the standard description is in the inclusion of a damping term
+from the fluid film between the beam and the substrate.
+
+The axial part is modeled as a simple spring system:
+\[
+  \rho A u_{,tt} - (E A u_{,x})_{,x} = F_{a}
+\]
+and the transverse deflection is governed by a fourth order
+equation
+\[
+  \rho A v_{,tt} + (E I v_{,xx})_{,xx} = F_{t}
+\]
+where $\rho$ is the density, $A$ is the cross-section area,
+$w$ is the beam width, 
+and $E$ and $I$ are the
+Young's modulus and moment of inertia for the beam, respectively. %'
+
+
+\section{Interface}
+
+\nwfilename{model-beam2d.nw}\nwbegincode{1}\sublabel{NWmodF-modE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modE-1}}}\moddef{model-beam2d.h~{\nwtagstyle{}\subpageref{NWmodF-modE-1}}}\endmoddef
+#ifndef MODEL_BEAM2D_H
+#define MODEL_BEAM2D_H
+
+#include "modelmgr.h"
+
+void model_beam2d_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_BEAM2D_H */
+\nwnotused{model-beam2d.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmodF-modE.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modE.2-1}}}\moddef{model-beam2d.c~{\nwtagstyle{}\subpageref{NWmodF-modE.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+
+#include "model-beam2d.h"
+#include "affine.h"
+#include "mesh.h"
+#include "vars.h"
+#include "assemble.h"
+#include "netdraw.h"
+#include "netout.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWmodF-staG-1}}\RA{}
+\LA{}model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}\RA{}
+\LA{}registration function~{\nwtagstyle{}\subpageref{NWmodF-regL-1}}\RA{}
+\nwnotused{model-beam2d.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+For the moment, the beam model keeps track of the density per unit length,
+the axial stiffness, the product $EI$, the beam length, and a transformation
+from the local to global coordinates for the beam.  It also tracks the
+identifiers for the end nodes, of course.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmodF-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}}\endmoddef
+typedef struct beam2d_t \{
+    element_t element;
+    int node[2];
+    int vars[6];
+    double density;
+    double Kaxial;
+    double EI, EA;
+    double l, w, h;
+    double transform[12];
+\} beam2d_t;
+
+\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmodF-modF.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\endmoddef
+static element_t* beam2d_init(mesh_t mesh, const char* model,
+                              model_element_t* modelfunc)
+\{
+    beam2d_t* self = (beam2d_t*) 
+        mempool_cget(mesh_pool(mesh), sizeof(beam2d_t));
+
+    double rho, A, E;
+    material_t* material;
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    \LA{}get nodes~{\nwtagstyle{}\subpageref{NWmodF-get9-1}}\RA{}
+    \LA{}get material~{\nwtagstyle{}\subpageref{NWmodF-getC-1}}\RA{}
+    \LA{}get process parameters~{\nwtagstyle{}\subpageref{NWmodF-getM-1}}\RA{}
+
+    return &(self->element);
+\}
+
+\nwalsodefined{\\{NWmodF-modF.2-2}\\{NWmodF-modF.2-3}\\{NWmodF-modF.2-4}\\{NWmodF-modF.2-5}\\{NWmodF-modF.2-6}\\{NWmodF-modF.2-7}}\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+Once we have the nodes, we can get the node positions and (ta-da!)
+the lengths.  We cross our fingers and hope that the third coordinate
+of both nodes is the same -- perhaps it should be a checked error if
+that is not the case?
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmodF-modF.2-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-2}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void beam2d_set_position(void* pself, mesh_t mesh)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+    double* x1 = mesh_node(mesh, self->node[0])->x;
+    double* x2 = mesh_node(mesh, self->node[1])->x;
+
+    self->l  = (x2[0]-x1[0])*(x2[0]-x1[0]);
+    self->l += (x2[1]-x1[1])*(x2[1]-x1[1]);
+    self->l  = sqrt(self->l);
+    self->Kaxial  = self->EA / self->l;
+    compute_transformation(self->transform, x1, x2, self->l);
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmodF-getC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-getC-1}}}\moddef{get material~{\nwtagstyle{}\subpageref{NWmodF-getC-1}}}\endmoddef
+material = mesh_param_material(mesh, mesh_param_byname(mesh, "material"));
+\nwused{\\{NWmodF-modF.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+It might be smart to save the actual parameters instead of just the
+derived quantities, so that we can later see what they are.  Right now,
+though, we discard the parameters after we are finished computing
+derived quantities.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmodF-getM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-getM-1}}}\moddef{get process parameters~{\nwtagstyle{}\subpageref{NWmodF-getM-1}}}\endmoddef
+rho = get_number(mesh, material, "density");
+E = get_number(mesh, material, "Youngsmodulus");
+self->w = get_number(mesh, material, "w");
+self->h = get_number(mesh, material, "h");
+
+A = self->w * self->h;
+self->EA      = E*A;
+self->EI      = E*A* self->w * self->w /12;
+self->density = rho*A;
+\nwused{\\{NWmodF-modF.2-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmodF-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmodF-staG-1}}}\endmoddef
+static double get_number(mesh_t mesh, material_t* material,
+                         const char* name)
+\{
+    mesh_param_t* param = mesh_param_byname(mesh, name);
+    if (param == NULL && material != NULL && material->model != NULL &&
+            material->model->param != NULL)
+        param = (material->model->param)(material->data, name);
+    return mesh_param_number(mesh, param);    
+\}
+
+\nwalsodefined{\\{NWmodF-staG-2}\\{NWmodF-staG-3}}\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+When we get the node identifier, we just check that the correct
+number of nodes is specified.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmodF-get9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-get9-1}}}\moddef{get nodes~{\nwtagstyle{}\subpageref{NWmodF-get9-1}}}\endmoddef
+if (mesh_num_param_nodes(mesh) != 2)
+    mesh_error(mesh, "Incorrect number of nodes for beam2d");
+self->node[0] = mesh_param_node(mesh, 0);
+self->node[1] = mesh_param_node(mesh, 1);
+\nwused{\\{NWmodF-modF.2-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+Since this model is strictly in-plane, computing the desired
+rotation is simple.  Note that the {\tt{}transform} matrix from
+local to global coordinates is a 3-by-4 matrix.  The last
+column represents a translation.  We are using
+what the graphics folks would call ``homogeneous coordinates.''
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmodF-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmodF-staG-1}}}\plusendmoddef
+static void compute_transformation(double *transform,
+                                   double* x1, double* x2, double l)
+\{
+    double c = (x2[0] - x1[0])/l;
+    double s = (x2[1] - x1[1])/l;
+    memset(transform, 0, 12*sizeof(double));
+
+    #define T(i,j) (transform[((j)-1)*3+((i)-1)])
+
+    T(1,1) =  c;
+    T(1,2) = -s;
+    T(2,1) =  s;
+    T(2,2) =  c;
+    T(3,3) =  1;
+
+    T(1,4) = x1[0];
+    T(2,4) = x1[1];
+    T(3,4) = x1[2];
+
+    #undef T
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+We associate {\tt{}x}, {\tt{}y}, and {\tt{}rz} variables with each coordinate.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmodF-modF.2-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-3}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void beam2d_vars(void* pself, vars_mgr_t vars)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+
+    self->vars[0] = vars_node(vars, self->node[0], "x");
+    self->vars[1] = vars_node(vars, self->node[0], "y");
+    self->vars[2] = vars_node(vars, self->node[0], "rz");
+
+    self->vars[3] = vars_node(vars, self->node[1], "x");
+    self->vars[4] = vars_node(vars, self->node[1], "y");
+    self->vars[5] = vars_node(vars, self->node[1], "rz");
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmodF-modF.2-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-4}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void beam2d_R(void* pself, assemble_matrix_t *R, 
+                     assemble_matrix_t* x,
+                     assemble_matrix_t* v,
+                     assemble_matrix_t* a)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+    \LA{}get parameters from \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NWmodF-getS-1}}\RA{}
+
+    double Rlocal[6];
+
+    if (x) \{
+        double xlocal[6];
+        memset(xlocal, 0, 6 * sizeof(double));
+
+        assemble_matrix_add(x, self->vars, 6, xlocal);
+        affine_apply_AT(self->transform, xlocal + 0);
+        affine_apply_AT(self->transform, xlocal + 3);
+
+        Rlocal[0] = Kaxial * (xlocal[0] - xlocal[3]);
+        
+        Rlocal[1] = c * (12 * ( xlocal[1] - xlocal[4] ) + 
+                         6*l* ( xlocal[2] + xlocal[5] ));
+
+        Rlocal[2] = c * (6*l* ( xlocal[1] - xlocal[4] ) +
+                         l*l*(4*xlocal[2] + 2*xlocal[5] ));
+
+
+        Rlocal[3] = Kaxial * (xlocal[3] - xlocal[0]);
+
+        Rlocal[4] = c * (12 *  (-xlocal[1] + xlocal[4] ) + 
+                         -6*l* ( xlocal[2] + xlocal[5] ));
+
+        Rlocal[5] = c * (6*l* ( xlocal[1] - xlocal[4] ) +
+                         l*l*(2*xlocal[2] + 4*xlocal[5] ));
+    \}
+
+    if (a) \{
+        double xlocal[6];
+        memset(xlocal, 0, 6 * sizeof(double));
+
+        assemble_matrix_add(x, self->vars, 6, xlocal);
+        affine_apply_AT(self->transform, xlocal + 0);
+        affine_apply_AT(self->transform, xlocal + 3);
+
+        assert(0);
+        /* TODO: Fill in the inertial force computation */
+        Rlocal[0] = Kaxial * (xlocal[0] - xlocal[3]);
+        
+        Rlocal[1] = c * (12 * ( xlocal[1] - xlocal[4] ) + 
+                         6*l* ( xlocal[2] + xlocal[5] ));
+
+        Rlocal[2] = c * (6*l* ( xlocal[1] - xlocal[4] ) +
+                         l*l*(4*xlocal[2] + 2*xlocal[5] ));
+
+
+        Rlocal[3] = Kaxial * (xlocal[3] - xlocal[0]);
+
+        Rlocal[4] = c * (12 *  (-xlocal[1] + xlocal[4] ) + 
+                         -6*l* ( xlocal[2] + xlocal[5] ));
+
+        Rlocal[5] = c * (6*l* ( xlocal[1] - xlocal[4] ) +
+                         l*l*(2*xlocal[2] + 4*xlocal[5] ));
+    \}
+
+    affine_apply_A(self->transform, Rlocal + 0);
+    affine_apply_A(self->transform, Rlocal + 3);
+    assemble_matrix_add(R, self->vars, 6, Rlocal);
+\}
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmodF-modF.2-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-5}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void beam2d_dR(void* pself, assemble_matrix_t* dR, 
+                      double cx, assemble_matrix_t* x,
+                      double cv, assemble_matrix_t* v,
+                      double ca, assemble_matrix_t* a)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+    \LA{}get parameters from \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NWmodF-getS-1}}\RA{}
+
+    if (cx) \{
+        double Klocal[36];
+        memset(Klocal, 0, 36*sizeof(double));
+        c *= cx;
+
+        #define K(i,j) (Klocal[(j)*6+(i)-7])
+        \LA{}compute axial stiffness~{\nwtagstyle{}\subpageref{NWmodF-comN-1}}\RA{}
+        \LA{}compute transverse stiffness~{\nwtagstyle{}\subpageref{NWmodF-comS-1}}\RA{}
+        #undef K
+
+        beam2d_transform(self->transform, Klocal);
+        assemble_matrix_add(dR, self->vars, 6, Klocal);
+    \}
+
+    if (ca) \{
+        double Mlocal[36];
+        memset(Mlocal, 0, 36*sizeof(double));
+        crhoA *= ca;
+
+        #define M(i,j) (Mlocal[(j)*6+(i)-7])
+        \LA{}compute axial mass~{\nwtagstyle{}\subpageref{NWmodF-comI-1}}\RA{}
+        \LA{}compute transverse mass~{\nwtagstyle{}\subpageref{NWmodF-comN.2-1}}\RA{}
+        #undef M
+
+        beam2d_transform(self->transform, Mlocal);
+        assemble_matrix_add(dR, self->vars, 6, Mlocal);
+    \}
+
+\}
+
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmodF-getS-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-getS-1}}}\moddef{get parameters from \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NWmodF-getS-1}}}\endmoddef
+double Kaxial = self->Kaxial;
+double EI     = self->EI;
+double l      = self->l, l2 = l*l, l3 = l2*l;
+double crhoA  = self->w * self->h * self->density;
+double c      = EI/(l*l*l);
+\nwused{\\{NWmodF-modF.2-4}\\{NWmodF-modF.2-5}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmodF-comN-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-comN-1}}}\moddef{compute axial stiffness~{\nwtagstyle{}\subpageref{NWmodF-comN-1}}}\endmoddef
+K(1,1) = K(4,4) =  cx * Kaxial;
+K(4,1) = K(1,4) = -cx * Kaxial;
+
+\nwused{\\{NWmodF-modF.2-5}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWmodF-comI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-comI-1}}}\moddef{compute axial mass~{\nwtagstyle{}\subpageref{NWmodF-comI-1}}}\endmoddef
+M(1,1) = M(4,4) =  crhoA * l / 3;
+M(4,1) = M(1,4) =  crhoA * l / 6;
+
+\nwused{\\{NWmodF-modF.2-5}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWmodF-comS-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-comS-1}}}\moddef{compute transverse stiffness~{\nwtagstyle{}\subpageref{NWmodF-comS-1}}}\endmoddef
+/* Fill in the 11 block, first */
+K(2,2) =           12*c;
+K(3,3) =            4*c*l2;
+K(2,3) = K(3,2) =   6*c*l;
+
+/* Now fill in the 22 block */
+K(5,5) =           12*c;
+K(6,6) =            4*c*l2;
+K(5,6) = K(6,5) =  -6*c*l;
+
+/* Now the off-diagonal blocks */
+K(5,2) = K(2,5) = -12*c;
+K(6,3) = K(3,6) =   2*c*l2;
+K(6,2) = K(2,6) =   6*c*l;
+K(5,3) = K(3,5) =  -6*c*l;
+
+\nwused{\\{NWmodF-modF.2-5}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWmodF-comN.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-comN.2-1}}}\moddef{compute transverse mass~{\nwtagstyle{}\subpageref{NWmodF-comN.2-1}}}\endmoddef
+/* Fill in the 11 block, first */
+M(2,2) =           crhoA * 12/l3;
+M(3,3) =           crhoA * 4 /l;
+M(2,3) = M(3,2) =  crhoA * 6 /l2;
+
+/* Now fill in the 22 block */
+M(5,5) =           crhoA * 12/l3;
+M(6,6) =           crhoA * 4 /l;
+M(5,6) = M(6,5) = -crhoA * 6 /l2;
+
+/* Now the off-diagonal blocks */
+M(5,2) = M(2,5) = -crhoA * 12/l3;
+M(6,3) = M(3,6) =  crhoA * 2 /l;
+M(6,2) = M(2,6) =  crhoA * 6 /l2;
+M(5,3) = M(3,5) = -crhoA * 6 /l2;
+
+\nwused{\\{NWmodF-modF.2-5}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+The {\tt{}beam2d{\char95}transform} function transforms a matrix from
+the local coordinate frame to the global coordinate system.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWmodF-staG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-staG-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmodF-staG-1}}}\plusendmoddef
+static void beam2d_transform(double* transform, double* Klocal)
+\{
+    int i;
+
+    \LA{}transform to local coordinates on right~{\nwtagstyle{}\subpageref{NWmodF-trad-1}}\RA{}
+    \LA{}transform from local coordinates on left~{\nwtagstyle{}\subpageref{NWmodF-trae-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWmodF-trad-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-trad-1}}}\moddef{transform to local coordinates on right~{\nwtagstyle{}\subpageref{NWmodF-trad-1}}}\endmoddef
+for (i = 0; i < 6; ++i)
+    affine_apply_A_stride(transform, Klocal + i,      6);
+for (i = 0; i < 6; ++i)
+    affine_apply_A_stride(transform, Klocal + i + 18, 6);
+\nwused{\\{NWmodF-staG-3}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWmodF-trae-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-trae-1}}}\moddef{transform from local coordinates on left~{\nwtagstyle{}\subpageref{NWmodF-trae-1}}}\endmoddef
+for (i = 0; i < 6; ++i)
+    affine_apply_A_stride(transform, Klocal + i*6,     1);
+for (i = 0; i < 6; ++i)
+    affine_apply_A_stride(transform, Klocal + i*6 + 3, 1);
+\nwused{\\{NWmodF-staG-3}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWmodF-modF.2-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-6}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void beam2d_output(void* pself, netout_t* netout)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+
+    netout_string        (netout, "model",     "beam2d");
+    netout_int_matrix    (netout, "node",      self->node, 1, 2);
+    netout_double        (netout, "density",   self->density);
+    netout_double        (netout, "Kaxial",    self->Kaxial);
+    netout_double        (netout, "EI",        self->EI);
+    netout_double        (netout, "l",         self->l);
+    netout_double        (netout, "w",         self->w);
+    netout_double        (netout, "h",         self->h);
+    netout_double_matrix (netout, "transform", self->transform, 3, 4);
+    netout_int_matrix    (netout, "vars",      self->vars, 1, 6);
+\}
+
+\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWmodF-modF.2-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-7}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void beam2d_display(void* pself, netdraw_gc_t* gc)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+    int vars[12];
+    int i;
+
+    for (i = 0; i < 12; ++i)
+        vars[i] = -1;
+
+    vars[0]  = self->vars[0];
+    vars[1]  = self->vars[1];
+    vars[5]  = self->vars[2];
+    vars[6]  = self->vars[3];
+    vars[7]  = self->vars[4];
+    vars[11] = self->vars[5];
+
+    netdraw_beam(gc, self->transform, self->l, self->w, self->h, vars);
+\}
+
+\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWmodF-regL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-regL-1}}}\moddef{registration function~{\nwtagstyle{}\subpageref{NWmodF-regL-1}}}\endmoddef
+void model_beam2d_register(model_mgr_t model_mgr)
+\{
+    model_element_t model;
+    memset(&model, 0, sizeof(model));
+
+    model.init         = beam2d_init;
+    model.set_position = beam2d_set_position;
+    model.vars         = beam2d_vars;
+    model.R            = beam2d_R;
+    model.dR           = beam2d_dR;
+    model.output       = beam2d_output;
+    model.display      = beam2d_display;
+
+    model_mgr_add_element(model_mgr, "beam2d", &model);
+\}
+
+\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{compute axial mass}{NWmodF-comI-1}{\nwixu{NWmodF-modF.2-5}\nwixd{NWmodF-comI-1}}}%
+\nwixlogsorted{c}{{compute axial stiffness}{NWmodF-comN-1}{\nwixu{NWmodF-modF.2-5}\nwixd{NWmodF-comN-1}}}%
+\nwixlogsorted{c}{{compute transverse mass}{NWmodF-comN.2-1}{\nwixu{NWmodF-modF.2-5}\nwixd{NWmodF-comN.2-1}}}%
+\nwixlogsorted{c}{{compute transverse stiffness}{NWmodF-comS-1}{\nwixu{NWmodF-modF.2-5}\nwixd{NWmodF-comS-1}}}%
+\nwixlogsorted{c}{{get material}{NWmodF-getC-1}{\nwixu{NWmodF-modF.2-1}\nwixd{NWmodF-getC-1}}}%
+\nwixlogsorted{c}{{get nodes}{NWmodF-get9-1}{\nwixu{NWmodF-modF.2-1}\nwixd{NWmodF-get9-1}}}%
+\nwixlogsorted{c}{{get parameters from \code{}self\edoc{}}{NWmodF-getS-1}{\nwixu{NWmodF-modF.2-4}\nwixu{NWmodF-modF.2-5}\nwixd{NWmodF-getS-1}}}%
+\nwixlogsorted{c}{{get process parameters}{NWmodF-getM-1}{\nwixu{NWmodF-modF.2-1}\nwixd{NWmodF-getM-1}}}%
+\nwixlogsorted{c}{{model functions}{NWmodF-modF.2-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-modF.2-1}\nwixd{NWmodF-modF.2-2}\nwixd{NWmodF-modF.2-3}\nwixd{NWmodF-modF.2-4}\nwixd{NWmodF-modF.2-5}\nwixd{NWmodF-modF.2-6}\nwixd{NWmodF-modF.2-7}}}%
+\nwixlogsorted{c}{{model-beam2d.c}{NWmodF-modE.2-1}{\nwixd{NWmodF-modE.2-1}}}%
+\nwixlogsorted{c}{{model-beam2d.h}{NWmodF-modE-1}{\nwixd{NWmodF-modE-1}}}%
+\nwixlogsorted{c}{{registration function}{NWmodF-regL-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-regL-1}}}%
+\nwixlogsorted{c}{{static functions}{NWmodF-staG-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-staG-1}\nwixd{NWmodF-staG-2}\nwixd{NWmodF-staG-3}}}%
+\nwixlogsorted{c}{{transform from local coordinates on left}{NWmodF-trae-1}{\nwixu{NWmodF-staG-3}\nwixd{NWmodF-trae-1}}}%
+\nwixlogsorted{c}{{transform to local coordinates on right}{NWmodF-trad-1}{\nwixu{NWmodF-staG-3}\nwixd{NWmodF-trad-1}}}%
+\nwixlogsorted{c}{{types}{NWmodF-typ5-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-typ5-1}}}%
+\nwbegindocs{48}\nwdocspar
+
+
+\nwenddocs{}

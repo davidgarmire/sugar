@@ -1,0 +1,44 @@
+% -*- mode: Noweb; noweb-code-mode: icon-mode -*-
+\section{Finding definitions in Standard ML}
+<<*>>=
+procedure rcsinfo () 
+  return "$Id: smldefs.nw,v 1.3 2002/04/05 09:49:35 strive Exp $" ||
+         "$Name:  $"
+end
+procedure main(args)
+  go()
+end
+<<*>>=
+procedure postpass(name, arg)
+  static kind, definers, id1, id2, reserved
+  initial { kind := "bogus"
+            definers := ["fun", "val", "structure", "signature", "and", "functor",
+			 "type", "eqtype", "datatype", "withtype", "exception"]
+	    id1 := &letters ++ &digits ++ '\'_'
+            id2 := '!%&$+-/:<=>?@\\~^|#*`'
+            reserved := set()
+            every insert(reserved, !"*|:=#_" | "->" | "=>")
+          }
+  case name of {
+    "begin" : arg ? kind := tab(upto(' ')|0)
+    "text" : if kind == "code" then arg ?
+        if =(""|" "|"  ") & =!definers & tab(many(' ')) then {
+            skiptyvars(); optwhite()
+            writedefn(1(id := tab(many(id1 | id2)), not member(reserved, id)))
+        }
+  }
+  return
+end
+
+procedure prepass(name, arg)
+  if name == "end" then writedefn(&null) # force newline
+end
+
+procedure skiptyvars()
+  suspend ="'" || tab(many(&letters ++ &digits ++ '\'_')) |
+          ="(" || tab(bal(')', '(', ')')) || =")"
+end       
+
+procedure optwhite()
+ suspend tab(many(' \t')) | ""
+end

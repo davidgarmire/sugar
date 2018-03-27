@@ -1,0 +1,107 @@
+
+\section{Introduction}
+
+The {\tt{}netout} module provides a common interface for transferring
+information from the netlist data structure to some external
+representation (either printed or as a data structure in another
+language).
+
+
+\section{Interface}
+
+\nwfilename{netout.nw}\nwbegincode{1}\sublabel{NWnet9-net8-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnet9-net8-1}}}\moddef{netout.h~{\nwtagstyle{}\subpageref{NWnet9-net8-1}}}\endmoddef
+#ifndef NETOUT_H
+#define NETOUT_H
+
+typedef struct netout_fun_t \{
+    \LA{}\code{}netout\edoc{} functions~{\nwtagstyle{}\subpageref{NWnet9-**nK-1}}\RA{}
+\} netout_fun_t;
+
+typedef struct netout_t \{
+    netout_fun_t* methods;
+    void* data;
+\} netout_t;
+
+\LA{}external functions~{\nwtagstyle{}\subpageref{NWnet9-extI-1}}\RA{}
+
+#endif /* NETOUT_H */
+\nwnotused{netout.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWnet9-**nK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnet9-**nK-1}}}\moddef{\code{}netout\edoc{} functions~{\nwtagstyle{}\subpageref{NWnet9-**nK-1}}}\endmoddef
+void (*write_string)(void* pself, const char* name, const char* s);
+void (*write_double)(void* pself, const char* name, double d);
+void (*write_int)   (void* pself, const char* name, int i);
+\nwalsodefined{\\{NWnet9-**nK-2}}\nwused{\\{NWnet9-net8-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWnet9-**nK-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnet9-**nK-2}}}\moddef{\code{}netout\edoc{} functions~{\nwtagstyle{}\subpageref{NWnet9-**nK-1}}}\plusendmoddef
+void (*write_double_matrix)(void* pself, const char* name, 
+                            double* d, int m, int n);
+void (*write_int_matrix)   (void* pself, const char* name, 
+                            int* i, int m, int n);
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWnet9-extI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnet9-extI-1}}}\moddef{external functions~{\nwtagstyle{}\subpageref{NWnet9-extI-1}}}\endmoddef
+void netout_string(netout_t* self, const char* name, const char* s);
+void netout_double(netout_t* self, const char* name, double d);
+void netout_int   (netout_t* self, const char* name, int i);
+\nwalsodefined{\\{NWnet9-extI-2}}\nwused{\\{NWnet9-net8-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWnet9-extI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnet9-extI-2}}}\moddef{external functions~{\nwtagstyle{}\subpageref{NWnet9-extI-1}}}\plusendmoddef
+void netout_double_matrix(netout_t* self, const char* name,
+                          double* d, int m, int n);
+void netout_int_matrix   (netout_t* self, const char* name,
+                          int* i, int m, int n);
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWnet9-net8.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnet9-net8.2-1}}}\moddef{netout.c~{\nwtagstyle{}\subpageref{NWnet9-net8.2-1}}}\endmoddef
+#include <assert.h>
+#include "netout.h"
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NWnet9-fun9-1}}\RA{}
+\nwnotused{netout.c}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWnet9-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnet9-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWnet9-fun9-1}}}\endmoddef
+void netout_string(netout_t* self, const char* name, const char* s)
+\{
+    assert(self->methods->write_string);
+    self->methods->write_string(self->data, name, s);
+\}
+
+void netout_double(netout_t* self, const char* name, double d)
+\{
+    assert(self->methods->write_double);
+    self->methods->write_double(self->data, name, d);
+\}
+
+void netout_int(netout_t* self, const char* name, int i)
+\{
+    assert(self->methods->write_int);
+    self->methods->write_int(self->data, name, i);
+\}
+
+void netout_double_matrix(netout_t* self, const char* name,
+                          double* d, int m, int n)
+\{
+    assert(self->methods->write_double_matrix);
+    self->methods->write_double_matrix(self->data, name, d, m, n);
+\}
+
+void netout_int_matrix(netout_t* self, const char* name,
+                       int* i, int m, int n)
+\{
+    assert(self->methods->write_int_matrix);
+    self->methods->write_int_matrix(self->data, name, i, m, n);
+\}
+
+\nwused{\\{NWnet9-net8.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{external functions}{NWnet9-extI-1}{\nwixu{NWnet9-net8-1}\nwixd{NWnet9-extI-1}\nwixd{NWnet9-extI-2}}}%
+\nwixlogsorted{c}{{functions}{NWnet9-fun9-1}{\nwixu{NWnet9-net8.2-1}\nwixd{NWnet9-fun9-1}}}%
+\nwixlogsorted{c}{{\code{}netout\edoc{} functions}{NWnet9-**nK-1}{\nwixu{NWnet9-net8-1}\nwixd{NWnet9-**nK-1}\nwixd{NWnet9-**nK-2}}}%
+\nwixlogsorted{c}{{netout.c}{NWnet9-net8.2-1}{\nwixd{NWnet9-net8.2-1}}}%
+\nwixlogsorted{c}{{netout.h}{NWnet9-net8-1}{\nwixd{NWnet9-net8-1}}}%
+\nwbegindocs{14}\nwdocspar
+\nwenddocs{}

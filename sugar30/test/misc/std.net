@@ -1,0 +1,28 @@
+use("xformstack.lua")
+use("relpos.lua")
+
+function beam2d(p)
+  p.model    = "beam2d";
+  p.material = p[3];
+  p[3]       = nil;
+
+  if p.l then
+    relpos_add(p[1], p[2], top_xform({p.l, 0, 0}))
+  end
+
+  element(p);
+end
+beam2d = subnet(beam2d);
+
+function force(p)
+  p.model    = "force";
+  element(p);
+end
+
+function anchor(p)
+  p.model    = "anchor";
+  p.material = p[2];
+  p[2]       = nil;
+  element(p);
+end
+

@@ -1,0 +1,99 @@
+
+\section{Introduction}
+
+The [[netout]] module provides a common interface for transferring
+information from the netlist data structure to some external
+representation (either printed or as a data structure in another
+language).
+
+
+\section{Interface}
+
+<<netout.h>>=
+#ifndef NETOUT_H
+#define NETOUT_H
+
+typedef struct netout_fun_t {
+    <<[[netout]] functions>>
+} netout_fun_t;
+
+typedef struct netout_t {
+    netout_fun_t* methods;
+    void* data;
+} netout_t;
+
+<<external functions>>
+
+#endif /* NETOUT_H */
+@ 
+
+<<[[netout]] functions>>=
+void (*write_string)(void* pself, const char* name, const char* s);
+void (*write_double)(void* pself, const char* name, double d);
+void (*write_int)   (void* pself, const char* name, int i);
+@ 
+
+<<[[netout]] functions>>=
+void (*write_double_matrix)(void* pself, const char* name, 
+                            double* d, int m, int n);
+void (*write_int_matrix)   (void* pself, const char* name, 
+                            int* i, int m, int n);
+@ 
+
+<<external functions>>=
+void netout_string(netout_t* self, const char* name, const char* s);
+void netout_double(netout_t* self, const char* name, double d);
+void netout_int   (netout_t* self, const char* name, int i);
+@ 
+
+<<external functions>>=
+void netout_double_matrix(netout_t* self, const char* name,
+                          double* d, int m, int n);
+void netout_int_matrix   (netout_t* self, const char* name,
+                          int* i, int m, int n);
+@ 
+
+
+\section{Implementation}
+
+<<netout.c>>=
+#include <assert.h>
+#include "netout.h"
+
+<<functions>>
+@ 
+
+<<functions>>=
+void netout_string(netout_t* self, const char* name, const char* s)
+{
+    assert(self->methods->write_string);
+    self->methods->write_string(self->data, name, s);
+}
+
+void netout_double(netout_t* self, const char* name, double d)
+{
+    assert(self->methods->write_double);
+    self->methods->write_double(self->data, name, d);
+}
+
+void netout_int(netout_t* self, const char* name, int i)
+{
+    assert(self->methods->write_int);
+    self->methods->write_int(self->data, name, i);
+}
+
+void netout_double_matrix(netout_t* self, const char* name,
+                          double* d, int m, int n)
+{
+    assert(self->methods->write_double_matrix);
+    self->methods->write_double_matrix(self->data, name, d, m, n);
+}
+
+void netout_int_matrix(netout_t* self, const char* name,
+                       int* i, int m, int n)
+{
+    assert(self->methods->write_int_matrix);
+    self->methods->write_int_matrix(self->data, name, i, m, n);
+}
+
+@ 

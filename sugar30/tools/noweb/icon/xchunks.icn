@@ -1,0 +1,63 @@
+#line 29 "xchunks.nw"
+record chunk(lines, type)
+  # lines is all the lines of the chunk
+  # type is "code" or "docs" or "unknown"
+
+procedure main(args)
+  *args > 0 | stop("xchunks needs an external database")
+
+  
+#line 99 "xchunks.nw"
+every db ||:= " " || !args
+db := open(db, "rp") | stop("cannot pipe from ", image(db))
+
+#line 38 "xchunks.nw"
+  dbchunks := readchunks(db)
+  defns := defnstable(dbchunks)
+    # defns maps name to list of code chunks defining that name
+
+  thisdoc := readchunks(&input)
+  every c := !thisdoc do
+    if c.type ~== "code" | notEmpty(c) | /defns[chunkName(c)] then
+      every write(!c.lines)
+    else
+      every write(!(!defns[chunkName(c)]).lines)
+end
+#line 53 "xchunks.nw"
+procedure readchunks(infile)
+  local chunks, c
+  chunks := []
+  while line := read(infile) do
+    line ?
+      if ="@begin " then {
+        c := chunk([line], tab(upto(' ')|0))
+        line := read(infile) | stop("unmatched ", c.lines[1])
+        while line ? not ="@end " do {
+          put(c.lines, line)
+          line := read(infile) | stop("unmatched ", c.lines[1])
+        }
+        put(c.lines, line)
+        put(chunks, c)
+      } else
+        put(chunks, chunk([line], "unknown"))
+  return chunks
+end
+#line 74 "xchunks.nw"
+procedure defnstable(chunks)
+  t := table()
+  every c := !chunks & c.type == "code" do {
+    /t[chunkName(c)] := []
+    put(t[chunkName(c)], c)
+  }
+  return t
+end
+#line 87 "xchunks.nw"
+procedure chunkName(c)
+  return (!c.lines ? (="@defn " & tab(0))) | stop("no @defn in code chunk")
+end
+
+procedure notEmpty(c)
+  static nonwhite
+  initial nonwhite := ~' \t'
+  return !c.lines ? ="@use " | (="@text ", upto(nonwhite))
+end

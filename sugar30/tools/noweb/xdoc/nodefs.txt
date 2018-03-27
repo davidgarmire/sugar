@@ -1,0 +1,66 @@
+
+
+
+NOWEB(1)                                                 NOWEB(1)
+
+
+NNAAMMEE
+       nodefs - find definitions in noweb file
+
+SSYYNNOOPPSSIISS
+       nnooddeeffss [--aauuttoo _l_a_n_g] [--sshhoowwaauuttoo] file ...
+
+DDEESSCCRRIIPPTTIIOONN
+       _n_o_d_e_f_s  is  an auxiliary tool that produces output for use
+       with the --iinnddeexxffrroomm option of _n_o_w_e_a_v_e(1).  _n_o_d_e_f_s searches
+       a  _n_o_w_e_b  file  for  identifier  definitions, printing the
+       identifiers on standard output,  one  per  line.   If  the
+       --aauuttoo _l_a_n_g option is given, _n_o_d_e_f_s tries to discover defi-
+       nitions automatically, assuming the program is written  in
+       language  _l_a_n_g.  The --sshhoowwaauuttoo option displays permissible
+       values of _l_a_n_g, which vary but may include tteexx or iiccoonn.
+
+       For a complete description of using _n_o_d_e_f_s  together  with
+       _n_o_w_e_a_v_e(1)  and  _n_o_i_n_d_e_x(1),  see  the  man page for _n_o_i_n_-
+       _d_e_x(1).
+
+SSEEEE AALLSSOO
+       _n_o_w_e_a_v_e(1), _n_o_w_e_b(1), _n_o_i_n_d_e_x(1)
+
+VVEERRSSIIOONN
+       This man page is from _n_o_w_e_b version 2.10a.
+
+AAUUTTHHOORR
+       Norman  Ramsey,  Harvard  University.   Internet   address
+       nnrr@@eeeeccss..hhaarrvvaarrdd..eedduu.
+       Noweb  home page at hhttttpp::////wwwwww..eeeeccss..hhaarrvvaarrdd..eedduu//~~nnrr//nnoowweebb.
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+                         local 3/28/2001                        1
+
+

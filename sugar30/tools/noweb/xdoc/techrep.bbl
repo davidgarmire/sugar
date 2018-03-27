@@ -1,0 +1,68 @@
+\begin{thebibliography}{10}
+
+\bibitem{denning:announcing}
+P.~J. Denning.
+\newblock Announcing literate programming.
+\newblock {\em Communications of the ACM}, 30(7):593, July 1987.
+
+\bibitem{guntermann:cweb}
+K.~Guntermann and J.~Schrod.
+\newblock {{\tt WEB}} adapted to {C}.
+\newblock {\em {TUG}boat}, 7(3):134--137, Oct. 1986.
+
+\bibitem{knuth:web}
+D.~E. Knuth.
+\newblock The {{\tt WEB}} system of structured documentation.
+\newblock Technical Report 980, Stanford Computer Science, Stanford,
+  California, Sept. 1983.
+
+\bibitem{knuth:literate:book}
+D.~E. Knuth.
+\newblock {\em Literate Programming}.
+\newblock Stanford University, Stanford, California, 1992.
+
+\bibitem{levy:cweb}
+S.~Levy.
+\newblock {\tt WEB} adapted to {C}, another approach.
+\newblock {\em TUGBoat}, 8(1):12--13, Apr. 1987.
+
+\bibitem{ramsey:building}
+N.~Ramsey.
+\newblock {L}iterate programming: {\hskip 0pt plus 0.5em}{W}eaving a
+  language-independent {{\tt WEB}}.
+\newblock {\em Communications of the ACM}, 32(9):1051--1055, Sept. 1989.
+
+\bibitem{ramsey:correctness}
+N.~Ramsey.
+\newblock Correctness of trap-based breakpoint implementations.
+\newblock In {\em Proceedings of the 21st ACM Symposium on the Principles of
+  Programming Languages}, pages 15--24, Portland, Oregon, Jan. 1994.
+
+\bibitem{ramsey:literate}
+N.~Ramsey and C.~Marceau.
+\newblock Literate programming on a team project.
+\newblock {\em Software---Practice \& Experience}, 21(7):677--683, July 1991.
+
+\bibitem{sewell:weaving}
+W.~Sewell.
+\newblock {\em Weaving a Program: Literate Programming in {\tt WEB}}.
+\newblock Van Nostrand Reinhold, New York, 1989.
+
+\bibitem{thimbleby:cweb}
+H.~Thimbleby.
+\newblock Experiences of `literate programming' using cweb (a variant of
+  {K}nuth's {WEB}).
+\newblock {\em Computer Journal}, 29(3):201--211, 1986.
+
+\bibitem{thimbleby:review}
+H.~Thimbleby.
+\newblock A review of {Donald} {C}. {L}indsay's text file difference utility,
+  {{\em diff}}.
+\newblock {\em Communications of the ACM}, 32(6):752--755, June 1989.
+
+\bibitem{cvw:assessment}
+C.~J. Van~Wyk.
+\newblock Literate programming: An assessment.
+\newblock {\em Communications of the ACM}, 33(3):361--365, March 1990.
+
+\end{thebibliography}

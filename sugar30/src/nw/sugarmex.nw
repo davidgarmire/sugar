@@ -1,0 +1,341 @@
+
+\section{Introduction}
+
+The [[sugarmex]] module provides the main interface between Matlab
+and the main SUGAR routines and data structures.  It also provides
+a registration mechanism so other modules can add new cases to the
+MEX file with only minor modifications to this file.
+
+
+\section{Interface}
+
+<<sugarmex.h>>=
+#ifndef SUGARMEX_H
+#define SUGARMEX_H
+
+#include <mex.h>
+
+typedef void (*mex_fun_t)(int nlhs, mxArray* plhs[], 
+                          int nrhs, const mxArray* prhs[]);
+
+void mexmgr_add(const char* name, mex_fun_t fun);
+
+void*    mx_to_handle  (const mxArray* array, int tag, const char* errmsg);
+char*    mx_to_string  (const mxArray* array);
+double   mx_to_double  (const mxArray* array);
+mxArray* mx_from_double(double x);
+mxArray* mx_from_nil   ();
+
+void     mex_check_num_args(int nrhs, int expected);
+
+#endif /* SUGARMEX_H */
+@ 
+
+The [[mexmgr_add]] function registers a case with the main
+MEX function, so that when the user executes something like
+[[sugarmex('foo', 1, 2)]], the function registered as ``foo''
+gets called with the argument list ``1, 2''.
+
+The [[name]] argument to [[mexmgr_add]] should be a string
+that will persist (like a string constant).
+
+The conversion function [[mx_to_string]] and [[mx_to_double]]
+convert [[mxArray]] objects to strings and doubles.
+The [[mx_from_double]] converts a double precision number
+to an [[mxArray]] object, and the [[mx_from_nil]] function
+creates an empty matrix object.
+
+
+\section{Implementation}
+
+<<sugarmex.c>>=
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "dynarray.h"
+#include "sugarmex.h"
+#include "mex-handle.h"
+#include "mesh-mex.h"
+#include "vars-mex.h"
+#include "assemble-mex.h"
+#include "netdraw-mex.h"
+#include "netout-mex.h"
+
+<<types>>
+<<static data>>
+<<static functions>>
+<<functions>>
+@ 
+
+
+\subsection{Mex handle manager}
+
+The handle manager (documented in [[mex-handle]]) lets us refer to C
+objects from Matlab.
+
+<<initialize mex>>=
+mex_handle_create();
+@ 
+
+<<shutdown mex>>=
+mex_handle_destroy();
+@ 
+
+
+\subsection{Registering functions}
+
+The ``help!'' function is the equivalent of the venerable ``Hello world'' --
+something that demonstrates that the framework is working at the most
+basic level.  Eventually, it would probably be appropriate to actually
+make it print useful information.
+
+<<register mex functions>>=
+mexmgr_add("help", mex_help);
+@ 
+
+<<static functions>>=
+static void mex_help(int nlhs, mxArray* plhs[],
+                     int nrhs, const mxArray* prhs[])
+{
+    mexPrintf("Help!\n");
+}
+
+@ 
+
+<<initialize mex>>=
+mesh_mex_register();
+vars_mex_register();
+assemble_mex_register();
+netout_mex_register();
+gc_mex_register();
+@ 
+
+<<shutdown mex>>=
+mesh_mex_shutdown();
+vars_mex_shutdown();
+gc_mex_shutdown();
+@ 
+
+
+\subsection{Conversion functions}
+
+<<functions>>=
+void* mx_to_handle(const mxArray* array, int tag, const char* errmsg)
+{
+    int handle_id;
+
+    if (!mxIsNumeric(array) || mxGetM(array) != 1 || mxGetN(array) != 1)
+        mexErrMsgTxt(errmsg);
+
+    handle_id = (int) mx_to_double(array);
+    if (mex_handle_tag(handle_id) != tag)
+        mexErrMsgTxt(errmsg);
+
+    return mex_handle_data(handle_id);
+}
+
+@ 
+
+<<functions>>=
+char* mx_to_string(const mxArray* array)
+{
+    if (!mxIsChar(array)) {
+        mexErrMsgTxt("Value should be a string");
+    } else {
+        int namelen = mxGetN(array)+1;
+        char* name  = (char*) mxCalloc(namelen, sizeof(char));
+        mxGetString(array, name, namelen);
+        return name;
+    }
+    return NULL;
+}
+
+@ 
+
+<<functions>>=
+double mx_to_double(const mxArray* array)
+{
+    if (!mxIsNumeric(array))
+        mexErrMsgTxt("Value should be numeric");
+
+    if (mxGetN(array) != 1)
+        mexErrMsgTxt("Value should be a scalar");
+
+    return *mxGetPr(array);
+}
+
+@ 
+
+<<functions>>=
+mxArray* mx_from_double(double x)
+{
+    mxArray* array  = mxCreateDoubleMatrix(1, 1, mxREAL);
+    *mxGetPr(array) = x;
+    return array;
+}
+
+@ 
+
+<<functions>>=
+mxArray* mx_from_nil()
+{
+    return mxCreateDoubleMatrix(0, 0, mxREAL);
+}
+
+@ 
+
+
+\subsection{Common error handling}
+
+<<functions>>=
+void mex_check_num_args(int nrhs, int expected)
+{
+    if (nrhs < expected)
+        mxErrMsgTxt("Not enough arguments");
+}
+
+@ 
+
+
+\subsection{Function list}
+
+The list of functions is kept in a dynamic array of
+(name, function) pairs.
+
+<<types>>=
+typedef struct mex_entry_t {
+    const char*  name;
+    mex_fun_t    fun;
+} mex_entry_t;
+
+@ 
+
+<<static data>>=
+static dynarray_t entries;
+
+@ 
+
+The [[mexmgr_add]] function simply appends to the [[entries]] array.
+
+<<functions>>=
+void mexmgr_add(const char* name, mex_fun_t fun)
+{
+    mex_entry_t new_entry;
+    new_entry.name = name;
+    new_entry.fun  = fun;
+    dynarray_append(entries, &new_entry);
+}
+
+@ 
+
+The [[mexmgr_find]] function looks up a function in the [[entries]]
+array.
+
+<<static functions>>=
+static mex_fun_t mexmgr_find(const char* name)
+{
+    int i;
+    mex_entry_t* data;
+    int          n;
+
+    data = dynarray_data (entries);
+    n    = dynarray_count(entries);
+
+    for (i = 0; i < n; ++i)
+        if (strcmp(data[i].name, name) == 0)
+            return data[i].fun;
+
+    return NULL;
+}
+
+@ 
+
+
+\subsection{Initialization and shutdown}
+
+The [[mex_initialize]] and [[mex_shutdown]] functions are called
+when the MEX file is loaded and unloaded, respectively.
+The [[mex_shutdown]] function will probably not be called under
+normal circumstances, since we will almost always want the MEX
+file to remain locked.
+
+<<static functions>>=
+static void mex_initialize()
+{
+    mexLock();
+    entries = dynarray_create(sizeof(struct mex_entry_t), 32);
+    <<register mex functions>>
+    <<initialize mex>>
+}
+
+@ 
+
+<<static functions>>=
+static void mex_shutdown()
+{
+    <<shutdown mex>>
+    dynarray_destroy(entries);
+}
+
+@ 
+
+
+\subsection{Gateway function}
+
+The [[mexFunction]] is the standard Matlab interface gateway.
+
+<<functions>>=
+void mexFunction(int nlhs, mxArray* plhs[],
+                 int nrhs, const mxArray* prhs[])
+{
+    int          namelen;
+    char*        name;
+    mex_fun_t    fun;
+    static int   first_call = 1;
+
+    <<handle first call>>        
+    <<check [[mexFunction]] input variables>>
+
+    name = mx_to_string(prhs[0]);
+
+    <<find the function entry>>
+    fun(nlhs, plhs, nrhs-1, prhs+1);
+
+    mxFree(name);
+}
+
+@ 
+
+On the first call, we run the initialization routine and register
+the shutdown routine.
+
+<<handle first call>>=
+if (first_call) {
+    first_call = 0;
+    mex_initialize();
+    mexAtExit(mex_shutdown);
+}
+
+@ 
+
+There are two types of errors that we can catch here.  First, the
+first argument must be a string.  Second, the string must specify
+a valid function entry.
+
+
+<<check [[mexFunction]] input variables>>=
+if (nrhs == 0 || !mxIsChar(prhs[0]))
+    mexErrMsgTxt("First argument to SUGAR MEX file must specify function");
+@ 
+
+<<find the function entry>>=
+fun = mexmgr_find(name);
+
+if (fun == NULL) {
+    mexPrintf("Unknown function option: %s\n", name);
+    mexErrMsgTxt("Error calling SUGAR MEX file.");
+}
+
+@ 
+

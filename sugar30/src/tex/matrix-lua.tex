@@ -1,0 +1,899 @@
+
+\section{Introduction}
+
+The {\tt{}matrix-lua} module adds simple matrix support to Lua.
+Supported functions are
+\begin{itemize}
+  \item {\tt{}matrix(m,n)}: create a new zero matrix of size $m$ by $n$
+  \item {\tt{}A(i,j)}:      get $A_{ij}$
+  \item {\tt{}A[k]}:        get or set the $k$th element (column-major 1-based)
+  \item {\tt{}C\ =\ A+B}:     add two matrices
+  \item {\tt{}C\ =\ A-B}:     subtract two matrices
+  \item {\tt{}C\ =\ -A}:      take the unary negation of a matrix
+  \item {\tt{}C\ =\ A*B}:     multiply two matrices
+  \item {\tt{}A.print()}:   print matrix
+  \item {\tt{}A.factor()}:  factor matrix
+  \item {\tt{}A.solve(x)}:  compute $x := A^{-1}x$
+  \item {\tt{}A.clone()}:   create a copy of the matrix
+  \item {\tt{}A.slice(i1,i2,j1,j2)}:   create a slice of the matrix
+  \item {\tt{}A.free()}:    free matrix
+\end{itemize}
+Supported variables are
+\begin{itemize}
+  \item {\tt{}A.m}:  return number of rows in matrix
+  \item {\tt{}A.n}:  return number of columns in matrix
+\end{itemize}
+
+
+\section{Interface}
+
+\nwfilename{matrix-lua.nw}\nwbegincode{1}\sublabel{NWmatD-matC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-matC-1}}}\moddef{matrix-lua.h~{\nwtagstyle{}\subpageref{NWmatD-matC-1}}}\endmoddef
+#ifndef MATRIX_LUA_H
+#define MATRIX_LUA_H 
+
+#include <lua.h>
+
+struct lua_matrix_struct \{
+    int owns_data;  /* True if this matrix owns storage  */
+    int m, n, ld;   /* Array size and leading dimension  */
+    double* data;   /* Array data                        */
+    int* ipiv;      /* Pivot array for factored matrices */
+\};
+
+typedef struct lua_matrix_struct* lua_matrix_t;
+
+void         lua_matrix_register(lua_State* L);
+void         lua_matrix_push(lua_State* L, lua_matrix_t A);
+lua_matrix_t lua_matrix_get(lua_State* L, int index);
+
+lua_matrix_t lua_matrix_create(int m, int n);
+lua_matrix_t lua_matrix_slice(lua_matrix_t A, int i1, int i2, int j1, int j2);
+void         lua_matrix_destroy(lua_matrix_t self);
+
+#endif /* MATRIX_LUA_H */
+\nwnotused{matrix-lua.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}lua{\char95}matrix{\char95}register} function registers the functions of
+the module with the Lua interpreter.  The {\tt{}lua{\char95}matrix{\char95}push}
+and {\tt{}lua{\char95}matrix{\char95}get} functions add and get matrices
+on the Lua stack.
+
+The {\tt{}lua{\char95}matrix{\char95}create} and {\tt{}lua{\char95}matrix{\char95}destroy} functions create
+new matrices.  The {\tt{}lua{\char95}matrix{\char95}slice} function creates a ``parasite''
+matrix that uses the same storage as the original matrix but which
+has different indexing.  In Matlab parlance, the slice function returns
+{\tt{}A(i1:i2,\ j1:j2)}.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmatD-matC.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-matC.2-1}}}\moddef{matrix-lua.c~{\nwtagstyle{}\subpageref{NWmatD-matC.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include "matrix-lua.h"
+
+\LA{}macros~{\nwtagstyle{}\subpageref{NWmatD-mac6-1}}\RA{}
+\LA{}static prototypes~{\nwtagstyle{}\subpageref{NWmatD-staH-1}}\RA{}
+\LA{}static data~{\nwtagstyle{}\subpageref{NWmatD-staB-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWmatD-fun9-1}}\RA{}
+\nwnotused{matrix-lua.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Matrix tag}
+
+Lua provides \emph{tags} for user data, with semantics known only
+to the host program.  The {\tt{}lua{\char95}matrix{\char95}tag} is the tag for
+the Lua matrix type.  Note that you \emph{could} get into trouble
+with this if multiple interpreters are simultaneously active,
+since the different interpreters may not end up allocating the same
+tag value.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmatD-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWmatD-staB-1}}}\endmoddef
+static int lua_matrix_tag;
+
+\nwused{\\{NWmatD-matC.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{Accessor macros}
+
+We use a couple convenience macros for getting the matrix entries.
+The macros use one-based indexing for consistence with the Lua
+index conventions.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmatD-mac6-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-mac6-1}}}\moddef{macros~{\nwtagstyle{}\subpageref{NWmatD-mac6-1}}}\endmoddef
+#define Mij(M,i,j) (M->data[((j)-1)*M->ld + ((i)-1)])
+#define Mrow0(M,k) ( ((k)-1) % (M->m) )
+#define Mcol0(M,k) ( ((k)-1) / (M->m) )
+#define Mk(M,k)    ( M->data[Mcol0(M,k) * M->ld + Mrow0(M,k)] )
+
+\nwused{\\{NWmatD-matC.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\subsection{Matrix call getter}
+
+We use Lua tag methods to handle the case when the ``call'' syntax
+is applied to a matrix object.  If there is one numeric argument $i$,
+we get the $(i,1)$ matrix entry; if there are two numeric arguments,
+we get the $(i,j)$ entry.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmatD-regI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\endmoddef
+lua_pushcclosure(L, lua_matrix_call, 0);
+lua_settagmethod(L, lua_matrix_tag, "function");
+\nwalsodefined{\\{NWmatD-regI-2}\\{NWmatD-regI-3}\\{NWmatD-regI-4}\\{NWmatD-regI-5}\\{NWmatD-regI-6}\\{NWmatD-regI-7}\\{NWmatD-regI-8}}\nwused{\\{NWmatD-fun9-4}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmatD-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\endmoddef
+static int lua_matrix_call(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,1);
+    int n = lua_gettop(L);
+    int i, j;
+
+    if (n < 2 || n > 3)
+        lua_error(L, "Wrong number of arguments");
+
+    if (!lua_isnumber(L,2) || (n == 3 && !lua_isnumber(L,3)))
+        lua_error(L, "Index must be a number");
+
+    i = (int) lua_tonumber(L,2);
+    j = (n == 3) ? (int) lua_tonumber(L,3) : 1;
+
+    if (i <= 0 || i > A->m || j <= 0 || j > A->n)
+        lua_error(L, "Index out of range");
+
+    lua_settop(L,0);
+    lua_pushnumber(L, Mij(A,i,j));
+    return 1;
+\}
+
+\nwalsodefined{\\{NWmatD-staG-2}\\{NWmatD-staG-3}\\{NWmatD-staG-4}\\{NWmatD-staG-5}\\{NWmatD-staG-6}\\{NWmatD-staG-7}\\{NWmatD-staG-8}\\{NWmatD-staG-9}\\{NWmatD-staG-A}\\{NWmatD-staG-B}\\{NWmatD-staG-C}\\{NWmatD-staG-D}\\{NWmatD-staG-E}\\{NWmatD-staG-F}\\{NWmatD-staG-G}\\{NWmatD-staG-H}}\nwused{\\{NWmatD-matC.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{Matrix table getter}
+
+The indexed read operation does two different things.  If the index
+is a number $k$, we try to return the $k$th element of the matrix
+(as arranged in column-major order with one-based indexing).
+If the index is a string, then we probably have a method call,
+which is handled by the {\tt{}lua{\char95}matrix{\char95}getmethod} function described
+later.  (Recall that the dot syntax in Lua is a type of indexing,
+so that {\tt{}A.print()} is equivalent to {\tt{}A["print"]()}.)
+
+The {\tt{}gettable} tag method receives the tagged object and the index.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmatD-regI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-regI-2}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\plusendmoddef
+lua_pushcclosure(L, lua_matrix_gettable, 0);
+lua_settagmethod(L, lua_matrix_tag, "gettable");
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmatD-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_gettable(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,1);
+    int k;
+
+    if (!lua_isnumber(L,2)) \{
+        if (lua_isstring(L,2))
+            return lua_matrix_getmethod(L);
+        else
+            lua_error(L, "Index must be a number");
+    \}
+    k = (int) lua_tonumber(L,2);
+
+    if (k <= 0 || k > A->m * A->n)
+        lua_error(L, "Index out of range");
+
+    lua_settop(L,0);
+    lua_pushnumber(L, Mk(A,k));
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{Matrix setter}
+
+The indexed write operation can only do one thing: set a matrix
+entry.  The {\tt{}settable} tag method gets the tagged object,
+the index, and the value to write on the stack.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmatD-regI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-regI-3}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\plusendmoddef
+lua_pushcclosure(L, lua_matrix_settable, 0);
+lua_settagmethod(L, lua_matrix_tag, "settable");
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmatD-staG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_settable(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,1);
+    int k;
+
+    if (!lua_isnumber(L,2))
+        lua_error(L, "Index must be a number");
+
+    if (!lua_isnumber(L,3))
+        lua_error(L, "Value must be a number");
+
+    k = (int) lua_tonumber(L,2);
+    if (k <= 0 || k > A->m*A->n)
+        lua_error(L, "Index out of range");
+
+    Mk(A,k) = lua_tonumber(L,3);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+
+\subsection{Matrix arithmetic operations}
+
+The {\tt{}lua{\char95}matrix{\char95}add} and {\tt{}lua{\char95}matrix{\char95}sub} methods are attached
+to the add and subtract events.  The {\tt{}lua{\char95}matrix{\char95}unm} method is
+attached to the unary negation event.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmatD-regI-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-regI-4}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\plusendmoddef
+lua_pushcclosure(L, lua_matrix_add, 0);
+lua_settagmethod(L, lua_matrix_tag, "add");
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmatD-staG-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_add(lua_State* L)
+\{
+    int i, j;
+    \LA{}get binary operands~{\nwtagstyle{}\subpageref{NWmatD-getJ-1}}\RA{}
+
+    \LA{}check summand conformality~{\nwtagstyle{}\subpageref{NWmatD-cheQ-1}}\RA{}
+    C = lua_matrix_create(A->m, A->n);
+
+    for (i = 1; i <= A->m; ++i)
+        for (j = 1; j <= A->n; ++j)
+            Mij(C,i,j) = Mij(A,i,j) + Mij(B,i,j);
+
+    \LA{}return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NWmatD-retC-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmatD-regI-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-regI-5}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\plusendmoddef
+lua_pushcclosure(L, lua_matrix_sub, 0);
+lua_settagmethod(L, lua_matrix_tag, "sub");
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmatD-staG-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_sub(lua_State* L)
+\{
+    int i, j;
+    \LA{}get binary operands~{\nwtagstyle{}\subpageref{NWmatD-getJ-1}}\RA{}
+
+    \LA{}check summand conformality~{\nwtagstyle{}\subpageref{NWmatD-cheQ-1}}\RA{}
+    C = lua_matrix_create(A->m, A->n);
+
+    for (i = 1; i <= A->m; ++i)
+        for (j = 1; j <= A->n; ++j)
+            Mij(C,i,j) = Mij(A,i,j) - Mij(B,i,j);
+
+    \LA{}return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NWmatD-retC-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmatD-regI-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-regI-6}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\plusendmoddef
+lua_pushcclosure(L, lua_matrix_unm, 0);
+lua_settagmethod(L, lua_matrix_tag, "unm");
+\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWmatD-staG-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-6}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_unm(lua_State* L)
+\{
+    int i, j;
+    \LA{}get unary operand~{\nwtagstyle{}\subpageref{NWmatD-getH-1}}\RA{}
+
+    C = lua_matrix_create(A->m, A->n);
+
+    for (i = 1; i <= A->m; ++i)
+        for (j = 1; j <= A->n; ++j)
+            Mij(C,i,j) = -Mij(A,i,j);
+
+    \LA{}return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NWmatD-retC-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWmatD-regI-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-regI-7}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\plusendmoddef
+lua_pushcclosure(L, lua_matrix_mul, 0);
+lua_settagmethod(L, lua_matrix_tag, "mul");
+\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWmatD-staG-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-7}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_mul(lua_State* L)
+\{
+    extern int dgemm_(char* transA, char* transB, int* m, int* n, int* k,
+                      double* alpha, double* A, int* ldA,
+                      double* B, int* ldB,
+                      double* beta, double* C, int* ldC);
+
+    double one  = 1;
+    double zero = 0;
+    \LA{}get binary operands~{\nwtagstyle{}\subpageref{NWmatD-getJ-1}}\RA{}
+
+    if (A->n != B->m)
+        lua_error(L, "Nonconformal matrices");
+
+    C = lua_matrix_create(A->m, B->n);
+
+#ifdef HAS_LAPACK
+
+    dgemm_("N", "N", &(C->m), &(C->n), &(A->m),
+           &one, A->data, &(A->ld),
+           B->data, &(B->ld),
+           &zero, C->data, &(C->ld));
+
+#else
+    lua_error(L, "Dense linear algebra routines not linked\\n");
+#endif /* HAS_LAPACK */
+
+    \LA{}return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NWmatD-retC-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWmatD-getJ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-getJ-1}}}\moddef{get binary operands~{\nwtagstyle{}\subpageref{NWmatD-getJ-1}}}\endmoddef
+lua_matrix_t A, B, C;
+
+if (lua_tag(L,1) != lua_matrix_tag || lua_tag(L,2) != lua_matrix_tag)
+    lua_error(L, "Invalid operands");
+
+A = lua_touserdata(L,1);
+B = lua_touserdata(L,2);
+\nwused{\\{NWmatD-staG-4}\\{NWmatD-staG-5}\\{NWmatD-staG-7}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWmatD-getH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-getH-1}}}\moddef{get unary operand~{\nwtagstyle{}\subpageref{NWmatD-getH-1}}}\endmoddef
+lua_matrix_t A = lua_touserdata(L,1);
+lua_matrix_t C;
+\nwused{\\{NWmatD-staG-6}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWmatD-cheQ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-cheQ-1}}}\moddef{check summand conformality~{\nwtagstyle{}\subpageref{NWmatD-cheQ-1}}}\endmoddef
+if (A->m != B->m || A->n != B->n)
+    lua_error(L, "Noncomformal matrices");
+
+\nwused{\\{NWmatD-staG-4}\\{NWmatD-staG-5}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWmatD-retC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-retC-1}}}\moddef{return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NWmatD-retC-1}}}\endmoddef
+lua_settop(L,0);
+lua_pushusertag(L, C, lua_matrix_tag);
+return 1;
+\nwused{\\{NWmatD-staG-4}\\{NWmatD-staG-5}\\{NWmatD-staG-6}\\{NWmatD-staG-7}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\subsection{{\tt{}matrix} command}
+
+The {\tt{}matrix} command creates a new matrix of a specified size.
+The user is allowed to leave off the second argument $n$;
+if it is not explicitly specified, $n$ is assumed to be $1$.
+The sizes are only somewhat sanity checked -- there is no
+check to make sure that $mn$ is not humongous, and we fail
+gracelessly if the memory allocations fail.
+
+After the numeric arguments, the user may also specify a table
+of array contents in \emph{row-major} order.  The idea is that
+\begin{verbatim}
+  A = matrix(2,2, {1, 2,
+                   3, 4})
+\end{verbatim}
+is probably the most natural way to initialize a little two-by-two
+example matrix.  It should also be possible to write
+\begin{verbatim}
+  A = matrix{1, 2, 3}
+\end{verbatim}
+to get a three-element vector.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWmatD-regI-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-regI-8}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}}\plusendmoddef
+lua_register(L, "matrix", lua_matrix);
+\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWmatD-staG-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-8}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix(lua_State* L)
+\{
+    int nargs = lua_gettop(L);
+    lua_matrix_t A;
+    int i,j;
+    int m = 0, n = 0;
+    int init_table = 0;
+
+    \LA{}get \code{}matrix\edoc{} parameters~{\nwtagstyle{}\subpageref{NWmatD-getP-1}}\RA{}
+
+    A = lua_matrix_create(m,n);
+
+    \LA{}initialize matrix from table~{\nwtagstyle{}\subpageref{NWmatD-iniS-1}}\RA{}
+
+    lua_settop(L,0);
+    lua_pushusertag(L, A, lua_matrix_tag);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWmatD-getP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-getP-1}}}\moddef{get \code{}matrix\edoc{} parameters~{\nwtagstyle{}\subpageref{NWmatD-getP-1}}}\endmoddef
+for (i = 1; i <= nargs; ++i) \{
+    if (lua_isnumber(L,i)) \{
+        int val = (int) lua_tonumber(L,i);
+        if (val <= 0)
+            lua_error(L, "Size out of bounds");
+
+        if      (m == 0)  m = val;
+        else if (n == 0)  n = val;
+        else              lua_error(L, "Too many size parameters");
+
+    \} else if (lua_istable(L,i)) \{
+        if (init_table == 0)
+            init_table = i;
+        else
+            lua_error(L, "Too many initializers");
+    \}
+\}
+
+\nwalsodefined{\\{NWmatD-getP-2}}\nwused{\\{NWmatD-staG-8}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWmatD-getP-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-getP-2}}}\moddef{get \code{}matrix\edoc{} parameters~{\nwtagstyle{}\subpageref{NWmatD-getP-1}}}\plusendmoddef
+if (m == 0) \{
+    if (init_table) \{
+        m = lua_getn(L,init_table);
+        if (m == 0)
+            lua_error(L, "Insufficient initializer entries");
+    \}
+\}
+
+if (n == 0)
+    n = 1;
+
+if (init_table && lua_getn(L,init_table) > m*n)
+    lua_error(L, "Initializer too large");
+
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWmatD-iniS-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-iniS-1}}}\moddef{initialize matrix from table~{\nwtagstyle{}\subpageref{NWmatD-iniS-1}}}\endmoddef
+if (init_table) \{
+    int k = 1;
+    for (i = 1; i <= m; ++i) \{
+        for (j = 1; j <= n; ++j) \{
+            lua_rawgeti(L,init_table, k++);
+            if (lua_isnumber(L,-1))
+                Mij(A,i,j) = lua_tonumber(L,-1);
+            lua_pop(L,1);
+        \}
+    \}
+\}
+\nwused{\\{NWmatD-staG-8}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\subsection{Matrix {\tt{}print} method}
+
+Matlab's wrapped matrix output format is \emph{really} nice when you
+have to inspect matrices of moderate size.  The {\tt{}print{\char95}matrix} routine
+emulates Matlab's behavior for {\tt{}format\ short\ e}.
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWmatD-calP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-calP-1}}}\moddef{call Lua print for buffer~{\nwtagstyle{}\subpageref{NWmatD-calP-1}}}\endmoddef
+lua_pushvalue(L, -1);
+lua_pushstring(L, buf);
+lua_rawcall(L, 1, 0);
+\nwused{\\{NWmatD-staG-9}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWmatD-staG-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-9}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static void print_matrix(lua_State* L, lua_matrix_t A)
+\{
+    int i, j, c;
+    int m = A->m;
+    int n = A->n;
+    char buf[256];
+
+    lua_getglobal(L, "print");
+    for (c = 1; c <= n; c += 6) \{
+
+        if (n > 6) \{
+            sprintf(buf, "  Columns %d through %d\\n", 
+                    c, (c+5 > n) ? n : c+5);
+            \LA{}call Lua print for buffer~{\nwtagstyle{}\subpageref{NWmatD-calP-1}}\RA{}
+        \}
+
+        for (i = 1; i <= m; ++i) \{
+            char num[64];
+
+            *buf = '\\0';
+            for (j = c; j <= n && j < c+6; ++j) \{
+                if (Mij(A,i,j))
+                    sprintf(num, "  % .4e", Mij(A,i,j));
+                else
+                    sprintf(num, "            0");
+                strcat(buf, num);
+            \}
+            \LA{}call Lua print for buffer~{\nwtagstyle{}\subpageref{NWmatD-calP-1}}\RA{}
+
+        \}
+        buf[0] = ' ';
+        buf[1] = '\\0';
+        \LA{}call Lua print for buffer~{\nwtagstyle{}\subpageref{NWmatD-calP-1}}\RA{}
+    \}
+    lua_pop(L,1);
+\}
+
+\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+The {\tt{}matrix{\char95}print} routine (also known as the {\tt{}print} method
+for a matrix object) uses {\tt{}print{\char95}matrix} to output a reasonably
+pretty representation of the matrix.
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NWmatD-staG-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-A}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_print(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Wrong number of arguments");
+
+    print_matrix(L, A);
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+
+\subsection{Matrix {\tt{}factor} method}
+
+The {\tt{}matrix{\char95}factor} function computes $A = PLU$ using LAPACK's %'
+{\tt{}DGETRF} routine.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NWmatD-staG-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-B}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_factor(lua_State* L)
+\{
+    extern int dgetrf_(int* m, int* n, double* A, int* ldA,
+                       int* ipiv, int* info);
+
+    lua_matrix_t A = lua_touserdata(L,-1);
+    int info;
+
+    if (A->m != A->n)
+        lua_error(L, "Matrix must be square");
+
+#ifdef HAS_LAPACK
+    if (A->ipiv == NULL) \{
+        A->ipiv = calloc(A->m, sizeof(int));
+        dgetrf_(&(A->m), &(A->n), A->data, &(A->ld), A->ipiv, &info);    
+        if (info != 0) \{
+            printf("dgetrf failed with error code %d\\n", info);
+            lua_error(L, "Error during factorization");
+        \}
+    \}
+#else
+    lua_error(L, "Dense linear algebra not linked\\n");
+#endif
+
+    lua_settop(L,0);
+    lua_pushusertag(L, A, lua_matrix_tag);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+
+\subsection{Matrix {\tt{}solve} method}
+
+The {\tt{}matrix{\char95}solve} function computes $x := A^{-1} x$ given a factored
+matrix $A$.  If the matrix has not already been factored, we will factor
+it.
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NWmatD-staG-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-C}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_solve(lua_State* L)
+\{
+    extern int dgetrs_(char* trans, int* n, int* nrhs, double* A, int* ldA,
+                       int* ipiv, double* B, int* ldB, int* info);
+
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_matrix_t B;
+    int info;
+
+    if (lua_gettop(L) != 2)
+        lua_error(L, "Wrong number of arguments");
+
+    if (lua_tag(L,1) != lua_matrix_tag)
+        lua_error(L, "Argument must be a matrix");
+    B = lua_touserdata(L,1);
+
+    if (A->ipiv == NULL) \{
+        lua_matrix_factor(L);
+    \}
+
+    if (A->n != B->m)
+        lua_error(L, "Dimension mismatch");
+
+#ifdef HAS_LAPACK
+    dgetrs_("N", &(A->n), &(B->n), A->data, &(A->ld), A->ipiv, 
+            B->data, &(B->ld), &info);    
+    if (info != 0)
+        printf("Solve failed with error code %d\\n", info);
+
+#else
+    lua_error(L, "Dense linear algebra libraries not linked\\n");
+#endif
+
+    lua_settop(L,0);
+    lua_pushusertag(L, B, lua_matrix_tag);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+
+\subsection{Matrix {\tt{}clone} method}
+
+The {\tt{}matrix{\char95}clone} function ({\tt{}clone} method) makes a full
+copy of a matrix object.
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NWmatD-staG-D}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-D}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_clone(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_matrix_t B;
+    int j;
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    B = lua_matrix_create(A->m, A->n);
+    for (j = 1; j <= A->n; ++j)
+        memcpy(&Mij(B,1,j), &Mij(A,1,j), A->m * sizeof(double));
+
+    if (A->ipiv) \{
+        B->ipiv = calloc(A->m, sizeof(int));
+        memcpy(B->ipiv, A->ipiv, A->m * sizeof(int));
+    \}
+
+    lua_settop(L,0);
+    lua_pushusertag(L, B, lua_matrix_tag);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\subsection{Matrix {\tt{}slice} method}
+
+The matrix {\tt{}slice} command returns a copy of a subscripted slice
+of the matrix $A$.
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NWmatD-staG-E}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-E}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_slice_method(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_matrix_t B;
+    int n = lua_gettop(L);
+    int i1, i2, j1 = 1, j2 = 1;
+
+    \LA{}get slice subscript arguments~{\nwtagstyle{}\subpageref{NWmatD-getT-1}}\RA{}
+
+    B = lua_matrix_slice(A,i1,i2,j1,j2);
+
+    lua_settop(L,0);
+    lua_pushusertag(L, B, lua_matrix_tag);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NWmatD-getT-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-getT-1}}}\moddef{get slice subscript arguments~{\nwtagstyle{}\subpageref{NWmatD-getT-1}}}\endmoddef
+if (n != 3 && n != 5)
+    lua_error(L, "Wrong number of arguments");
+
+if (!lua_isnumber(L,1) || !lua_isnumber(L,2) ||
+    (n == 5 && (!lua_isnumber(L,3) || !lua_isnumber(L,4))))
+    lua_error(L, "Subscripts must be numeric");
+
+i1 = (int) lua_tonumber(L,1);
+i2 = (int) lua_tonumber(L,2);
+if (n == 5) \{
+    j1 = (int) lua_tonumber(L,3);
+    j2 = (int) lua_tonumber(L,4);
+\}
+
+if (i1 <= 0 || i2 < i1 || i2 > A->m ||
+    j1 <= 0 || j2 < j1 || j2 > A->n)
+    lua_error(L, "Bad subscripts");
+
+\nwused{\\{NWmatD-staG-E}}\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+\subsection{Matrix {\tt{}free} method}
+
+The {\tt{}matrix{\char95}free} function (also known as the {\tt{}free} method)
+deallocates the object memory.  It should probably be called on
+Lua garbage collection, but it isn't yet.
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NWmatD-staG-F}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-F}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_free(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    lua_matrix_destroy(A);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+
+\subsection{{\tt{}m} and {\tt{}n} fields}
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NWmatD-staG-G}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-G}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_m(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_settop(L,0);
+    lua_pushnumber(L, A->m);
+    return 1;
+\}
+
+static int lua_matrix_n(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_settop(L,0);
+    lua_pushnumber(L, A->n);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+
+\subsection{Method recall}
+
+When a matrix object is indexed by a method name string,
+we return a Lua closure that implements the method.
+So when the user requests {\tt{}A.print}, for instance,
+the returned closure object will have {\tt{}A} as its final
+argument when it is called.
+
+On entry, the Lua stack contains the matrix object
+and the name string.
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NWmatD-staH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staH-1}}}\moddef{static prototypes~{\nwtagstyle{}\subpageref{NWmatD-staH-1}}}\endmoddef
+static int lua_matrix_getmethod(lua_State* L);
+
+\nwused{\\{NWmatD-matC.2-1}}\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NWmatD-staG-H}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-staG-H}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmatD-staG-1}}}\plusendmoddef
+static int lua_matrix_getmethod(lua_State* L)
+\{
+    const char* name = lua_tostring(L,2);
+
+    lua_pop(L,1);
+    if (strcmp(name, "print") == 0)
+        lua_pushcclosure(L, lua_matrix_print, 1);
+    else if (strcmp(name, "free") == 0)
+        lua_pushcclosure(L, lua_matrix_free, 1);
+    else if (strcmp(name, "factor") == 0)
+        lua_pushcclosure(L, lua_matrix_factor, 1);
+    else if (strcmp(name, "solve") == 0)
+        lua_pushcclosure(L, lua_matrix_solve, 1);
+    else if (strcmp(name, "clone") == 0)
+        lua_pushcclosure(L, lua_matrix_clone, 1);
+    else if (strcmp(name, "slice") == 0)
+        lua_pushcclosure(L, lua_matrix_slice_method, 1);
+    else if (strcmp(name, "m") == 0)
+        lua_matrix_m(L);
+    else if (strcmp(name, "n") == 0)
+        lua_matrix_n(L);
+    else
+        lua_error(L, "Invalid method name");
+
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+
+\subsection{Public matrix manipulation}
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NWmatD-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmatD-fun9-1}}}\endmoddef
+lua_matrix_t lua_matrix_create(int m, int n)
+\{
+    lua_matrix_t C;
+
+    C = calloc(1, sizeof(*C));
+    C->owns_data = 1;
+    C->ld = m;
+    C->m  = m;
+    C->n  = n;
+    C->data = calloc(m*n, sizeof(double));
+    return C;
+\}
+
+void lua_matrix_destroy(lua_matrix_t self)
+\{
+    if (self->ipiv)
+        free(self->ipiv);
+
+    if (self->owns_data)
+        free(self->data);
+
+    free(self);
+\}
+
+\nwalsodefined{\\{NWmatD-fun9-2}\\{NWmatD-fun9-3}\\{NWmatD-fun9-4}}\nwused{\\{NWmatD-matC.2-1}}\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NWmatD-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmatD-fun9-1}}}\plusendmoddef
+lua_matrix_t lua_matrix_slice(lua_matrix_t A, int i1, int i2, int j1, int j2)
+\{
+    lua_matrix_t C;
+
+    C = calloc(1, sizeof(*C));
+    C->owns_data = 0;
+    C->ld   = A->ld;
+    C->m    = (i2-i1)+1;
+    C->n    = (j2-j1)+1;
+    C->data = &Mij(A,i1,j1);
+    return C;
+\}
+
+\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+\subsection{Setting and removing vectors}
+
+The {\tt{}lua{\char95}matrix{\char95}push} function is a thin wrapper around
+{\tt{}lua{\char95}pushusertag}.  Similarly, {\tt{}lua{\char95}matrix{\char95}get} is a
+thin wrapper around {\tt{}lua{\char95}touserdata}.  The only reason we
+don't want the user to directly use the {\tt{}lua{\char95}pushusertag} and 
+{\tt{}lua{\char95}touserdata} functions is that then we would have
+to expose the matrix tag value to the world.  That wouldn't
+be a tragedy, but it would be nice to keep it private.
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NWmatD-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmatD-fun9-1}}}\plusendmoddef
+void lua_matrix_push(lua_State* L, lua_matrix_t matrix)
+\{
+    lua_pushusertag(L, matrix, lua_matrix_tag);
+\}
+
+lua_matrix_t lua_matrix_get(lua_State* L, int index)
+\{
+    if (index > lua_gettop(L))
+        lua_error(L, "Index out of range");
+
+    if (lua_tag(L,index) != lua_matrix_tag)
+        lua_error(L, "Variable is not a matrix");
+
+    return lua_touserdata(L,index);
+\}
+
+\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+
+\subsection{Registration functions}
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NWmatD-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmatD-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmatD-fun9-1}}}\plusendmoddef
+void lua_matrix_register(lua_State* L)
+\{
+    lua_matrix_tag = lua_newtag(L);
+    \LA{}register functions~{\nwtagstyle{}\subpageref{NWmatD-regI-1}}\RA{}
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{call Lua print for buffer}{NWmatD-calP-1}{\nwixd{NWmatD-calP-1}\nwixu{NWmatD-staG-9}}}%
+\nwixlogsorted{c}{{check summand conformality}{NWmatD-cheQ-1}{\nwixu{NWmatD-staG-4}\nwixu{NWmatD-staG-5}\nwixd{NWmatD-cheQ-1}}}%
+\nwixlogsorted{c}{{functions}{NWmatD-fun9-1}{\nwixu{NWmatD-matC.2-1}\nwixd{NWmatD-fun9-1}\nwixd{NWmatD-fun9-2}\nwixd{NWmatD-fun9-3}\nwixd{NWmatD-fun9-4}}}%
+\nwixlogsorted{c}{{get binary operands}{NWmatD-getJ-1}{\nwixu{NWmatD-staG-4}\nwixu{NWmatD-staG-5}\nwixu{NWmatD-staG-7}\nwixd{NWmatD-getJ-1}}}%
+\nwixlogsorted{c}{{get \code{}matrix\edoc{} parameters}{NWmatD-getP-1}{\nwixu{NWmatD-staG-8}\nwixd{NWmatD-getP-1}\nwixd{NWmatD-getP-2}}}%
+\nwixlogsorted{c}{{get slice subscript arguments}{NWmatD-getT-1}{\nwixu{NWmatD-staG-E}\nwixd{NWmatD-getT-1}}}%
+\nwixlogsorted{c}{{get unary operand}{NWmatD-getH-1}{\nwixu{NWmatD-staG-6}\nwixd{NWmatD-getH-1}}}%
+\nwixlogsorted{c}{{initialize matrix from table}{NWmatD-iniS-1}{\nwixu{NWmatD-staG-8}\nwixd{NWmatD-iniS-1}}}%
+\nwixlogsorted{c}{{macros}{NWmatD-mac6-1}{\nwixu{NWmatD-matC.2-1}\nwixd{NWmatD-mac6-1}}}%
+\nwixlogsorted{c}{{matrix-lua.c}{NWmatD-matC.2-1}{\nwixd{NWmatD-matC.2-1}}}%
+\nwixlogsorted{c}{{matrix-lua.h}{NWmatD-matC-1}{\nwixd{NWmatD-matC-1}}}%
+\nwixlogsorted{c}{{register functions}{NWmatD-regI-1}{\nwixd{NWmatD-regI-1}\nwixd{NWmatD-regI-2}\nwixd{NWmatD-regI-3}\nwixd{NWmatD-regI-4}\nwixd{NWmatD-regI-5}\nwixd{NWmatD-regI-6}\nwixd{NWmatD-regI-7}\nwixd{NWmatD-regI-8}\nwixu{NWmatD-fun9-4}}}%
+\nwixlogsorted{c}{{return \code{}C\edoc{}}{NWmatD-retC-1}{\nwixu{NWmatD-staG-4}\nwixu{NWmatD-staG-5}\nwixu{NWmatD-staG-6}\nwixu{NWmatD-staG-7}\nwixd{NWmatD-retC-1}}}%
+\nwixlogsorted{c}{{static data}{NWmatD-staB-1}{\nwixu{NWmatD-matC.2-1}\nwixd{NWmatD-staB-1}}}%
+\nwixlogsorted{c}{{static functions}{NWmatD-staG-1}{\nwixu{NWmatD-matC.2-1}\nwixd{NWmatD-staG-1}\nwixd{NWmatD-staG-2}\nwixd{NWmatD-staG-3}\nwixd{NWmatD-staG-4}\nwixd{NWmatD-staG-5}\nwixd{NWmatD-staG-6}\nwixd{NWmatD-staG-7}\nwixd{NWmatD-staG-8}\nwixd{NWmatD-staG-9}\nwixd{NWmatD-staG-A}\nwixd{NWmatD-staG-B}\nwixd{NWmatD-staG-C}\nwixd{NWmatD-staG-D}\nwixd{NWmatD-staG-E}\nwixd{NWmatD-staG-F}\nwixd{NWmatD-staG-G}\nwixd{NWmatD-staG-H}}}%
+\nwixlogsorted{c}{{static prototypes}{NWmatD-staH-1}{\nwixu{NWmatD-matC.2-1}\nwixd{NWmatD-staH-1}}}%
+\nwbegindocs{86}\nwdocspar
+\nwenddocs{}

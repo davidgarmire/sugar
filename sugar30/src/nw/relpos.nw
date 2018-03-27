@@ -1,0 +1,280 @@
+
+\section{Introduction}
+
+In previous versions of SUGAR, the preferred way to specify device 
+geometry was by providing the dimensions and orientations of all 
+the structural elements.  From that information, the node positions 
+could be determined.  This module supports that form of 
+implicit node positioning.
+
+The current preferred method of specifying geometry is to specify
+the node positions directly, and possibly infer parameters like beam
+length (instead of vice-versa).  This module exists primarily to
+ease migration.
+
+
+\section{Interface}
+
+Public functions for this module are
+\begin{itemize}
+  \item [[relpos_add(n1, n2, delta)]]:
+	indicate the position of node [[n2]] relative to [[n1]]
+	is [[delta]]
+  \item [[relpos_dump()]]:
+	dump the current table of relative positioning information
+  \item [[relpos_treewalk()]]:
+	use relative positioning information to determine the
+	actual node positions
+\end{itemize}
+
+
+\section{Implementation}
+
+The [[relpos_table]] data structure is an adjacency list
+representation of the graph whose edges are known relative
+positions.  For instance, we might have
+\begin{verbatim}
+ relpos_table[n1] = {{dx12, dy12, dz12, n2}, {dx13, dy13, dz13, n3}, ...}
+\end{verbatim}
+to represent known relative positions of node 2, 3, etc. with respect
+to node 1.  The position of node 2 relative to an origin at node 1 is
+$(dx_{12}, dy_{12}, dz_{12})$.
+
+<<relpos.lua>>=
+relpos_table = {};
+relpos_first_attached = nil;
+
+<<functions>>
+@ 
+
+
+<<functions>>=
+-- Add edges from node 1 to 2 and vice-versa
+--
+function relpos_add(n1, n2, delta)
+  local elist;
+
+  relpos_first_attached = relpos_first_attached or n1;
+
+  elist = relpos_get_elist(n1);
+  elist.n = elist.n + 1;
+  elist[elist.n] = {  delta[1],  delta[2],  delta[3], n2}
+
+  elist = relpos_get_elist(n2);
+  elist.n = elist.n + 1;
+  elist[elist.n] = { -delta[1], -delta[2], -delta[3], n1}
+
+  return elist;
+end
+
+@ 
+
+For the purposes of easing the translation of SUGAR 2.0 netlists
+(where basically all the node positions are determined implicitly),
+we drop the first node with relative position information at
+the origin when [[relpos_position_first_node]] is true.
+
+<<optionally place first node at origin>>=
+if relpos_position_first_node then
+  n1[1] = 0;
+  n1[2] = 0;
+  n1[3] = 0;
+  n1.color = 1
+  node_position(n1)
+  relpos_position_first_node = nil;
+end
+@ 
+
+We use the [[relpos_get_elist]] function to get an existing
+adjacency list for a particular node, or to create a new list
+if one does not already exist.
+
+<<functions>>=
+function relpos_get_elist(n)
+  local elist = relpos_table[n];
+  if not elist then
+    elist = {n = 0};
+    relpos_table[n] = elist;
+  end
+  return elist;
+end
+
+@ 
+
+To figure out the node positions, we do a depth-first search
+through the relative position graph.  When we finish the search,
+we do a quick check to make sure that there are no nodes that
+still need to be positioned.
+
+<<functions>>=
+function relpos_treewalk()
+  local stack = {n = 0};
+
+  <<push all grey nodes onto the stack>>
+
+  while stack.n > 0 do
+    local node = stack[stack.n]
+    stack.n = stack.n - 1
+
+    <<visit neighbors>>
+
+    node.color = 2
+  end
+
+  relpos_assert_all_done();
+end
+
+postload('relpos_treewalk()');
+
+@
+
+Recall that in DFS (or any other standard tree search), we can
+color nodes according to how much they have been processed.
+``White'' nodes ([[color == 0]]) have not yet been visited.
+``Grey'' nodes ([[color == 1]]) have an absolute position,
+but their neighbors have not yet been processed.  ``Black'' nodes
+([[colore == 2]]) are completely processed -- they have been
+positioned, and so have all their neighbors.
+
+The grey nodes at the start of the sweep are our initial roots.
+We know their absolute positions from user specification.
+If there are \emph{no} absolutely positioned nodes, we pick
+a single root (the first node for which we saw relative position
+information), put it at the origin, and work from there.
+
+<<push all grey nodes onto the stack>>=
+for node, elist in relpos_table do
+  if node.color == 1 then
+    stack.n = stack.n + 1;
+    stack[stack.n] = node;
+  end
+end
+
+if stack.n == 0 and relpos_first_attached then
+  stack.n = 1
+  stack[1] = relpos_first_attached
+  relpos_first_attached[1] = 0;
+  relpos_first_attached[2] = 0;
+  relpos_first_attached[3] = 0;
+  relpos_first_attached.color = 1;
+end
+
+@ 
+
+When we visit the neighbors of the current node, we only need
+to do anything to the ones that have not already been positioned.
+
+<<visit neighbors>>=
+local elist = relpos_table[node];
+for k = 1, elist.n do
+  local e   = elist[k];
+  local nbr = e[4]; 
+  if nbr.color == 0 then
+    <<process uncolored neighbor>>
+  end
+end
+@ 
+
+When we process a white node, we first assign it an absolute position,
+then color it grey and put it on the stack.
+
+<<process uncolored neighbor>>=
+nbr[1] = node[1] + e[1];
+nbr[2] = node[2] + e[2];
+nbr[3] = node[3] + e[3];
+node_position(nbr);
+
+nbr.color = 1;
+stack.n = stack.n + 1;
+stack[stack.n] = nbr;
+@ 
+
+We add a wrapper around the node command to mark nodes as 
+grey if a position is specified, white otherwise.
+
+<<functions>>=
+function node(p)
+  if p[1] then
+    p.color = 1
+  else
+    p.color = 0
+  end
+  return %node(p)
+end
+
+@ 
+
+The [[relpos_assert_all_done]] function just makes sure that
+none of the nodes that appear in the relative positioning graph
+have no absolute position at the end of processing.  If there
+is ever a component of the graph disconnected from one of the
+initially-positioned roots, the netlist is in error.
+
+<<functions>>=
+function relpos_assert_all_done()
+  for node, elist in relpos_table do
+    if node.color == 0 then
+      error("Unpositioned node " .. relpos_node_name(node))
+    end
+  end
+end
+
+@ 
+
+The [[relpos_dump]] command is useful for debugging.  It simply
+prints a text representation of the relative positioning graph.
+
+<<functions>>=
+function relpos_dump()
+  for node, elist in relpos_table do
+
+    <<print node name and position>>
+    <<print adjacency list>>
+
+  end
+end
+
+@ 
+
+If a node in the graph has an associated position, we might as 
+well print that out, too.  But if the node is still colored white,
+we just print the name of the node and skip the position.
+
+<<print node name and position>>=
+if node.color == 0 then
+  print("From " .. relpos_node_name(node) .. ":")
+else
+  print("From " .. relpos_node_name(node) .. " at ("
+        .. node[1] .. ", "
+        .. node[2] .. ", "
+        .. node[3] .. "):")
+end
+@ 
+
+When we print the adjacent nodes, we only print the node
+name and the relative position information (and not the
+associated position, if it has been determined).
+
+<<print adjacency list>>=
+for k = 1, elist.n do
+  local e = elist[k];
+  print("  to " .. relpos_node_name(e[4]) .. ": (" ..
+        e[1] .. ", " ..
+        e[2] .. ", " .. 
+        e[3] .. ")")
+end
+@ 
+
+Some nodes have names; others may not.  We want to output the name
+when it is available, and otherwise just output the node number.
+
+<<functions>>=
+function relpos_node_name(n)
+  if n.name then
+    return n.name .. " (" .. n["mesh index"] .. ")"
+  else
+    return "(" .. n["mesh index"] .. ")"
+  end
+end
+
+@ 

@@ -1,0 +1,294 @@
+
+% Some models.
+
+\section{Available models}
+
+Note that some of these models are implemented using subnets in
+stdlib.net.
+
+\begin{description}
+  \item[beam2d]     planar mechanical beam 
+  \item[beam2de]    planar mechanical beam and electric resistor 
+  \item[beam3d]     3D mechanical beam 
+  \item[beam3de]    3D mechanical beam and electronic resistor 
+  \item[anchor]     0D  mechanical  fixed  node 
+  \item[f2d]        planar force or moment 
+  \item[f3d]        3D force or moment 
+  \item[gap2de]     two planar electrostatic mechanical beams, resistors  
+  \item[gap3de]     two electrostatic 3D mechanical beams, resistors 
+  \item[Vsrc]       Voltage source 
+  \item[eground]    Electronic ground  
+  \item[comb2d]     N-finger electrostatic comb, 2D mechanical  
+  \item[R]          constant resistor 
+  \item[Isrc]       constant current source 
+  \item[nmos]       nmos model 
+  \item[pmos]       pmos model 
+\end{description}
+
+
+\section{Model descriptions and interfaces}
+
+
+\subsection{beam2d}
+ 
+Describes an in-plane beam connecting two nodes.
+
+\subsubsection*{Example:}
+
+\begin{verbatim}
+  beam2d { A, B; material=p1, l=100u, w=5u, oz=10 }
+\end{verbatim}
+ 
+\subsubsection*{Nodal variables:}
+
+\{x, y, rz\} at both nodes 
+ 
+\subsubsection{Parameters}
+
+\begin{description}
+ \item[l]  beam length in meters (required) 
+ \item[w]  beam width in meters (required) 
+ \item[h]  thickness of beam in meters (optional; supplied in process info) 
+ \item[oz] initial rotation about beam's z-axis (required if not 0) 
+\end{description}
+
+\subsection{beam2de}
+ 
+Similar to beam2d but adds electronic resistance to the beam. 
+
+\subsubsection*{Example}
+
+\begin{verbatim}
+  beam2de { A, B; material=p1, l=100u, w=5u, oz=10, R=100 }
+\end{verbatim}
+
+ 
+\subsubsection*{Nodal variables}
+
+\{x, y, rz, e\} at both nodes 
+ 
+\subsubsection*{Parameters}
+\begin{description}
+ \item[l] beam length meters (required) 
+ \item[w] beam width in meters (required) 
+ \item[R] beam resistance in ohms (required) 
+ \item[h] thickness of beam in meters (optional; supplied in process info) 
+ \item[oz] initial rotation about beam's z -axis (required if not 0) 
+\end{description}
+
+\subsection{beam3d}
+ 
+Similar to beam2d but can be rotated out-of-plane. 
+
+\subsubsection*{Example}
+\begin{verbatim}
+  beam3d { A, B; material=p1, l=100u, w=5u, oy=20, oz=10, ox=45 }
+\end{verbatim}
+ 
+\subsubsection*{Nodal variables}
+
+\{x, y, z, rx, ry, rz\} at both nodes 
+ 
+\subsubsection{Parameters}
+\begin{description}
+ \item[l] beam length meters (required) 
+ \item[w] beam width in meters (required) 
+ \item[h] thickness of beam in meters (optional; supplied in process info) 
+ \item[oy] initial rotation about y-axis (required if not 0) 
+ \item[oz] initial rotation about beam's z -axis (required if not 0) 
+ \item[ox] initial twist about the beam's x-axis (required if not 0) 
+\end{description}
+
+\subsection{beam3de}
+ 
+Similar to beam3d but adds electronic resistance to the beam. 
+
+\subsubsection*{Example}
+\begin{verbatim}
+  beam3de { A, B; material=p1, l=100u, w=5u, oy=20, oz=10, ox=45,  R=100}
+\end{verbatim}
+ 
+\subsubsection*{Nodal variables}
+
+\{x, y, z, rx, ry, rz, e\} at both nodes 
+ 
+\subsubsection*{Parameters}
+\begin{description}
+ \item[l] beam length meters (required) 
+ \item[w] beam width in meters (required) 
+ \item[R] beam resistance in ohms (required) 
+ \item[h] thickness of beam in meters (optional; supplied in process info) 
+ \item[oy] initial rotation about y-axis (required if not 0) 
+ \item[oz] initial rotation about beam's z -axis (required if not 0) 
+ \item[ox] initial twist about the beam's x-axis (required if not 0) 
+\end{description}
+
+
+\subsection{anchor}
+ 
+Describes a mechanically fixed node. 3D or 2D. 
+
+\subsubsection*{Example}
+\begin{verbatim}
+  anchor { A, B; material=p1, l=10u, w=10u, h=10u }
+\end{verbatim}
+ 
+\subsubsection*{Nodal variables}
+
+\{x, y, z, rx, ry, rz\} at both nodes 
+ 
+\subsubsection*{Parameters}
+
+\begin{description}
+  \item[l]  beam length meters (required) 
+  \item[w]  beam width in meters (required) 
+  \item[h]  thickness of beam in meters (optional; supplied in process info) 
+  \item[oy]  initial rotation about y-axis (required if not 0) 
+  \item[oz]  initial rotation about beam's z -axis (required if not 0) 
+  \item[ox]  initial twist about the beam's x-axis (required if not 0) 
+\end{description}
+
+\subsection{f2d}
+ 
+Describes an in-plane external force at a node. 
+
+\subsubsection*{Example}
+
+\begin{verbatim}
+  f2d { A; F=10u, oz=45 }
+  f2d { A; M=1u, oz=45 }
+\end{verbatim}
+ 
+\subsubsection*{Nodal variables}
+
+\{x, y, rz\} at node 
+ 
+\subsubsection*{Parameters}
+
+\begin{description}
+ \item[F] force in Newtons (required if M is not used) 
+ \item[M] moment in Newton-meters (required is F is not used) 
+ \item[oy] initial rotation about y-axis (required if not 0) 
+ \item[oz] initial rotation about the vetors's z -axis (required if not 0) 
+\end{description}
+
+\subsection{f3d}
+ 
+Describes a 3D external force at a node. 
+
+\subsubsection*{Example}
+
+\begin{verbatim}
+  f3d { A; F=10u, oy=35, oz=45 }
+  f3d { A; M=1u, oy=35, oz=45 }
+\end{verbatim}
+
+ 
+\subsubsection*{Nodal variables}
+
+\{x, y, z, rx, ry, rz\} at node 
+ 
+\subsubsection*{Parameters}
+\begin{description}
+ \item[F] force in Newtons (required if M is not used) 
+ \item[M] moment in Newton-meters (required is F is not used) 
+ \item[oy] initial rotation about y-axis (required if not 0) 
+ \item[oz] initial rotation about the vectors's z -axis (required if not 0) 
+\end{description}
+ 
+\subsection{gap2de}
+
+Describes a 2D electrostatic gap, which consists of two electronic, mechanical
+beams. 
+
+\subsubsection*{Example}
+
+\begin{verbatim}
+  gap2de { a, b, c, d; material=p1, l=100u, w1=5u, w2=5u, 
+                        oz=0, gap=2u, R1=100, R2=100 }
+\end{verbatim}
+
+\subsubsection*{Nodal variables}
+\{x, y, z, rx, ry, rz, e\} at all four nodes 
+ 
+\subsubsection*{Parameters}
+\begin{description}
+ \item[l] beam length meters (required) 
+ \item[w1] beam1 width in meters (required) 
+ \item[w1] beam2 width in meters (required) 
+ \item[gap] initial gap spacing 
+ \item[h] thickness of both beams in meters (optional; supplied in process info) 
+ \item[R1] beam1 resistance in ohms (required) 
+ \item[R2] beam2 resistance in ohms (required) 
+ \item[oz] initial rotation about beam1's z -axis (required if not 0) 
+\end{description}
+
+\subsection{gap3de}
+ 
+Describes a 2D electrostatic gap, which consists of two electronic, 
+mechanical beams. 
+ 
+\subsubsection*{Example}
+
+\begin{verbatim}
+  gap3de { a, b, c, d; material=p1, l=100u, w1=5u, w2=5u, 
+                       oz=0, gap=2u, R1=100, R2=100 }
+\end{verbatim}
+
+\subsubsection*{Nodal variables}
+
+\{x, y, z, rx, ry, rz, e\} at all four nodes 
+
+\subsubsection*{Parameters}
+\begin{description}
+ \item[l] beam length meters (required) 
+ \item[w1] beam1 width in meters (required) 
+ \item[w1] beam2 width in meters (required) 
+ \item[gap] initial gap spacing 
+ \item[h] thickness of both beams in meters (optional; supplied in process info) 
+ \item[R1] beam1 resistance in ohms (required) 
+ \item[R2] beam2 resistance in ohms (required) 
+ \item[oy] initial rotation about y-axis (required if not 0) 
+ \item[oz] initial rotation about beam1's z -axis (required if not 0) 
+ \item[ox] initial twist about the beam1's x-axis (required if not 0) 
+\end{description}
+ 
+\subsection{Vsrc}
+ 
+Describes a voltage source. 
+ 
+\subsubsection*{Example}
+\begin{verbatim}
+  Vsrc { e, d; V=5 }
+\end{verbatim}
+
+See Fig 5 for nodes. Note: only mechanical element display. 
+
+\subsubsection*{Nodal variables}
+\{e\} at both nodes 
+ 
+\subsubsection*{Parameters}
+\begin{description}
+ \item[V] voltage in volts (required) 
+\end{description}
+        
+  
+\subsection{eground}
+ 
+Describes a electronic ground. 
+
+\subsubsection*{Example}
+\begin{verbatim}
+  eground { e }
+\end{verbatim}
+
+Note: only mechanical elements display. 
+
+\subsubsection*{Nodal variables}
+
+\{e\} at nodes 
+ 
+\subsubsection*{Parameters}
+
+none 
+

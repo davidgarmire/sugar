@@ -1,0 +1,250 @@
+###TAG### NWrof7-tor6-1 1a 
+###TAG### NWrof7-proH-1 2a 
+###TAG### NWrof7-invI-1 2b 
+###TAG### NWrof7-awkB-1 2c 
+###TAG### NWrof7-reaT-1 2d 
+###TAG### NWrof7-tma6-1 2e 
+<standard input>:393: warning: number register `"' not defined
+###TAG### NWrof7-staE-1 2f 
+###TAG### NWrof7-tma6-2 3a 
+###TAG### NWrof7-reaT-2 3b 
+###TAG### NWrof7-tma6-3 3c 
+###TAG### NWrof7-reaT-3 3d 
+###TAG### NWrof7-tma6-4 3e 
+###TAG### NWrof7-tma6-5 4a 
+###TAG### NWrof7-tma6-6 4b 
+<standard input>:653: warning: numeric expression expected (got `\')
+<standard input>:655: warning: numeric expression expected (got `\')
+<standard input>:656: warning: numeric expression expected (got `\')
+<standard input>:658: warning: numeric expression expected (got `\')
+<standard input>:659: warning: numeric expression expected (got `\')
+<standard input>:661: warning: numeric expression expected (got `\')
+<standard input>:662: warning: numeric expression expected (got `\')
+<standard input>:663: warning: numeric expression expected (got `\')
+<standard input>:664: warning: numeric expression expected (got `\')
+###TAG### NWrof7-savG-1 4c 
+<standard input>:682: warning: numeric expression expected (got `\')
+<standard input>:683: warning: numeric expression expected (got `\')
+###TAG### NWrof7-setL-1 4d 
+<standard input>:719: warning: missing closing delimiter
+###TAG### \$1 \n[%]\n+[SECTIONLETTER] 
+<standard input>:725: warning: diversion stack underflow
+<standard input>:725: warning: indent cannot be negative
+<standard input>:725: warning: `CODECHUNK' not defined
+###TAG### NWrof7-reaZ-1 5a 
+<standard input>:738: warning: can't find font `\n[PREVft]'
+<standard input>:739: warning: can't find font `\n[OLDft]'
+<standard input>:740: warning: numeric expression expected (got `\')
+<standard input>:741: warning: numeric expression expected (got `\')
+<standard input>:742: warning: numeric expression expected (got `\')
+<standard input>:743: warning: numeric expression expected (got `\')
+<standard input>:744: warning: missing closing delimiter
+<standard input>:745: warning: numeric expression expected (got `\')
+<standard input>:746: warning: numeric expression expected (got `\')
+<standard input>:748: warning: indent cannot be negative
+###TAG### NWrof7-resJ-1 5b 
+###TAG### NWrof7-reaT-4 5c 
+###TAG### NWrof7-reaT-5 5d 
+###TAG### NWrof7-reaT-6 5e 
+###TAG### NWrof7-tma6-7 6a 
+<standard input>:898: warning: numeric expression expected (got `\')
+<standard input>:899: warning: numeric expression expected (got `\')
+###TAG### NWrof7-plaI-1 6b 
+###TAG### NWrof7-reaT-7 6c 
+###TAG### NWrof7-tma6-8 6d 
+###TAG### NWrof7-reaT-8 7a 
+###TAG### NWrof7-tma6-9 7b 
+<standard input>:1075: a space character is not allowed in an escape name
+<standard input>:1076: warning: escape character ignored before `]'
+<standard input>:1076: warning: escape character ignored before `]'
+<standard input>:1079: warning: escape character ignored before `]'
+<standard input>:1079: warning: escape character ignored before `]'
+###TAG### NWrof7-fun9-1 8a 
+###TAG### NWrof7-tma6-A 8b 
+###TAG### NWrof7-reaT-9 8c 
+###TAG### NWrof7-tma6-B 8d 
+###TAG### NWrof7-reaT-A 9a 
+###TAG### NWrof7-tma6-C 9b 
+###TAG### NWrof7-reaT-B 9c 
+###TAG### NWrof7-tma6-D 9d 
+###TAG### NWrof7-tma6-E 10a 
+###TAG### NWrof7-che9-1 10b 
+###TAG### NWrof7-tma6-F 10c 
+###TAG### NWrof7-reaT-C 11a 
+###TAG### NWrof7-reaT-D 11b 
+<standard input>:1512: warning: number register `.' not defined
+###TAG### NWrof7-actO-1 11c 
+###TAG### NWrof7-tma6-G 11d 
+###TAG### NWrof7-fun9-2 12a 
+###TAG### NWrof7-awkB-2 12b 
+###TAG### NWrof7-nor6-1 13a 
+###TAG### NWrof7-tma6-H 13b 
+###TAG### NWrof7-tma6-I 14a 
+###TAG### NWrof7-ExaB-1 14b 
+###BEGINCHUNKS###
+###CHUNKBEGIN### action for [[tags]] line
+###CHUNKDEFN### NWrof7-actO-1
+###CHUNKUSE### NWrof7-awkB-2
+###CHUNKUSE### NWrof7-nor6-1
+###CHUNKEND###
+###CHUNKBEGIN### awk program
+###CHUNKUSE### NWrof7-invI-1
+###CHUNKDEFN### NWrof7-awkB-1
+###CHUNKDEFN### NWrof7-awkB-2
+###CHUNKEND###
+###CHUNKBEGIN### checkcode
+###CHUNKUSE### NWrof7-reaT-9
+###CHUNKUSE### NWrof7-reaT-A
+###CHUNKUSE### NWrof7-reaT-B
+###CHUNKDEFN### NWrof7-che9-1
+###CHUNKEND###
+###CHUNKBEGIN### Example run
+###CHUNKDEFN### NWrof7-ExaB-1
+###CHUNKEND###
+###CHUNKBEGIN### functions
+###CHUNKUSE### NWrof7-awkB-1
+###CHUNKDEFN### NWrof7-fun9-1
+###CHUNKDEFN### NWrof7-fun9-2
+###CHUNKUSE### NWrof7-nor6-1
+###CHUNKEND###
+###CHUNKBEGIN### invoke awk program
+###CHUNKUSE### NWrof7-tor6-1
+###CHUNKDEFN### NWrof7-invI-1
+###CHUNKEND###
+###CHUNKBEGIN### noroff
+###CHUNKDEFN### NWrof7-nor6-1
+###CHUNKEND###
+###CHUNKBEGIN### plant newline trap
+###CHUNKUSE### NWrof7-tma6-7
+###CHUNKDEFN### NWrof7-plaI-1
+###CHUNKUSE### NWrof7-tma6-9
+###CHUNKEND###
+###CHUNKBEGIN### process arguments
+###CHUNKUSE### NWrof7-tor6-1
+###CHUNKDEFN### NWrof7-proH-1
+###CHUNKEND###
+###CHUNKBEGIN### read and process noweb source
+###CHUNKUSE### NWrof7-awkB-1
+###CHUNKDEFN### NWrof7-reaT-1
+###CHUNKDEFN### NWrof7-reaT-2
+###CHUNKDEFN### NWrof7-reaT-3
+###CHUNKDEFN### NWrof7-reaT-4
+###CHUNKDEFN### NWrof7-reaT-5
+###CHUNKDEFN### NWrof7-reaT-6
+###CHUNKDEFN### NWrof7-reaT-7
+###CHUNKDEFN### NWrof7-reaT-8
+###CHUNKDEFN### NWrof7-reaT-9
+###CHUNKDEFN### NWrof7-reaT-A
+###CHUNKDEFN### NWrof7-reaT-B
+###CHUNKDEFN### NWrof7-reaT-C
+###CHUNKDEFN### NWrof7-reaT-D
+###CHUNKEND###
+###CHUNKBEGIN### read back code chunk from diversion
+###CHUNKUSE### NWrof7-tma6-5
+###CHUNKDEFN### NWrof7-reaZ-1
+###CHUNKEND###
+###CHUNKBEGIN### restore environment
+###CHUNKUSE### NWrof7-tma6-5
+###CHUNKDEFN### NWrof7-resJ-1
+###CHUNKEND###
+###CHUNKBEGIN### save environment
+###CHUNKUSE### NWrof7-tma6-5
+###CHUNKDEFN### NWrof7-savG-1
+###CHUNKEND###
+###CHUNKBEGIN### set local environment
+###CHUNKUSE### NWrof7-tma6-5
+###CHUNKDEFN### NWrof7-setL-1
+###CHUNKEND###
+###CHUNKBEGIN### start document
+###CHUNKUSE### NWrof7-reaT-1
+###CHUNKDEFN### NWrof7-staE-1
+###CHUNKEND###
+###CHUNKBEGIN### tmac.w
+###CHUNKDEFN### NWrof7-tma6-1
+###CHUNKDEFN### NWrof7-tma6-2
+###CHUNKDEFN### NWrof7-tma6-3
+###CHUNKDEFN### NWrof7-tma6-4
+###CHUNKDEFN### NWrof7-tma6-5
+###CHUNKDEFN### NWrof7-tma6-6
+###CHUNKDEFN### NWrof7-tma6-7
+###CHUNKDEFN### NWrof7-tma6-8
+###CHUNKDEFN### NWrof7-tma6-9
+###CHUNKDEFN### NWrof7-tma6-A
+###CHUNKDEFN### NWrof7-tma6-B
+###CHUNKDEFN### NWrof7-tma6-C
+###CHUNKDEFN### NWrof7-tma6-D
+###CHUNKDEFN### NWrof7-tma6-E
+###CHUNKDEFN### NWrof7-tma6-F
+###CHUNKDEFN### NWrof7-tma6-G
+###CHUNKDEFN### NWrof7-tma6-H
+###CHUNKDEFN### NWrof7-tma6-I
+###CHUNKEND###
+###CHUNKBEGIN### toroff
+###CHUNKDEFN### NWrof7-tor6-1
+###CHUNKEND###
+###ENDCHUNKS###
+###BEGININDEX###
+###ENTRYBEGIN### awkfile
+###ENTRYDEFN### NWrof7-invI-1
+###ENTRYEND###
+###ENTRYBEGIN### chunkdefn
+###ENTRYDEFN### NWrof7-actO-1
+###ENTRYEND###
+###ENTRYBEGIN### chunkuse
+###ENTRYDEFN### NWrof7-actO-1
+###ENTRYEND###
+###ENTRYBEGIN### code
+###ENTRYDEFN### NWrof7-reaT-3
+###ENTRYEND###
+###ENTRYBEGIN### convquote
+###ENTRYDEFN### NWrof7-fun9-1
+###ENTRYEND###
+###ENTRYBEGIN### defn
+###ENTRYDEFN### NWrof7-reaT-8
+###ENTRYEND###
+###ENTRYBEGIN### delay
+###ENTRYDEFN### NWrof7-proH-1
+###ENTRYEND###
+###ENTRYBEGIN### entryarray
+###ENTRYDEFN### NWrof7-actO-1
+###ENTRYEND###
+###ENTRYBEGIN### entrydefn
+###ENTRYDEFN### NWrof7-actO-1
+###ENTRYEND###
+###ENTRYBEGIN### entryuse
+###ENTRYDEFN### NWrof7-actO-1
+###ENTRYEND###
+###ENTRYBEGIN### lastdefnlabel
+###ENTRYDEFN### NWrof7-reaT-8
+###ENTRYEND###
+###ENTRYBEGIN### lastuse
+###ENTRYDEFN### NWrof7-reaT-B
+###ENTRYEND###
+###ENTRYBEGIN### lastxreflabel
+###ENTRYDEFN### NWrof7-reaT-2
+###ENTRYEND###
+###ENTRYBEGIN### lastxrefref
+###ENTRYDEFN### NWrof7-reaT-2
+###ENTRYEND###
+###ENTRYBEGIN### macrodir
+###ENTRYDEFN### NWrof7-nor6-1
+###ENTRYEND###
+###ENTRYBEGIN### name
+###ENTRYDEFN### NWrof7-reaT-8
+###ENTRYEND###
+###ENTRYBEGIN### noindex
+###ENTRYDEFN### NWrof7-proH-1
+###ENTRYEND###
+###ENTRYBEGIN### tag
+###ENTRYDEFN### NWrof7-fun9-2
+###ENTRYEND###
+###ENTRYBEGIN### tags
+###ENTRYDEFN### NWrof7-actO-1
+###ENTRYEND###
+###ENTRYBEGIN### tagsfile
+###ENTRYDEFN### NWrof7-invI-1
+###ENTRYEND###
+###ENTRYBEGIN### text
+###ENTRYDEFN### NWrof7-reaT-4
+###ENTRYEND###
+###ENDINDEX###

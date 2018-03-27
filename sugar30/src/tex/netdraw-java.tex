@@ -1,0 +1,192 @@
+\section{Introduction}
+
+The {\tt{}netdraw-java} module writes a device geometry to a file
+that can be read by the Java viewer.
+
+
+\section{Interface}
+
+\nwfilename{netdraw-java.nw}\nwbegincode{1}\sublabel{NWnetF-netE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-netE-1}}}\moddef{netdraw-java.h~{\nwtagstyle{}\subpageref{NWnetF-netE-1}}}\endmoddef
+#ifndef NETDRAW_JAVA_H
+#define NETDRAW_JAVA_H
+
+#include "mesh.h"
+
+void javawrite(FILE* fp, mesh_t mesh, double* x, int num_vars);
+
+#endif /* NETDRAW_JAVA_H */
+\nwnotused{netdraw-java.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWnetF-netE.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-netE.2-1}}}\moddef{netdraw-java.c~{\nwtagstyle{}\subpageref{NWnetF-netE.2-1}}}\endmoddef
+#ifdef HAS_XDR
+
+#include <stdio.h>
+#include <rpc/xdr.h>
+
+#include "netdraw-java.h"
+#include "netdraw.h"
+
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWnetF-staG-1}}\RA{}
+\LA{}beam function~{\nwtagstyle{}\subpageref{NWnetF-beaD-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWnetF-fun9-1}}\RA{}
+
+#endif /* HAS_XDR */
+\nwnotused{netdraw-java.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+\subsection{XDR output}
+
+Since Java saves data in standard network order, which is why we're
+using the external data representation (XDR) routines.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWnetF-creH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-creH-1}}}\moddef{create XDR stream~{\nwtagstyle{}\subpageref{NWnetF-creH-1}}}\endmoddef
+xdrstdio_create(&xdrs, fp, XDR_ENCODE);
+\nwused{\\{NWnetF-fun9-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWnetF-desI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-desI-1}}}\moddef{destroy XDR stream~{\nwtagstyle{}\subpageref{NWnetF-desI-1}}}\endmoddef
+xdr_destroy(&xdrs);
+\nwused{\\{NWnetF-fun9-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+Because the XDR routines are used for both input and output,
+they pass the variables by pointer.  It's convenient for us
+to write convenience functions that take their parameters
+by value.  Also, since it's overkill to write double precision
+values for something that will just go to the display, we
+actually convert double precision numbers to single precision
+before writing them out.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWnetF-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWnetF-staG-1}}}\endmoddef
+static void write_int(XDR* xdrs, int i)
+\{
+    xdr_int(xdrs, &i);
+\}
+
+static void write_double(XDR* xdrs, double d)
+\{
+    float ftmp = (float) d;
+    xdr_float(xdrs, &ftmp);
+\}
+
+\nwused{\\{NWnetF-netE.2-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{Draw commands}
+
+The records for elements in the Java display routine consist
+of a type identifier (beams are element type 1 to the display
+routine), followed by type-specific data.  For a beam, the
+record consists of the rotation to global coordinates,
+the dimensions of the beam, the translation part of the transformation
+to global coordinates, and the indices of the variables.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWnetF-beaD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-beaD-1}}}\moddef{beam function~{\nwtagstyle{}\subpageref{NWnetF-beaD-1}}}\endmoddef
+static void beam(void* xdrsp, double* transform, double l, double w, double h,
+                 int* vindex)
+\{
+    XDR*  xdrs = (XDR*) xdrsp;
+    int   i;
+
+    write_int(xdrs, 1);
+
+    for (i = 0; i < 9; ++i)
+        write_double(xdrs, transform[i]);
+
+    write_double(xdrs, l);
+    write_double(xdrs, w);
+    write_double(xdrs, h);
+
+    for (i = 10; i < 12; ++i)
+        write_double(xdrs, transform[i]);
+
+    for (i = 0; i < 12; ++i)
+        write_int(xdrs, vindex[i]);
+\}
+
+\nwused{\\{NWnetF-netE.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{Main routine}
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWnetF-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWnetF-fun9-1}}}\endmoddef
+void javawrite(FILE* fp, mesh_t mesh, double* x, int num_vars)
+\{
+    XDR xdrs;
+    int i, n;
+    \LA{}declare Java writer context~{\nwtagstyle{}\subpageref{NWnetF-decR-1}}\RA{}
+
+    \LA{}create XDR stream~{\nwtagstyle{}\subpageref{NWnetF-creH-1}}\RA{}
+    \LA{}write header~{\nwtagstyle{}\subpageref{NWnetF-wriC-1}}\RA{}
+    \LA{}write element records~{\nwtagstyle{}\subpageref{NWnetF-wriL-1}}\RA{}
+    \LA{}write displacement vector~{\nwtagstyle{}\subpageref{NWnetF-wriP-1}}\RA{}
+    \LA{}destroy XDR stream~{\nwtagstyle{}\subpageref{NWnetF-desI-1}}\RA{}    
+\}
+
+\nwused{\\{NWnetF-netE.2-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+The Java viewer file consists of
+\begin{itemize}
+  \item A header
+  \item Element geometry records
+  \item A displacement vector
+\end{itemize}
+
+The header is a single integer -- the number of geometry records.
+I hope to change the format some so that there is an end record
+rather than a count in the header.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWnetF-wriC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-wriC-1}}}\moddef{write header~{\nwtagstyle{}\subpageref{NWnetF-wriC-1}}}\endmoddef
+n = 0;
+for (i = 1; i <= mesh_num_elements(mesh); ++i) \{
+    element_t* element = mesh_element(mesh, i);
+    if (element->model->display)
+        ++n;
+\}
+
+write_int(&xdrs, n);
+
+\nwused{\\{NWnetF-fun9-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The geometry records are provided by the individual elements.
+We made the (not very good) assumption above that the number
+of records is equal to the number of routines that have display
+values.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWnetF-decR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-decR-1}}}\moddef{declare Java writer context~{\nwtagstyle{}\subpageref{NWnetF-decR-1}}}\endmoddef
+netdraw_fun_t java_draw_fun = \{ NULL, NULL, beam, NULL \};
+netdraw_gc_t  java_gc;
+
+java_gc.methods = &java_draw_fun;
+java_gc.data    = &xdrs;
+\nwused{\\{NWnetF-fun9-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWnetF-wriL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-wriL-1}}}\moddef{write element records~{\nwtagstyle{}\subpageref{NWnetF-wriL-1}}}\endmoddef
+for (i = 1; i <= mesh_num_elements(mesh); ++i)
+    element_display( mesh_element(mesh, i), &java_gc );
+
+\nwused{\\{NWnetF-fun9-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+Right now, we need \emph{some} displacement vector, even if
+we want to display the undisplaced structure.  Probably not
+the best way to arrange things, but it worked.  So if {\tt{}x}
+is NULL, we output an appropriately sized vector of zeros.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWnetF-wriP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetF-wriP-1}}}\moddef{write displacement vector~{\nwtagstyle{}\subpageref{NWnetF-wriP-1}}}\endmoddef
+for (i = 0; i < num_vars; ++i)
+    write_double(&xdrs, (x != NULL) ? x[i] : 0);
+\nwused{\\{NWnetF-fun9-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{beam function}{NWnetF-beaD-1}{\nwixu{NWnetF-netE.2-1}\nwixd{NWnetF-beaD-1}}}%
+\nwixlogsorted{c}{{create XDR stream}{NWnetF-creH-1}{\nwixd{NWnetF-creH-1}\nwixu{NWnetF-fun9-1}}}%
+\nwixlogsorted{c}{{declare Java writer context}{NWnetF-decR-1}{\nwixu{NWnetF-fun9-1}\nwixd{NWnetF-decR-1}}}%
+\nwixlogsorted{c}{{destroy XDR stream}{NWnetF-desI-1}{\nwixd{NWnetF-desI-1}\nwixu{NWnetF-fun9-1}}}%
+\nwixlogsorted{c}{{functions}{NWnetF-fun9-1}{\nwixu{NWnetF-netE.2-1}\nwixd{NWnetF-fun9-1}}}%
+\nwixlogsorted{c}{{netdraw-java.c}{NWnetF-netE.2-1}{\nwixd{NWnetF-netE.2-1}}}%
+\nwixlogsorted{c}{{netdraw-java.h}{NWnetF-netE-1}{\nwixd{NWnetF-netE-1}}}%
+\nwixlogsorted{c}{{static functions}{NWnetF-staG-1}{\nwixu{NWnetF-netE.2-1}\nwixd{NWnetF-staG-1}}}%
+\nwixlogsorted{c}{{write displacement vector}{NWnetF-wriP-1}{\nwixu{NWnetF-fun9-1}\nwixd{NWnetF-wriP-1}}}%
+\nwixlogsorted{c}{{write element records}{NWnetF-wriL-1}{\nwixu{NWnetF-fun9-1}\nwixd{NWnetF-wriL-1}}}%
+\nwixlogsorted{c}{{write header}{NWnetF-wriC-1}{\nwixu{NWnetF-fun9-1}\nwixd{NWnetF-wriC-1}}}%
+\nwbegindocs{22}\nwdocspar
+\nwenddocs{}

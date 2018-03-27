@@ -1,0 +1,452 @@
+\section{Introduction}
+
+The {\tt{}xtnetdraw} module is an X toolkit implementation of the
+{\tt{}netdraw} interface.
+
+
+\section{Interface}
+
+\nwfilename{netdraw-xt.nw}\nwbegincode{1}\sublabel{NWnetD-netC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-netC-1}}}\moddef{netdraw-xt.h~{\nwtagstyle{}\subpageref{NWnetD-netC-1}}}\endmoddef
+#ifndef NETDRAW_XT_H
+#define NETDRAW_XT_H
+
+#include "mesh.h"
+
+void xtnetdraw_init(int argc, char** argv);
+void xtnetdraw(mesh_t mesh, double* x);
+
+#endif /* NETDRAW_XT_H */
+\nwnotused{netdraw-xt.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+I am \emph{not} an expert X programmer.  Most of what I know about
+practical X programming is gleaned from manual pages, examples online,
+and experimenting with crossed fingers.  Caveat user.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWnetD-netC.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-netC.2-1}}}\moddef{netdraw-xt.c~{\nwtagstyle{}\subpageref{NWnetD-netC.2-1}}}\endmoddef
+#ifdef HAS_X11
+
+#include <stdlib.h>
+#include <assert.h>
+#include <math.h>
+
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <X11/StringDefs.h>
+#include <X11/Intrinsic.h>
+#include <X11/Core.h>
+#include <X11/Xaw/Box.h>
+#include <X11/Xaw/Command.h>
+
+#include "netdraw-xt.h"
+#include "netdraw.h"
+#include "mesh.h"
+#include "affine.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWnetD-typ5-1}}\RA{}
+\LA{}macros~{\nwtagstyle{}\subpageref{NWnetD-mac6-1}}\RA{}
+\LA{}static data~{\nwtagstyle{}\subpageref{NWnetD-staB-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWnetD-staG-1}}\RA{}
+\LA{}draw functions~{\nwtagstyle{}\subpageref{NWnetD-draE-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}\RA{}
+
+#endif /* HAS_X11 */
+\nwnotused{netdraw-xt.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Draw commands}
+
+The {\tt{}line} command is our one and only drawing function.  Its only
+exposure to the outside world will be when it is passed into the
+{\tt{}draw} model using the {\tt{}netdraw} interface.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWnetD-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWnetD-staB-1}}}\endmoddef
+static void line(void* pself, double* x1, double* x2);
+static double* get_x(void* pself);
+
+static netdraw_fun_t xt_draw_fun = \{line, NULL, NULL, get_x\};
+
+\nwalsodefined{\\{NWnetD-staB-2}}\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+There are two coordinate frames that we care about when displaying
+a line: global (world) coordinates, and view coordinates.
+There's also the screen coordinates. %'
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWnetD-draE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-draE-1}}}\moddef{draw functions~{\nwtagstyle{}\subpageref{NWnetD-draE-1}}}\endmoddef
+static void line(void* pself, double* x1, double* x2)
+\{
+    xtnet_gc_t* self = (xtnet_gc_t*) pself;
+    double pts[6];
+
+    memcpy(pts + 0, x1, 3*sizeof(double));
+    memcpy(pts + 3, x2, 3*sizeof(double));
+
+    affine_apply(self->toview,   pts + 0);
+    affine_apply(self->toscreen, pts + 0);    
+    affine_apply(self->toview,   pts + 3);
+    affine_apply(self->toscreen, pts + 3);
+
+    XDrawLine(self->disp, self->win, self->gc, 
+              (int) pts[0], (int) pts[1], (int) pts[3], (int) pts[4]);
+\}
+
+\nwalsodefined{\\{NWnetD-draE-2}}\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWnetD-draE-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-draE-2}}}\moddef{draw functions~{\nwtagstyle{}\subpageref{NWnetD-draE-1}}}\plusendmoddef
+static double* get_x(void* pself)
+\{
+    xtnet_gc_t* self = (xtnet_gc_t*) pself;
+    return self->x;
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{Draw all}
+
+The {\tt{}draw{\char95}all} function is called by the main X interface routine
+on display events, and is responsible for drawing the device.
+Naturally, the routine passes the buck on to the model functions.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWnetD-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWnetD-staG-1}}}\endmoddef
+static void draw_all(xtnet_gc_t* self)
+\{
+    int i, n;
+    netdraw_gc_t netdraw;
+    netdraw.methods = &xt_draw_fun;
+    netdraw.data    = self;
+
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_display( mesh_element(self->mesh, i), &netdraw );
+\}
+
+\nwalsodefined{\\{NWnetD-staG-2}\\{NWnetD-staG-3}\\{NWnetD-staG-4}\\{NWnetD-staG-5}}\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{X interface routines}
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWnetD-staB-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-staB-2}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWnetD-staB-1}}}\plusendmoddef
+static int    argc;
+static char** argv;
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWnetD-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}}\endmoddef
+void xtnetdraw_init(int my_argc, char** my_argv)
+\{
+    argc = my_argc;
+    argv = my_argv;
+\}
+
+\nwalsodefined{\\{NWnetD-fun9-2}}\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The main function {\tt{}xtnetdraw} forks a new process to serve
+as the X client, and then sets up the main X loop in the new
+process.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWnetD-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}}\plusendmoddef
+void xtnetdraw(mesh_t mesh, double* x)
+\{
+    \LA{}widget declarations~{\nwtagstyle{}\subpageref{NWnetD-widJ-1}}\RA{}
+    xtnet_gc_t* self;
+
+    int n;
+    Arg wargs[10];
+
+    if (fork() != 0)
+        return;
+
+    \LA{}initialize \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NWnetD-iniJ-1}}\RA{}
+    \LA{}initialize X client~{\nwtagstyle{}\subpageref{NWnetD-iniJ.2-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+The {\tt{}xtnet{\char95}gc{\char95}t} structure contains information about the
+graphics context needed by the drawing routines.
+The {\tt{}mesh} and {\tt{}x} fields store the mesh pointer and
+displacement vector; the {\tt{}toview} and {\tt{}toscreen} transformations
+describe how to map to view coordinates and to screen coordinates;
+and the {\tt{}disp}, {\tt{}win}, and {\tt{}gc} fields store the X context
+on which to display.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWnetD-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWnetD-typ5-1}}}\endmoddef
+typedef struct xtnet_gc_t \{
+    mesh_t mesh;
+    double* x;
+
+    double toview[12];
+    double toscreen[12];
+
+    Display* disp;
+    Window   win;
+    GC       gc;
+\} xtnet_gc_t;
+
+\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+The X context fields are set during the display event, when we actually
+have an X context to work with.  For now, we just save the mesh and
+displacement vectors and initialize the transformations.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWnetD-iniJ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-iniJ-1}}}\moddef{initialize \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NWnetD-iniJ-1}}}\endmoddef
+self = (xtnet_gc_t*) malloc(sizeof(struct xtnet_gc_t));
+
+self->mesh = mesh;
+self->x    = x;
+
+set_transforms(mesh, self->toview, self->toscreen);
+\nwused{\\{NWnetD-fun9-2}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWnetD-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWnetD-staG-1}}}\plusendmoddef
+static void set_transforms(mesh_t mesh, double* toview, double* toscreen)
+\{
+    int i, n;
+    double xmin, xmax, ymin, ymax, scale;
+
+    \LA{}get coordinate range information~{\nwtagstyle{}\subpageref{NWnetD-getW-1}}\RA{}
+    \LA{}set transformation to view coordinates~{\nwtagstyle{}\subpageref{NWnetD-setc-1}}\RA{}
+    \LA{}set transformation to screen coordinates~{\nwtagstyle{}\subpageref{NWnetD-sete-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The first step in figuring out our transformations is to figure out
+what ranges of coordinate values we'll see.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWnetD-mac6-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-mac6-1}}}\moddef{macros~{\nwtagstyle{}\subpageref{NWnetD-mac6-1}}}\endmoddef
+#define min(a,b) (((a)<(b)) ? (a) : (b))
+#define max(a,b) (((a)>(b)) ? (a) : (b))
+
+\nwalsodefined{\\{NWnetD-mac6-2}}\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWnetD-getW-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-getW-1}}}\moddef{get coordinate range information~{\nwtagstyle{}\subpageref{NWnetD-getW-1}}}\endmoddef
+xmin = ymin = 1;
+xmax = ymax = -1;
+n = mesh_num_nodes(mesh);
+for (i = 1; i <= n; ++i) \{
+    mesh_node_t* node = mesh_node(mesh, i);
+    xmin = min(xmin, node->x[0]);
+    xmax = max(xmax, node->x[0]);
+    ymin = min(ymin, node->x[1]);
+    ymax = max(ymax, node->x[1]);
+\}
+
+\nwused{\\{NWnetD-staG-2}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+Once we have the coordinate ranges, we use them to scale the device
+into the cube $[-0.5, 0.5]^3$.
+There should probably be a check here to ensure
+that the ranges aren't both zero.  We also want the bounding box for the
+device to be reasonably well-centered.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWnetD-setc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-setc-1}}}\moddef{set transformation to view coordinates~{\nwtagstyle{}\subpageref{NWnetD-setc-1}}}\endmoddef
+scale = 1/max(xmax-xmin, ymax-ymin);
+
+affine_identity(toview);
+affine_translate_xyz(toview, -(xmax+xmin)/2, -(ymax+ymin)/2, 0);
+affine_scale(toview, scale);
+\nwused{\\{NWnetD-staG-2}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+We need some size information in order to figure out the
+transformation to screen coordinates.  From some experimentation,
+these look like good size values.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWnetD-mac6-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-mac6-2}}}\moddef{macros~{\nwtagstyle{}\subpageref{NWnetD-mac6-1}}}\plusendmoddef
+#define FRAME_IN_SPACE 100
+#define FRAMEW 510
+#define FRAMEH 510
+
+#define FRAME_INW (FRAMEW - 2*FRAME_IN_SPACE)
+#define FRAME_INH (FRAMEH - 2*FRAME_IN_SPACE)
+
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+To get to the screen coordinates, we first reflect across
+the $y$ axis.  We then translate the
+interval $[-0.5, 0.5]$ into $[0,1]$, scale to screen widths,
+and then translate again to get a little border.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWnetD-sete-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-sete-1}}}\moddef{set transformation to screen coordinates~{\nwtagstyle{}\subpageref{NWnetD-sete-1}}}\endmoddef
+affine_identity(toscreen);
+toscreen[4] = -1;
+
+affine_translate_xyz(toscreen, 0.5, 0.5, 0);
+affine_scale_x(toscreen, FRAME_INW);
+affine_scale_y(toscreen, FRAME_INH);
+affine_translate_xyz(toscreen, FRAME_IN_SPACE, FRAME_IN_SPACE, 0);
+
+\nwused{\\{NWnetD-staG-2}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+The setup for the X client is pretty standard: we create a top level
+widget, add children and event handlers, and then display the widget
+and enter the Xt event loop.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWnetD-widJ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-widJ-1}}}\moddef{widget declarations~{\nwtagstyle{}\subpageref{NWnetD-widJ-1}}}\endmoddef
+Widget toplevel;
+\nwalsodefined{\\{NWnetD-widJ-2}}\nwused{\\{NWnetD-fun9-2}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWnetD-iniJ.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-iniJ.2-1}}}\moddef{initialize X client~{\nwtagstyle{}\subpageref{NWnetD-iniJ.2-1}}}\endmoddef
+toplevel = XtInitialize(argv[0], "drawing", NULL, 0, &argc, argv);
+
+\LA{}add widgets~{\nwtagstyle{}\subpageref{NWnetD-addB-1}}\RA{}
+\LA{}set frame size~{\nwtagstyle{}\subpageref{NWnetD-setE-1}}\RA{}
+\LA{}add event handlers~{\nwtagstyle{}\subpageref{NWnetD-addI-1}}\RA{}
+
+XtRealizeWidget(toplevel);
+XtMainLoop();
+\nwused{\\{NWnetD-fun9-2}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+There are three widgets in the user interface: a parent box where
+everything lives, a drawing pad, and a ``quit'' button.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWnetD-widJ-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-widJ-2}}}\moddef{widget declarations~{\nwtagstyle{}\subpageref{NWnetD-widJ-1}}}\plusendmoddef
+Widget box;
+Widget drawing;
+Widget quit;
+\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWnetD-addB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-addB-1}}}\moddef{add widgets~{\nwtagstyle{}\subpageref{NWnetD-addB-1}}}\endmoddef
+box     = XtCreateManagedWidget("box",  boxWidgetClass,  toplevel, NULL, 0);
+drawing = XtCreateManagedWidget("draw", coreWidgetClass,    box, NULL, 0);
+quit    = XtCreateManagedWidget("quit", commandWidgetClass, box, NULL, 0);
+\nwused{\\{NWnetD-iniJ.2-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWnetD-setE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-setE-1}}}\moddef{set frame size~{\nwtagstyle{}\subpageref{NWnetD-setE-1}}}\endmoddef
+n = 0;
+XtSetArg(wargs[n], XtNheight, FRAMEH); n++;
+XtSetArg(wargs[n], XtNwidth,  FRAMEW); n++;
+XtSetValues(drawing, wargs, n);
+
+\nwused{\\{NWnetD-iniJ.2-1}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+The setup for the ``quit'' button is darned simple -- we just get
+out of dodge.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWnetD-addI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-addI-1}}}\moddef{add event handlers~{\nwtagstyle{}\subpageref{NWnetD-addI-1}}}\endmoddef
+XtAddCallback(quit, XtNcallback, quit_func, NULL);
+\nwalsodefined{\\{NWnetD-addI-2}\\{NWnetD-addI-3}}\nwused{\\{NWnetD-iniJ.2-1}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWnetD-staG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-staG-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWnetD-staG-1}}}\plusendmoddef
+static void quit_func(Widget w, XtPointer client, XtPointer call)
+\{
+    exit(0);
+\}
+
+\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+The redraw event simply sets the appropriate fields in the {\tt{}self}
+record, creates a new graphics context, and then calls the 
+{\tt{}draw{\char95}all} routine to do most of the work.
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWnetD-addI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-addI-2}}}\moddef{add event handlers~{\nwtagstyle{}\subpageref{NWnetD-addI-1}}}\plusendmoddef
+XtAddEventHandler(drawing, ExposureMask, FALSE,
+                  (XtEventHandler) redisplay_event, self);
+\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWnetD-staG-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-staG-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWnetD-staG-1}}}\plusendmoddef
+static void redisplay_event(Widget w, XtPointer client, XExposeEvent* ev,
+                            Boolean* continue_dispatch)
+\{
+    xtnet_gc_t* self = (xtnet_gc_t*) client;
+
+    if (ev->count != 0)
+        return;
+
+    self->disp = XtDisplay(w);
+    self->win  = XtWindow(w);
+    XClearWindow(self->disp, self->win);
+
+    self->gc = XCreateGC(self->disp, self->win, 0, NULL);
+    XSetForeground(self->disp, self->gc, 1);
+    XSetBackground(self->disp, self->gc, 0);
+    draw_all(self);
+    XFreeGC(self->disp, self->gc);
+\}
+
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWnetD-cleG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-cleG-1}}}\moddef{clear and redraw~{\nwtagstyle{}\subpageref{NWnetD-cleG-1}}}\endmoddef
+self->disp = XtDisplay(w);
+self->win  = XtWindow(w);
+XClearWindow(self->disp, self->win);
+
+self->gc = XCreateGC(self->disp, self->win, 0, NULL);
+XSetForeground(self->disp, self->gc, 1);
+XSetBackground(self->disp, self->gc, 0);
+draw_all(self);
+XFreeGC(self->disp, self->gc);
+\nwused{\\{NWnetD-staG-5}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+The key press event handler rotates the displayed device by
+composing the transformation to view coordinates with a
+rotation.  Up and down arrows rotate about the $x$ axis;
+left and right arrows about the $y$ axis; and page up and
+page down about the $z$ axis.
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWnetD-addI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-addI-3}}}\moddef{add event handlers~{\nwtagstyle{}\subpageref{NWnetD-addI-1}}}\plusendmoddef
+XtAddEventHandler(drawing, KeyPressMask, FALSE,
+                  (XtEventHandler) keypress_event, self);
+\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWnetD-staG-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-staG-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWnetD-staG-1}}}\plusendmoddef
+static void keypress_event(Widget w, XtPointer client, XKeyEvent* ev,
+                           Boolean* continue_dispatch)
+\{
+    xtnet_gc_t* self = (xtnet_gc_t*) client;
+    double inc = (M_PI / 18);
+
+    switch (ev->keycode) \{
+        case 98:    /* Up    */
+            affine_rotate_ox(self->toview, -inc);
+            break;
+
+        case 104:   /* Down  */
+            affine_rotate_ox(self->toview, inc);
+            break;
+            
+        case 100:   /* Left  */
+            affine_rotate_oy(self->toview, inc);
+            break;
+            
+        case 102:   /* Right */
+            affine_rotate_oy(self->toview, -inc);
+            break;
+
+        case 99:    /* PgUp  */
+            affine_rotate_oz(self->toview, -inc);
+            break;
+
+        case 105:   /* PgDn  */
+            affine_rotate_oz(self->toview, inc);
+            break;
+    \}
+
+    \LA{}clear and redraw~{\nwtagstyle{}\subpageref{NWnetD-cleG-1}}\RA{}
+\}
+\nwendcode{}
+
+\nwixlogsorted{c}{{add event handlers}{NWnetD-addI-1}{\nwixu{NWnetD-iniJ.2-1}\nwixd{NWnetD-addI-1}\nwixd{NWnetD-addI-2}\nwixd{NWnetD-addI-3}}}%
+\nwixlogsorted{c}{{add widgets}{NWnetD-addB-1}{\nwixu{NWnetD-iniJ.2-1}\nwixd{NWnetD-addB-1}}}%
+\nwixlogsorted{c}{{clear and redraw}{NWnetD-cleG-1}{\nwixd{NWnetD-cleG-1}\nwixu{NWnetD-staG-5}}}%
+\nwixlogsorted{c}{{draw functions}{NWnetD-draE-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-draE-1}\nwixd{NWnetD-draE-2}}}%
+\nwixlogsorted{c}{{functions}{NWnetD-fun9-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-fun9-1}\nwixd{NWnetD-fun9-2}}}%
+\nwixlogsorted{c}{{get coordinate range information}{NWnetD-getW-1}{\nwixu{NWnetD-staG-2}\nwixd{NWnetD-getW-1}}}%
+\nwixlogsorted{c}{{initialize X client}{NWnetD-iniJ.2-1}{\nwixu{NWnetD-fun9-2}\nwixd{NWnetD-iniJ.2-1}}}%
+\nwixlogsorted{c}{{initialize \code{}self\edoc{}}{NWnetD-iniJ-1}{\nwixu{NWnetD-fun9-2}\nwixd{NWnetD-iniJ-1}}}%
+\nwixlogsorted{c}{{macros}{NWnetD-mac6-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-mac6-1}\nwixd{NWnetD-mac6-2}}}%
+\nwixlogsorted{c}{{netdraw-xt.c}{NWnetD-netC.2-1}{\nwixd{NWnetD-netC.2-1}}}%
+\nwixlogsorted{c}{{netdraw-xt.h}{NWnetD-netC-1}{\nwixd{NWnetD-netC-1}}}%
+\nwixlogsorted{c}{{set frame size}{NWnetD-setE-1}{\nwixu{NWnetD-iniJ.2-1}\nwixd{NWnetD-setE-1}}}%
+\nwixlogsorted{c}{{set transformation to screen coordinates}{NWnetD-sete-1}{\nwixu{NWnetD-staG-2}\nwixd{NWnetD-sete-1}}}%
+\nwixlogsorted{c}{{set transformation to view coordinates}{NWnetD-setc-1}{\nwixu{NWnetD-staG-2}\nwixd{NWnetD-setc-1}}}%
+\nwixlogsorted{c}{{static data}{NWnetD-staB-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-staB-1}\nwixd{NWnetD-staB-2}}}%
+\nwixlogsorted{c}{{static functions}{NWnetD-staG-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-staG-1}\nwixd{NWnetD-staG-2}\nwixd{NWnetD-staG-3}\nwixd{NWnetD-staG-4}\nwixd{NWnetD-staG-5}}}%
+\nwixlogsorted{c}{{types}{NWnetD-typ5-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-typ5-1}}}%
+\nwixlogsorted{c}{{widget declarations}{NWnetD-widJ-1}{\nwixu{NWnetD-fun9-2}\nwixd{NWnetD-widJ-1}\nwixd{NWnetD-widJ-2}}}%
+\nwbegindocs{58}\nwdocspar
+\nwenddocs{}

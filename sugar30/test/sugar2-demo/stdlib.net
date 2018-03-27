@@ -1,0 +1,149 @@
+
+subnet beam2de [a b] [l=* w=* h=* R=? G=? resistivity=?
+                      density=* fluid=* viscosity=* Youngsmodulus=*]
+[
+    call assert(isdef(R) | isdef(G) | isdef(resistivity), 
+		'R, G, or resistivity must be defined in beam2de')
+
+    if isdef(R) [
+        R parent [a b] [R=R]
+    ] else if isdef(G) [
+        R parent [a b] [G=G]
+    ] else if isdef(resistivity) & isdef(l) & isdef(w) & isdef(h) [
+        R parent [a b] [R=resistivity*l/(w*h)]
+    ] else [
+        call assert(0, 'R, G, or resistivity must be defined')
+    ]
+
+    beam2d parent [a b] [l=l w=w h=h 
+                         density=density viscosity=viscosity
+			 Youngsmodulus=Youngsmodulus]
+]
+
+subnet beam3de [a b] [l=* w=* h=* R=? G=? resistivity=?
+                      density=* fluid=* viscosity=* Youngsmodulus=*]
+[
+    if isdef(R) [
+        R parent [a b] [R=R]
+    ] else if isdef(G) [
+        R parent [a b] [G=G]
+    ] else if isdef(resistivity) & isdef(l) & isdef(w) & isdef(h) [
+        R parent [a b] [R=resistivity*l/(w*h)]
+    ] else [
+        call assert(0, 'R, G, or resistivity must be defined')
+    ]
+
+    beam3d parent [a b] [l=l w=w h=h 
+                         density=density viscosity=viscosity
+			 Youngsmodulus=Youngsmodulus]
+]
+
+subnet gap2de [a b c d] [l=* w=? w1=? w2=? h=*
+                         R=? R1=? R2=? G=? G1=? G2=? resistivity=? 
+                         density=* fluid=* viscosity=*
+		         Youngsmodulus=* 
+			 gap=* permittivity=*]
+[
+    call assert(isdef(w) | (isdef(w1) & isdef(w2)),
+		'Must define beam widths')
+
+    call assert(isdef(resistivity) | isdef(R) | isdef(G) |
+		((isdef(R1) | isdef(G1)) & isdef(R2) | isdef(G2)),
+		'Must define beam resistivities')
+   
+    w1 = cond(isdef(w1), w1, w)
+    w2 = cond(isdef(w2), w2, w)
+    R1 = cond(isdef(R1), R1, R)
+    R2 = cond(isdef(R2), R2, R)
+    G1 = cond(isdef(G1), G1, G)
+    G2 = cond(isdef(G2), G2, G)
+    
+    R1 = cond(isdef(R1) | isdef(G1), R1, resistivity*l/(w1*h))
+    R2 = cond(isdef(R2) | isdef(G2), R2, resistivity*l/(w2*h))
+
+    beam2de parent [a b] [l=l w=w1 h=h
+                          density=density fluid=fluid viscosity=viscosity
+			  Youngsmodulus=Youngsmodulus
+		          R=R1 G=G1]
+
+    beam2de parent [c d] [l=l w=w2 h=h
+                          density=density fluid=fluid viscosity=viscosity
+			  Youngsmodulus=Youngsmodulus
+			  R=R1 G=G1]
+
+    gap2dforce parent [a b c d] [l=l w1=w1 w2=w2 gap=gap 
+                                 permittivity=permittivity]
+]
+
+subnet gap3de [a b c d] [l=* w=? w1=? w2=? h=*
+                         R=? R1=? R2=? 
+			 G=? G1=? G2=? 
+			 resistivity=? 
+                         density=* fluid=* viscosity=*
+		         Youngsmodulus=* 
+			 gap=* permittivity=*]
+[
+    call assert(isdef(w) | (isdef(w1) & isdef(w2)),
+		'Must define beam widths')
+
+    call assert(isdef(resistivity) | isdef(R) | isdef(G) |
+		((isdef(R1) | isdef(G1)) & isdef(R2) | isdef(G2)),
+		'Must define beam resistivities')
+   
+    w1 = cond(isdef(w1), w1, w)
+    w2 = cond(isdef(w2), w2, w)
+    R1 = cond(isdef(R1), R1, R)
+    R2 = cond(isdef(R2), R2, R)
+    G1 = cond(isdef(G1), G1, G)
+    G2 = cond(isdef(G2), G2, G)
+    
+    R1 = cond(isdef(R1) | isdef(G1), R1, resistivity*l/(w1*h))
+    R2 = cond(isdef(R2) | isdef(G2), R2, resistivity*l/(w2*h))
+
+    beam3de parent [a b] [l=l w=w1 h=h
+                          density=density fluid=fluid viscosity=viscosity
+			  Youngsmodulus=Youngsmodulus
+		          R=R1 G=G1]
+
+    beam3de parent [c d] [l=l w=w2 h=h
+                          density=density fluid=fluid viscosity=viscosity
+			  Youngsmodulus=Youngsmodulus
+			  R=R1 G=G1]
+
+    gap3dforce parent [a b c d] [l=l w1=w1 w2=w2 gap=gap 
+                                 permittivity=permittivity]
+]
+
+subnet gap2dV [a b c d] [l=* w=? w1=? w2=? 
+                         R=? R1=? R2=? G=? G1=? G2=? resistivity=? 
+                         density=* fluid=* viscosity=*
+		         Youngsmodulus=* 
+			 gap=* permittivity=* V=*]
+[
+    gap2dV parent [a b c d] 
+                     [l=l w=w w1=w1 w2=w2 
+                      R=R R1=R1 R2=R2 G=G G1=G1 G2=G2 resistivity=resistivity
+                      density=density fluid=fluid viscosity=viscosity
+                      Youngsmodulus=Youngsmodulus 
+		      gap=gap permittivity=permittivity]
+
+    Vsrc    * [d b] [V=V]
+    eground * [b]   []
+]
+
+subnet gap3dV [a b c d] [l=* w=? w1=? w2=? 
+                         R=? R1=? R2=? G=? G1=? G2=? resistivity=? 
+                         density=* fluid=* viscosity=*
+		         Youngsmodulus=* 
+			 gap=* permittivity=* V=*]
+[
+    gap3dV parent [a b c d] 
+                     [l=l w=w w1=w1 w2=w2 
+                      R=R R1=R1 R2=R2 G=G G1=G1 G2=G2 resistivity=resistivity
+                      density=density fluid=fluid viscosity=viscosity
+                      Youngsmodulus=Youngsmodulus 
+		      gap=gap permittivity=permittivity]
+
+    Vsrc    * [d b] [V=V]
+    eground * [b]   []
+]

@@ -1,0 +1,75 @@
+% Describe a mass and suspension assembly for a simple resonator.
+
+uses mumps.net
+
+param forcerot=0
+param forcesize=30u
+
+L1=150u % Length of suspension beams to mass
+L3=130u % Length of suspension beams to anchors
+L2=90u  % Length of beams across the top
+
+%main mass
+Lm=50u
+wm=30u
+LM=50u
+wM=100u
+
+% This subnet builds half a flexural suspension.  The general shape of the
+% suspension is:
+%    +--+--+--+
+%    |  |  |  |
+%    |  |  |  |
+%    |  X  X  |
+%    |        |
+%    L        R
+%
+% where the "X"s are anchors and "L" and "R" are nodes that attach
+% to some other useful piece of the device.
+%
+subnet half_suspension [L R] [top=* to_anchor=* to_mass=* w=2u h=*]
+[
+  %top horizontals
+  beam3d parent [topleft topmidleft]     [l=top/3 w=w h=h oz=0]
+  beam3d parent [topmidleft topmidright] [l=top/3 w=w h=h oz=0]
+  beam3d parent [topmidright topright]   [l=top/3 w=w h=h oz=0]
+
+  %top verticals
+  beam3d parent [topleft L]   [l=to_mass w=w h=h oz=-deg(90)]
+  beam3d parent [topright R] [l=to_mass w=w h=h oz=-deg(90)]
+
+  %to anchors
+  beam3d parent [topmidleft leftanchor]   [l=to_mass w=w h=h oz=-deg(90)]
+  beam3d parent [topmidright rightanchor] [l=to_mass w=w h=h oz=-deg(90)]
+  anchor parent [leftanchor]              [l=5u w=10u h=h oz=-deg(90)]
+  anchor parent [rightanchor]             [l=5u w=10u h=h oz=-deg(90)]
+]
+
+% And this subnet builds half of a center piece shaped
+% vaguely like a dog bone:
+%
+subnet half_bone [center top bottom tip] 
+                 [lbone=* wbone=* lhandle=* whandle=* lm=* lM=* wM=*]
+[
+  % Build a handle to hold onto the mass from top and bottom
+  beam3d parent [top connector]    [l=lhandle w=whandle oz=-deg(90)]
+  beam3d parent [connector bottom] [l=lhandle w=whandle oz=-deg(90)]
+
+  % The shaft of the beam, with a place to attach handles
+  % and the "joint" of the bone at the end
+  beam3d parent [center connector]   [l=lbone w=wbone]
+  beam3d parent [connector massbase] [l=lm    w=wbone]
+  beam3d parent [massbase tip]       [l=lM    w=wM]
+]
+
+%force
+f3d * [j] [F=forcesize oz=forcerot]
+
+half_suspension p1 [e h] [top=L2 to_mass=L1 to_anchor=L2]
+half_suspension p1 [o l] [top=L2 to_mass=L1 to_anchor=L2 oz=deg(180)]
+
+half_bone p1 [j h o t]   [lbone=L2/2 wbone=20u lhandle=20u whandle=20u
+                          lm=20u lM=LM wM=wM]
+half_bone p1 [j l e v]   [lbone=L2/2 wbone=20u lhandle=20u whandle=20u
+                          lm=20u lM=LM wM=wM oz=deg(180)]
+

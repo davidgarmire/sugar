@@ -1,0 +1,73 @@
+
+\subsection{Interface}
+
+The standard netlist include file {\tt{}std.net} adds wrappers for
+the basic model functions.  This is also the right place to put
+commonly-used composite model functions.
+
+For models that require a material parameter, our convention
+is to add the material identifier as an additional ``positional''
+parameter to the wrapper function, after the node numbers.
+For example, to create a two-dimensional beam in the {\tt{}p1} process,
+we would write
+\begin{verbatim}
+  beam2d {A, B, p1; w=2u}
+\end{verbatim}
+For contrast, the corresponding call to {\tt{}element} would be
+\begin{verbatim}
+  element {A, B; model="beam2d", material=p1, w=2u}
+\end{verbatim}
+
+
+\subsection{Implementation}
+
+\nwfilename{std-net.nw}\nwbegincode{1}\sublabel{NWstdA-std7-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWstdA-std7-1}}}\moddef{std.net~{\nwtagstyle{}\subpageref{NWstdA-std7-1}}}\endmoddef
+use("xformstack.lua")
+use("relpos.lua")
+use("subnetize.lua")
+
+\LA{}model wrappers~{\nwtagstyle{}\subpageref{NWstdA-modE-1}}\RA{}
+\nwnotused{std.net}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}beam2d} wrapper adds relative position information
+if the length parameter {\tt{}l} is defined.  The {\tt{}beam2d}
+function is ``subnetized,'' so specifying {\tt{}ox}, {\tt{}oy},
+and {\tt{}oz} results in a rotated beam (a la SUGAR 2.0).
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWstdA-modE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWstdA-modE-1}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NWstdA-modE-1}}}\endmoddef
+subnet beam2d(A, B, material, l, w, h)
+  if l then
+    relpos_add(A, B, top_xform(\{l, 0, 0\}))
+  end
+  element \{A, B; model="beam2d", material=material, l=l, w=w, h=h\}
+end
+
+\nwalsodefined{\\{NWstdA-modE-2}\\{NWstdA-modE-3}}\nwused{\\{NWstdA-std7-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The semantics of the {\tt{}force} wrapper are not the same
+as those of the SUGAR 2.0 force.
+Perhaps the {\tt{}force} wrapper should also be ``subnetized''?
+Alternatively, we might add a separate wrapper (specifically
+to ease porting SUGAR 2.0 netlists) that applies a force along 
+a specified axis.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWstdA-modE-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWstdA-modE-2}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NWstdA-modE-1}}}\plusendmoddef
+subnet force()
+  args.model    = "force";
+  element(args);
+end
+
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWstdA-modE-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWstdA-modE-3}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NWstdA-modE-1}}}\plusendmoddef
+subnet anchor(A, material, l, w, h)
+  element \{A; model="anchor", material=material, l=l, w=w, h=h\}
+end
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{model wrappers}{NWstdA-modE-1}{\nwixu{NWstdA-std7-1}\nwixd{NWstdA-modE-1}\nwixd{NWstdA-modE-2}\nwixd{NWstdA-modE-3}}}%
+\nwixlogsorted{c}{{std.net}{NWstdA-std7-1}{\nwixd{NWstdA-std7-1}}}%
+\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}

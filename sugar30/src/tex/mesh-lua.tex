@@ -1,0 +1,478 @@
+
+\section{Introduction}
+
+The {\tt{}mesh-lua} module provides Lua interfaces to the mesh manipulation
+(not generation!) commands.  The mesh object methods provided include
+\begin{itemize}
+  \item {\tt{}m.print}:   Print out a textual representation of the mesh structure
+  \item {\tt{}m.vars}:    Assign variable identifiers
+  \item {\tt{}m.bc}:      Apply boundary conditions
+  \item {\tt{}m.R(x)}:    Return $R$ and $dR$ at $x$ (0 if $x$ omitted)
+  \item {\tt{}m.draw}:    Draws the undisplaced device
+  \item {\tt{}m.free}:    Free the mesh object
+\end{itemize}
+The mesh variables include
+\begin{itemize}
+  \item {\tt{}m.nvars}:   The number of variables in the mesh
+  \item {\tt{}m.nactive}: The number of active variables in the mesh
+\end{itemize}
+
+
+\section{Interface}
+
+The functions {\tt{}lua{\char95}mesh{\char95}add{\char95}table} and {\tt{}lua{\char95}mesh{\char95}rm{\char95}table}
+respectively add and remove closure functions for the table at the
+top of the stack.
+
+\nwfilename{mesh-lua.nw}\nwbegincode{1}\sublabel{NWmesB-mesA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mesA-1}}}\moddef{mesh-lua.h~{\nwtagstyle{}\subpageref{NWmesB-mesA-1}}}\endmoddef
+#ifndef MESH_LUA_H
+#define MESH_LUA_H
+
+#include <lua.h>
+#include "mesh.h"
+#include "netdraw-xt.h"
+#include "netdraw-java.h"
+
+void lua_mesh_register(lua_State* L);
+
+void   lua_mesh_create(lua_State* L, mesh_t mesh);
+mesh_t lua_mesh_get   (lua_State* L, int i);
+
+#endif /* MESH_LUA_H */
+\nwnotused{mesh-lua.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmesB-mesA.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mesA.2-1}}}\moddef{mesh-lua.c~{\nwtagstyle{}\subpageref{NWmesB-mesA.2-1}}}\endmoddef
+#include <stdlib.h>
+#include <string.h>
+
+#include "meshgen-lua.h"
+#include "mesh-lua.h"
+#include "matrix-lua.h"
+#include "superlu-lua.h"
+#include "vars.h"
+#include "assemble.h"
+#include "netout.h"
+#include "netout-file.h"
+#include "newton.h"
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NWmesB-staB-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}\RA{}
+\nwnotused{mesh-lua.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Mesh tag}
+
+The {\tt{}lua{\char95}mesh{\char95}tag} is the tag for the Lua mesh type.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmesB-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWmesB-staB-1}}}\endmoddef
+static int lua_mesh_tag;
+
+\nwused{\\{NWmesB-mesA.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{{\tt{}print} command}
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmesB-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\endmoddef
+static int lua_mesh_print(lua_State* L)
+\{
+    mesh_t mesh = lua_touserdata(L,-1);
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    netout_file(stdout, mesh);
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwalsodefined{\\{NWmesB-staG-2}\\{NWmesB-staG-3}\\{NWmesB-staG-4}\\{NWmesB-staG-5}\\{NWmesB-staG-6}\\{NWmesB-staG-7}\\{NWmesB-staG-8}\\{NWmesB-staG-9}\\{NWmesB-staG-A}\\{NWmesB-staG-B}}\nwused{\\{NWmesB-mesA.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{{\tt{}vars} command}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmesB-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_vars(lua_State* L)
+\{
+    mesh_t     mesh;
+    vars_mgr_t vars;
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    mesh = lua_touserdata(L,-1);
+    vars = mesh_vars_mgr(mesh);
+    vars_get_vartypes(vars);
+    vars_assign(vars);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{{\tt{}bc} command}
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmesB-staG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_bc(lua_State* L)
+\{
+    if (lua_gettop(L) != 1)
+        lua_error(L, "To many arguments");
+
+    assemble_displace(mesh_assembler(lua_touserdata(L,-1)));
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{{\tt{}R} command}
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmesB-staG-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_R(lua_State* L)
+\{
+    mesh_t      mesh      = lua_touserdata(L,-1);
+    vars_mgr_t  vars      = mesh_vars_mgr(mesh);
+    assembler_t assembler = mesh_assembler(mesh);
+    int         nvars     = vars_count(vars);
+    int         nactive   = assemble_get_active(assembler);
+
+    lua_matrix_t dR;
+    lua_matrix_t R;
+
+    double* x;
+    \LA{}get optional $x$ argument~{\nwtagstyle{}\subpageref{NWmesB-getP-1}}\RA{}
+
+    R  = lua_matrix_create(nactive, 1);
+    dR = lua_matrix_create(nactive, nactive);
+
+    R->m  = nactive;
+    dR->m = nactive;
+    dR->n = nactive;
+
+    assemble_R   (assembler, x, NULL, NULL, R->data, nactive);
+    assemble_dR  (assembler, 1, x, 0, NULL, 0, NULL, dR->data, nactive);
+
+    free(x);
+    lua_settop(L,0);
+    lua_matrix_push(L,R);
+    lua_matrix_push(L,dR);
+    return 2;
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmesB-getP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-getP-1}}}\moddef{get optional $x$ argument~{\nwtagstyle{}\subpageref{NWmesB-getP-1}}}\endmoddef
+if (lua_gettop(L) > 2)
+    lua_error(L, "Too many arguments");
+
+x = calloc(nvars, sizeof(double));
+memcpy(x, assemble_get_displacements(assembler), nvars * sizeof(double));
+if (lua_gettop(L) == 2) \{
+    lua_matrix_t xarg = lua_matrix_get(L,1);
+    if (xarg->m > nvars || xarg->n > 1) \{
+        free(x);
+        lua_error(L, "State vector too large");
+    \}
+    memcpy(x, xarg->data, xarg->m * sizeof(double));
+\}
+\nwused{\\{NWmesB-staG-4}\\{NWmesB-staG-5}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{{\tt{}R{\char95}csc} command}
+
+The {\tt{}R{\char95}csc} command \emph{prints} $R$, $dR$, and $(dR)^{-1} R$,
+but creates no Lua objects at the moment.  The only point is to test
+out that the sparse matrix assembly and solve routines work.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmesB-staG-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_R_csc(lua_State* L)
+\{
+#ifdef HAS_SUPERLU
+    mesh_t mesh = lua_touserdata(L,-1);
+
+    vars_mgr_t  vars      = mesh_vars_mgr(mesh);
+    assembler_t assembler = mesh_assembler(mesh);
+    int         nvars     = vars_count(vars);
+
+    double*      x;
+    lua_matrix_t R;
+    superlu_t    dR;
+    \LA{}get optional $x$ argument~{\nwtagstyle{}\subpageref{NWmesB-getP-1}}\RA{}
+
+    R = lua_matrix_create(nvars, 1);
+    R->m = assemble_get_active(assembler);
+
+    assemble_R(assembler, x, NULL, NULL, R->data, R->m);
+    dR = assemble_dR_csc(assembler, 1, x, 0, NULL, 0, NULL, R->m);
+
+    free(x);
+    lua_settop(L, 0);
+    lua_matrix_push(L, R);
+    lua_superlu_push(L, dR);
+    return 2;
+
+#else
+
+    lua_error(L, "SuperLU library not linked");
+    lua_settop(L, 0);
+    return 0;
+
+#endif
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\subsection{{\tt{}newton} command}
+
+This command calls Jiawang's Newton code to solve the residual equations. %'
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmesB-staG-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-6}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_newton(lua_State* L)
+\{
+#ifdef HAS_SUPERLU
+    mesh_t mesh = lua_touserdata(L,-1);
+    assembler_t assembler = mesh_assembler(mesh);
+
+    vars_mgr_t  vars      = mesh_vars_mgr(mesh);
+    int         nvars     = vars_count(vars);
+
+    lua_matrix_t x   = lua_matrix_create(nvars, 1);
+    lua_matrix_t R   = lua_matrix_create(nvars, 1);
+
+    memcpy(x->data, assemble_get_displacements(assembler), 
+           nvars * sizeof(double));
+    x->m = assemble_get_active(assembler);
+    R->m = assemble_get_active(assembler);
+
+    newton(mesh, x->m, x->data, R->data, NULL,
+           1e-4, 1e-10, 5);
+
+    lua_settop(L, 0);
+    lua_matrix_push(L, x);
+    lua_matrix_push(L, R);
+    return 2;
+
+#else
+
+    lua_error(L, "SuperLU library not linked");
+    lua_settop(L, 0);
+    return 0;
+
+#endif
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\subsection{{\tt{}draw} command}
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmesB-staG-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-7}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_draw(lua_State* L)
+\{
+    mesh_t mesh = lua_touserdata(L,-1);
+
+    const char* name = NULL;
+    double*     x    = NULL;
+
+    \LA{}get draw parameters~{\nwtagstyle{}\subpageref{NWmesB-getJ-1}}\RA{}
+
+    if (name != NULL) \{
+        \LA{}draw to Java file~{\nwtagstyle{}\subpageref{NWmesB-draH-1}}\RA{}
+    \} else \{
+        \LA{}draw to X display~{\nwtagstyle{}\subpageref{NWmesB-draH.2-1}}\RA{}
+    \}
+
+    if (x)
+        free(x);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmesB-draH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-draH-1}}}\moddef{draw to Java file~{\nwtagstyle{}\subpageref{NWmesB-draH-1}}}\endmoddef
+#ifdef HAS_XDR
+    FILE* fp = fopen(name, "w");
+    javawrite(fp, mesh, x, vars_count(mesh_vars_mgr(mesh)));
+    fclose(fp);
+#else
+    lua_error(L, "XDR libraries required for Java output\\n");
+#endif
+\nwused{\\{NWmesB-staG-7}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmesB-draH.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-draH.2-1}}}\moddef{draw to X display~{\nwtagstyle{}\subpageref{NWmesB-draH.2-1}}}\endmoddef
+#ifdef HAS_X11
+    xtnetdraw(mesh, x);
+#else
+    lua_error(L, "X libraries not linked\\n");
+#endif
+\nwused{\\{NWmesB-staG-7}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmesB-getJ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-getJ-1}}}\moddef{get draw parameters~{\nwtagstyle{}\subpageref{NWmesB-getJ-1}}}\endmoddef
+lua_pop(L,1);
+if (lua_gettop(L) > 0 && lua_isuserdata(L,-1)) \{
+    \LA{}get draw displacement parameter~{\nwtagstyle{}\subpageref{NWmesB-getV-1}}\RA{}
+    lua_pop(L,1);
+\}
+
+if (lua_gettop(L) > 0 && lua_isstring(L,-1)) \{
+    name = lua_tostring(L,-1);
+    lua_pop(L,1);
+\}
+
+if (lua_gettop(L) > 0)
+    lua_error(L, "Wrong number of parameters");
+
+\nwused{\\{NWmesB-staG-7}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmesB-getV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-getV-1}}}\moddef{get draw displacement parameter~{\nwtagstyle{}\subpageref{NWmesB-getV-1}}}\endmoddef
+lua_matrix_t xarg = lua_matrix_get(L,-1);
+vars_mgr_t   vars_mgr  = mesh_vars_mgr(mesh);
+assembler_t  assembler = mesh_assembler(mesh);
+int          nvars     = vars_count(vars_mgr);
+int          nactive   = assemble_get_active(assembler);
+
+double*      displacements = assemble_get_displacements(assembler);
+
+if (xarg->m != nactive || xarg->n != 1)
+    lua_error(L, "State vector is wrong size");
+
+x = calloc(nvars, sizeof(double));
+memcpy(x, displacements, nvars * sizeof(double));
+memcpy(x, xarg->data, nactive * sizeof(double));
+ 
+\nwused{\\{NWmesB-getJ-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\subsection{{\tt{}free} method}
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWmesB-staG-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-8}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_free(lua_State* L)
+\{
+    mesh_t mesh = lua_touserdata(L,-1);
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    mesh_destroy(mesh);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+
+\subsection{{\tt{}nvars} and {\tt{}nactive}}
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWmesB-staG-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-9}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_nvars(lua_State* L)
+\{
+    int nvars = vars_count(mesh_vars_mgr(lua_touserdata(L,-1)));
+    lua_settop(L,0);
+    lua_pushnumber(L, nvars);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWmesB-staG-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-A}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_nactive(lua_State* L)
+\{
+    int nvars = assemble_get_active(mesh_assembler(lua_touserdata(L,-1)));
+    lua_settop(L,0);
+    lua_pushnumber(L, nvars);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+
+\subsection{Methods}
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWmesB-staG-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-B}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_mesh_getmethod(lua_State* L)
+\{
+    const char* name;
+
+    if (!lua_isstring(L,2))
+        lua_error(L, "Invalid index");
+    name = lua_tostring(L,2);
+    lua_pop(L,1);
+
+    if (strcmp(name, "print") == 0)
+        lua_pushcclosure(L, lua_mesh_print, 1);
+    else if (strcmp(name, "vars") == 0)
+        lua_pushcclosure(L, lua_mesh_vars, 1);
+    else if (strcmp(name, "bc") == 0)
+        lua_pushcclosure(L, lua_mesh_bc, 1);
+    else if (strcmp(name, "R") == 0)
+        lua_pushcclosure(L, lua_mesh_R, 1);
+    else if (strcmp(name, "R_csc") == 0)
+        lua_pushcclosure(L, lua_mesh_R_csc, 1);
+    else if (strcmp(name, "newton") == 0)
+        lua_pushcclosure(L, lua_mesh_newton, 1);
+    else if (strcmp(name, "draw") == 0)
+        lua_pushcclosure(L, lua_mesh_draw, 1);
+    else if (strcmp(name, "free") == 0)
+        lua_pushcclosure(L, lua_mesh_free, 1);
+    else if (strcmp(name, "nvars") == 0)
+        lua_mesh_nvars(L);
+    else if (strcmp(name, "nactive") == 0)
+        lua_mesh_nactive(L);
+    else
+        lua_error(L, "Invalid field or method name");
+
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+
+\subsection{Registration function}
+
+The {\tt{}lua{\char95}mesh{\char95}add{\char95}table} and {\tt{}lua{\char95}mesh{\char95}rm{\char95}table} functions
+respectively add methods to and remove methods from a Lua table.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWmesB-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\endmoddef
+void lua_mesh_register(lua_State* L)
+\{
+    lua_mesh_tag = lua_newtag(L);
+    lua_pushcclosure(L, lua_mesh_getmethod, 0);
+    lua_settagmethod(L, lua_mesh_tag, "gettable");
+\}
+
+void lua_mesh_create(lua_State* L, mesh_t mesh)
+\{
+    lua_pushusertag(L, mesh, lua_mesh_tag);
+\}
+
+mesh_t lua_mesh_get(lua_State* L, int i)
+\{
+    if (lua_gettop(L) < i)
+        lua_error(L, "Index out of range");
+
+    if (lua_tag(L,i) != lua_mesh_tag)
+        lua_error(L, "Not a mesh!");
+
+    return lua_touserdata(L,i);
+\}
+
+\nwused{\\{NWmesB-mesA.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{draw to Java file}{NWmesB-draH-1}{\nwixu{NWmesB-staG-7}\nwixd{NWmesB-draH-1}}}%
+\nwixlogsorted{c}{{draw to X display}{NWmesB-draH.2-1}{\nwixu{NWmesB-staG-7}\nwixd{NWmesB-draH.2-1}}}%
+\nwixlogsorted{c}{{functions}{NWmesB-fun9-1}{\nwixu{NWmesB-mesA.2-1}\nwixd{NWmesB-fun9-1}}}%
+\nwixlogsorted{c}{{get draw displacement parameter}{NWmesB-getV-1}{\nwixu{NWmesB-getJ-1}\nwixd{NWmesB-getV-1}}}%
+\nwixlogsorted{c}{{get draw parameters}{NWmesB-getJ-1}{\nwixu{NWmesB-staG-7}\nwixd{NWmesB-getJ-1}}}%
+\nwixlogsorted{c}{{get optional $x$ argument}{NWmesB-getP-1}{\nwixu{NWmesB-staG-4}\nwixd{NWmesB-getP-1}\nwixu{NWmesB-staG-5}}}%
+\nwixlogsorted{c}{{mesh-lua.c}{NWmesB-mesA.2-1}{\nwixd{NWmesB-mesA.2-1}}}%
+\nwixlogsorted{c}{{mesh-lua.h}{NWmesB-mesA-1}{\nwixd{NWmesB-mesA-1}}}%
+\nwixlogsorted{c}{{static data}{NWmesB-staB-1}{\nwixu{NWmesB-mesA.2-1}\nwixd{NWmesB-staB-1}}}%
+\nwixlogsorted{c}{{static functions}{NWmesB-staG-1}{\nwixu{NWmesB-mesA.2-1}\nwixd{NWmesB-staG-1}\nwixd{NWmesB-staG-2}\nwixd{NWmesB-staG-3}\nwixd{NWmesB-staG-4}\nwixd{NWmesB-staG-5}\nwixd{NWmesB-staG-6}\nwixd{NWmesB-staG-7}\nwixd{NWmesB-staG-8}\nwixd{NWmesB-staG-9}\nwixd{NWmesB-staG-A}\nwixd{NWmesB-staG-B}}}%
+\nwbegindocs{40}\nwdocspar
+\nwenddocs{}

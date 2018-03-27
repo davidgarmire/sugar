@@ -1,0 +1,388 @@
+
+\section{Introduction}
+
+The {\tt{}vars{\char95}mex} module is the Matlab interface to the variable
+manager routines.
+
+
+\section{Interface}
+
+\nwfilename{vars-mex.nw}\nwbegincode{1}\sublabel{NWvarB-varA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-varA-1}}}\moddef{vars-mex.h~{\nwtagstyle{}\subpageref{NWvarB-varA-1}}}\endmoddef
+#ifndef VARS_MEX_H
+#define VARS_MEX_H
+
+#include "vars.h"
+
+void vars_mex_register();
+void vars_mex_shutdown();
+int  vars_mex_handle_tag();
+
+vars_mgr_t mx_to_vars_mgr(const mxArray* array);
+
+#endif /* VARS_MEX_H */
+\nwnotused{vars-mex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWvarB-varA.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-varA.2-1}}}\moddef{vars-mex.c~{\nwtagstyle{}\subpageref{NWvarB-varA.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include "mex-handle.h"
+#include "sugarmex.h"
+#include "mesh-mex.h"
+#include "vars-mex.h"
+#include "assemble.h"
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NWvarB-staB-1}}\RA{}
+\LA{}mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWvarB-fun9-1}}\RA{}
+\nwnotused{vars-mex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Variable manager data structures}
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWvarB-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWvarB-staB-1}}}\endmoddef
+static int vars_handle_tag;
+
+\nwused{\\{NWvarB-varA.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWvarB-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvarB-fun9-1}}}\endmoddef
+void vars_mex_register()
+\{
+    vars_handle_tag = mex_handle_new_tag();
+    \LA{}register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}\RA{}
+\}
+
+void vars_mex_shutdown()
+\{
+\}
+
+int vars_mex_handle_tag()
+\{
+    return vars_handle_tag;
+\}
+
+\nwalsodefined{\\{NWvarB-fun9-2}}\nwused{\\{NWvarB-varA.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Conversion functions}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWvarB-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWvarB-fun9-1}}}\plusendmoddef
+vars_mgr_t mx_to_vars_mgr(const mxArray* array)
+\{
+    return mx_to_handle(array, vars_handle_tag, "Invalid vars manager handle");
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{{\tt{}vars{\char95}node} command}
+
+The {\tt{}vars{\char95}node(vars{\char95}mgr,\ node{\char95}id,\ name)} function adds a variable
+to the variable manager.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWvarB-choF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-choF-1}}}\moddef{cho-vars-node.m~{\nwtagstyle{}\subpageref{NWvarB-choF-1}}}\endmoddef
+function [var_id] = cho_vars_node(varmgr, node, name)
+var_id = sugarmex('vars_node', varmgr, node, name);
+\nwnotused{cho-vars-node.m}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWvarB-regM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\endmoddef
+mexmgr_add("vars_node", mex_vars_node);
+\nwalsodefined{\\{NWvarB-regM-2}\\{NWvarB-regM-3}\\{NWvarB-regM-4}\\{NWvarB-regM-5}\\{NWvarB-regM-6}\\{NWvarB-regM-7}\\{NWvarB-regM-8}}\nwused{\\{NWvarB-fun9-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWvarB-mexD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\endmoddef
+static void mex_vars_node(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+\{
+    vars_mgr_t vars;
+    int        node_id;
+    char*      name;
+
+    mex_check_num_args(nrhs, 3);
+    vars    = mx_to_vars_mgr    (prhs[0]);
+    node_id = (int) mx_to_double(prhs[1]);
+    name    = mx_to_string      (prhs[2]);
+
+    plhs[0] = mx_from_double(vars_node(vars, node_id, name));
+\}
+
+\nwalsodefined{\\{NWvarB-mexD-2}\\{NWvarB-mexD-3}\\{NWvarB-mexD-4}\\{NWvarB-mexD-5}\\{NWvarB-mexD-6}\\{NWvarB-mexD-7}\\{NWvarB-mexD-8}}\nwused{\\{NWvarB-varA.2-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{{\tt{}vars{\char95}branch} command}
+
+The {\tt{}vars{\char95}branch(vars{\char95}mgr,\ name)} function adds a variable
+to the variable manager.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWvarB-choH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-choH-1}}}\moddef{cho-vars-branch.m~{\nwtagstyle{}\subpageref{NWvarB-choH-1}}}\endmoddef
+function [var_id] = cho_mesh_branch(varmgr, name)
+var_id = sugarmex('vars_branch', varmgr, name);
+\nwnotused{cho-vars-branch.m}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWvarB-regM-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-regM-2}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\plusendmoddef
+mexmgr_add("vars_branch", mex_vars_branch);
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWvarB-mexD-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-mexD-2}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\plusendmoddef
+static void mex_vars_branch(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    vars_mgr_t vars;
+    char*      name;
+
+    mex_check_num_args(nrhs, 2);
+    vars    = mx_to_vars_mgr    (prhs[0]);
+    name    = mx_to_string      (prhs[1]);
+
+    plhs[0] = mx_from_double(vars_branch(vars, name));
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+
+\subsection{{\tt{}vars{\char95}assign} command}
+
+The {\tt{}vars{\char95}assign} function does variable identifier assignment
+for a mesh.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWvarB-choH.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-choH.2-1}}}\moddef{cho-vars-assign.m~{\nwtagstyle{}\subpageref{NWvarB-choH.2-1}}}\endmoddef
+function cho_vars_assign(mesh)
+sugarmex('vars_assign', mesh);
+\nwnotused{cho-vars-assign.m}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWvarB-regM-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-regM-3}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\plusendmoddef
+mexmgr_add("vars_assign", mex_vars_assign);
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWvarB-mexD-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-mexD-3}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\plusendmoddef
+static void mex_vars_assign(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    mesh_t     mesh;
+    vars_mgr_t vars;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+    vars = mesh_vars_mgr(mesh);
+
+    vars_get_vartypes(vars);
+    vars_assign(vars);
+\}
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+ 
+
+\subsection{{\tt{}vars{\char95}lookup{\char95}node} command}
+
+The {\tt{}vars{\char95}lookup{\char95}node} function looks up a nodal variable index.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWvarB-choM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-choM-1}}}\moddef{cho-vars-lookup-node.m~{\nwtagstyle{}\subpageref{NWvarB-choM-1}}}\endmoddef
+function [id] = cho_vars_lookup_node(mesh, node_id, name)
+id = sugarmex('vars_lookup_node', mesh, node_id, name);
+\nwnotused{cho-vars-lookup-node.m}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWvarB-regM-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-regM-4}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\plusendmoddef
+mexmgr_add("vars_lookup_node", mex_vars_lookup_node);
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWvarB-mexD-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-mexD-4}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\plusendmoddef
+static void mex_vars_lookup_node(int nlhs, mxArray* plhs[],
+                                 int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    int         node_id;
+    const char* name;
+    vars_mgr_t  vars;
+
+    mex_check_num_args(nrhs, 3);
+    mesh    = mx_to_mesh(prhs[0]);
+    node_id = (int) mx_to_double(prhs[1]);
+    name    = mx_to_string(prhs[2]);
+    vars    = mesh_vars_mgr(mesh);
+
+    plhs[0] = mx_from_double(vars_lookup_node(vars, node_id, name) + 1);
+\}
+
+\nwendcode{}\nwbegindocs{34}\nwdocspar
+ 
+
+\subsection{{\tt{}vars{\char95}lookup{\char95}branch} command}
+
+The {\tt{}vars{\char95}lookup{\char95}branch} function looks up a branch variable index.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWvarB-choO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-choO-1}}}\moddef{cho-vars-lookup-branch.m~{\nwtagstyle{}\subpageref{NWvarB-choO-1}}}\endmoddef
+function [id] = cho_vars_lookup_branch(mesh, elt_id, var_number)
+id = sugarmex('vars_lookup_branch', mesh, elt_id, var_number);
+\nwnotused{cho-vars-lookup-branch.m}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWvarB-regM-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-regM-5}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\plusendmoddef
+mexmgr_add("vars_lookup_branch", mex_vars_lookup_branch);
+\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWvarB-mexD-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-mexD-5}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\plusendmoddef
+static void mex_vars_lookup_branch(int nlhs, mxArray* plhs[],
+                                   int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    int         elt_id;
+    int         var_number;
+    vars_mgr_t  vars;
+
+    mex_check_num_args(nrhs, 3);
+    mesh        = mx_to_mesh(prhs[0]);
+    elt_id      = (int) mx_to_double(prhs[1]);
+    var_number  = (int) mx_to_double(prhs[2]);
+    vars        = mesh_vars_mgr(mesh);
+
+    plhs[0] = mx_from_double(vars_lookup_branch(vars, elt_id, var_number) + 1);
+\}
+
+\nwendcode{}\nwbegindocs{40}\nwdocspar
+ 
+
+\subsection{{\tt{}vars{\char95}lookup} command}
+
+The {\tt{}vars{\char95}lookup} function builds a table of variable
+information.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWvarB-choH.3-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-choH.3-1}}}\moddef{cho-vars-lookup.m~{\nwtagstyle{}\subpageref{NWvarB-choH.3-1}}}\endmoddef
+function [vars] = cho_vars_lookup(mesh)
+vars = sugarmex('vars_lookup', mesh);
+\nwnotused{cho-vars-lookup.m}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWvarB-regM-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-regM-6}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\plusendmoddef
+mexmgr_add("vars_lookup", mex_vars_lookup);
+\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWvarB-mexD-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-mexD-6}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\plusendmoddef
+static void mex_vars_lookup(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    mesh_t       mesh;
+    vars_mgr_t   vars;
+    vars_desc_t* v;
+    int          nvars;
+    int          i;
+
+    const char* fieldnames[4] = \{
+        "type",
+        "parent",
+        "name",
+        "offset"
+    \};
+
+    mex_check_num_args(nrhs, 1);
+    mesh        = mx_to_mesh(prhs[0]);
+    vars        = mesh_vars_mgr(mesh);
+    nvars       = vars_count(vars);
+
+    v = mxCalloc(nvars, sizeof(vars_desc_t));
+    vars_lookup(vars, v);
+
+    plhs[0] = mxCreateStructMatrix(nvars, 1, 4, fieldnames);
+    for (i = 0; i < nvars; ++i) \{
+        if (v[i].type == 'n') \{
+            mxSetFieldByNumber(plhs[0], i, 0, mxCreateString("node"));
+            mxSetFieldByNumber(plhs[0], i, 1, mx_from_double(v[i].parent));
+            mxSetFieldByNumber(plhs[0], i, 2, mxCreateString(v[i].name));
+            mxSetFieldByNumber(plhs[0], i, 3, mx_from_nil   ());
+        \} else if (v[i].type == 'b') \{
+            mxSetFieldByNumber(plhs[0], i, 0, mxCreateString("branch"));
+            mxSetFieldByNumber(plhs[0], i, 1, mx_from_double(v[i].parent));
+            mxSetFieldByNumber(plhs[0], i, 2, mxCreateString(""));
+            mxSetFieldByNumber(plhs[0], i, 3, mx_from_double(v[i].offset));
+        \} else \{
+            mexErrMsgTxt("Internal error in variable indexing");
+        \}
+    \}
+    mxFree(v);
+\}
+
+\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+
+\subsection{{\tt{}vars{\char95}nvars} command}
+
+The {\tt{}vars{\char95}nvars} function returns the count of the total
+number of variables.
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWvarB-choG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-choG-1}}}\moddef{cho-vars-nvars.m~{\nwtagstyle{}\subpageref{NWvarB-choG-1}}}\endmoddef
+function [nvars] = cho_vars_nvars(mesh)
+nvars = sugarmex('vars_nvars', mesh);
+\nwnotused{cho-vars-nvars.m}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWvarB-regM-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-regM-7}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\plusendmoddef
+mexmgr_add("vars_nvars", mex_vars_nvars);
+\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWvarB-mexD-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-mexD-7}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\plusendmoddef
+static void mex_vars_nvars(int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[])
+\{
+    mesh_t     mesh;
+    vars_mgr_t vars;
+    int        nvars;
+
+    mex_check_num_args(nrhs, 1);
+    mesh  = mx_to_mesh(prhs[0]);
+    vars  = mesh_vars_mgr(mesh);
+    nvars = vars_count(vars);
+
+    plhs[0] = mx_from_double(nvars);
+\}
+
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+
+\subsection{{\tt{}vars{\char95}nactive} command}
+
+The {\tt{}vars{\char95}nactive} function returns the count of the total
+number of variables.
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWvarB-choI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-choI-1}}}\moddef{cho-vars-nactive.m~{\nwtagstyle{}\subpageref{NWvarB-choI-1}}}\endmoddef
+function [nactive] = cho_vars_nactive(mesh)
+nactive = sugarmex('vars_nactive', mesh);
+\nwnotused{cho-vars-nactive.m}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWvarB-regM-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-regM-8}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWvarB-regM-1}}}\plusendmoddef
+mexmgr_add("vars_nactive", mex_vars_nactive);
+\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWvarB-mexD-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWvarB-mexD-8}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWvarB-mexD-1}}}\plusendmoddef
+static void mex_vars_nactive(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    assembler_t assembler;
+    int         nactive;
+
+    mex_check_num_args(nrhs, 1);
+    mesh      = mx_to_mesh(prhs[0]);
+    assembler = mesh_assembler(mesh);
+    nactive   = assemble_get_active(assembler);
+
+    plhs[0] = mx_from_double(nactive);
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{cho-vars-assign.m}{NWvarB-choH.2-1}{\nwixd{NWvarB-choH.2-1}}}%
+\nwixlogsorted{c}{{cho-vars-branch.m}{NWvarB-choH-1}{\nwixd{NWvarB-choH-1}}}%
+\nwixlogsorted{c}{{cho-vars-lookup-branch.m}{NWvarB-choO-1}{\nwixd{NWvarB-choO-1}}}%
+\nwixlogsorted{c}{{cho-vars-lookup.m}{NWvarB-choH.3-1}{\nwixd{NWvarB-choH.3-1}}}%
+\nwixlogsorted{c}{{cho-vars-lookup-node.m}{NWvarB-choM-1}{\nwixd{NWvarB-choM-1}}}%
+\nwixlogsorted{c}{{cho-vars-nactive.m}{NWvarB-choI-1}{\nwixd{NWvarB-choI-1}}}%
+\nwixlogsorted{c}{{cho-vars-node.m}{NWvarB-choF-1}{\nwixd{NWvarB-choF-1}}}%
+\nwixlogsorted{c}{{cho-vars-nvars.m}{NWvarB-choG-1}{\nwixd{NWvarB-choG-1}}}%
+\nwixlogsorted{c}{{functions}{NWvarB-fun9-1}{\nwixu{NWvarB-varA.2-1}\nwixd{NWvarB-fun9-1}\nwixd{NWvarB-fun9-2}}}%
+\nwixlogsorted{c}{{mex functions}{NWvarB-mexD-1}{\nwixu{NWvarB-varA.2-1}\nwixd{NWvarB-mexD-1}\nwixd{NWvarB-mexD-2}\nwixd{NWvarB-mexD-3}\nwixd{NWvarB-mexD-4}\nwixd{NWvarB-mexD-5}\nwixd{NWvarB-mexD-6}\nwixd{NWvarB-mexD-7}\nwixd{NWvarB-mexD-8}}}%
+\nwixlogsorted{c}{{register mex functions}{NWvarB-regM-1}{\nwixu{NWvarB-fun9-1}\nwixd{NWvarB-regM-1}\nwixd{NWvarB-regM-2}\nwixd{NWvarB-regM-3}\nwixd{NWvarB-regM-4}\nwixd{NWvarB-regM-5}\nwixd{NWvarB-regM-6}\nwixd{NWvarB-regM-7}\nwixd{NWvarB-regM-8}}}%
+\nwixlogsorted{c}{{static data}{NWvarB-staB-1}{\nwixu{NWvarB-varA.2-1}\nwixd{NWvarB-staB-1}}}%
+\nwixlogsorted{c}{{vars-mex.c}{NWvarB-varA.2-1}{\nwixd{NWvarB-varA.2-1}}}%
+\nwixlogsorted{c}{{vars-mex.h}{NWvarB-varA-1}{\nwixd{NWvarB-varA-1}}}%
+\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}

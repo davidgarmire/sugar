@@ -1,0 +1,120 @@
+
+\section{Introduction}
+
+The {\tt{}netout{\char95}mex} module provides Matlab interfaces to
+the netlist output routines.
+
+
+\section{Interface}
+
+\nwfilename{netout-mex.nw}\nwbegincode{1}\sublabel{NWnetD-netC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-netC-1}}}\moddef{netout-mex.h~{\nwtagstyle{}\subpageref{NWnetD-netC-1}}}\endmoddef
+#ifndef NETOUT_MEX_H
+#define NETOUT_MEX_H
+
+#include <mex.h>
+#include "netout.h"
+
+void netout_mex_register();
+int  netout_mex_tag();
+
+netout_t* mx_to_netout(const mxArray* array);
+
+#endif /* NETOUT_MEX_H */
+\nwnotused{netout-mex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWnetD-netC.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-netC.2-1}}}\moddef{netout-mex.c~{\nwtagstyle{}\subpageref{NWnetD-netC.2-1}}}\endmoddef
+#include "sugarmex.h"
+#include "mex-handle.h"
+#include "netout-mex.h"
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NWnetD-staB-1}}\RA{}
+\LA{}mex functions~{\nwtagstyle{}\subpageref{NWnetD-mexD-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}\RA{}
+\nwnotused{netout-mex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Netout data structures}
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWnetD-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWnetD-staB-1}}}\endmoddef
+static int netout_handle_tag;
+
+\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWnetD-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}}\endmoddef
+void netout_mex_register()
+\{
+    netout_handle_tag = mex_handle_new_tag();
+    \LA{}register mex functions~{\nwtagstyle{}\subpageref{NWnetD-regM-1}}\RA{}
+\}
+
+\nwalsodefined{\\{NWnetD-fun9-2}\\{NWnetD-fun9-3}}\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWnetD-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}}\plusendmoddef
+int netout_mex_tag()
+\{
+    return netout_handle_tag;
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\subsection{Conversion functions}
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWnetD-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWnetD-fun9-1}}}\plusendmoddef
+netout_t* mx_to_netout(const mxArray* array)
+\{
+    return mx_to_handle(array, netout_handle_tag, "Invalid netout handle");
+\}
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{{\tt{}netout} command}
+
+The {\tt{}netout(netout,\ name,\ data)} command adds parameters to the netlist.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWnetD-choC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-choC-1}}}\moddef{cho-netout.m~{\nwtagstyle{}\subpageref{NWnetD-choC-1}}}\endmoddef
+function cho_netout(handle, name, data)
+sugarmex('netout', handle, name, data);
+\nwnotused{cho-netout.m}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWnetD-regM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-regM-1}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWnetD-regM-1}}}\endmoddef
+mexmgr_add("netout", netout);
+\nwused{\\{NWnetD-fun9-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWnetD-mexD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetD-mexD-1}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWnetD-mexD-1}}}\endmoddef
+static void netout(int nlhs, mxArray* plhs[],
+                   int nrhs, const mxArray* prhs[])
+\{
+    netout_t*   netout;
+    const char* name;
+
+    mex_check_num_args(nrhs, 3);
+    netout = mx_to_netout(prhs[0]);
+    name   = mx_to_string(prhs[1]);
+
+    if (mxIsChar(prhs[2]))
+        netout_string(netout, name, mx_to_string(prhs[2]));
+    else if (mxIsNumeric(prhs[2]))
+        netout_double_matrix(netout, name, mxGetPr(prhs[2]), 
+                             mxGetM(prhs[2]), mxGetN(prhs[2]));
+    else \{
+/*        mexErrMsgTxt("Cannot output a non-string and non-number type\\n");*/
+netout_string(netout, name, "***");
+    \}
+\}
+
+\nwused{\\{NWnetD-netC.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{cho-netout.m}{NWnetD-choC-1}{\nwixd{NWnetD-choC-1}}}%
+\nwixlogsorted{c}{{functions}{NWnetD-fun9-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-fun9-1}\nwixd{NWnetD-fun9-2}\nwixd{NWnetD-fun9-3}}}%
+\nwixlogsorted{c}{{mex functions}{NWnetD-mexD-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-mexD-1}}}%
+\nwixlogsorted{c}{{netout-mex.c}{NWnetD-netC.2-1}{\nwixd{NWnetD-netC.2-1}}}%
+\nwixlogsorted{c}{{netout-mex.h}{NWnetD-netC-1}{\nwixd{NWnetD-netC-1}}}%
+\nwixlogsorted{c}{{register mex functions}{NWnetD-regM-1}{\nwixu{NWnetD-fun9-1}\nwixd{NWnetD-regM-1}}}%
+\nwixlogsorted{c}{{static data}{NWnetD-staB-1}{\nwixu{NWnetD-netC.2-1}\nwixd{NWnetD-staB-1}}}%
+\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}

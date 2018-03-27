@@ -1,0 +1,203 @@
+
+\section{Introduction}
+
+The {\tt{}force} module actually applies two model functions.
+The {\tt{}force} model function applies forces to specified
+nodal variables; the {\tt{}displace} model function applies
+displacement boundary conditions.
+
+
+\section{Interface}
+
+\nwfilename{model-force.nw}\nwbegincode{1}\sublabel{NWmodE-modD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-modD-1}}}\moddef{model-force.h~{\nwtagstyle{}\subpageref{NWmodE-modD-1}}}\endmoddef
+#ifndef MODEL_FORCE_H
+#define MODEL_FORCE_H
+
+#include "modelmgr.h"
+
+void model_force_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_FORCE_H */
+\nwnotused{model-force.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmodE-modD.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-modD.2-1}}}\moddef{model-force.c~{\nwtagstyle{}\subpageref{NWmodE-modD.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "model-force.h"
+#include "mesh.h"
+#include "vars.h"
+#include "assemble.h"
+#include "netout.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWmodE-typ5-1}}\RA{}
+\LA{}model functions~{\nwtagstyle{}\subpageref{NWmodE-modF-1}}\RA{}
+\LA{}registration function~{\nwtagstyle{}\subpageref{NWmodE-regL-1}}\RA{}
+\nwnotused{model-force.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+Both the {\tt{}force} model and the {\tt{}displace} model use the same
+data structure, which keeps track of the node and of the
+values (either of forces or displacements).
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmodE-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmodE-typ5-1}}}\endmoddef
+typedef struct bc_t \{
+    element_t     element;
+    const char*   model;
+    int           node;
+    int*          vars;
+    const char**  var_names;
+    double*       var_values;
+    int           num_vars;
+\} bc_t;
+
+\nwused{\\{NWmodE-modD.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmodE-modF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-modF-1}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodE-modF-1}}}\endmoddef
+static element_t* bc_init(mesh_t mesh, const char* model, 
+                          model_element_t* modelfunc)
+\{
+    int i, j;
+    mempool_t pool = mesh_pool(mesh);
+    bc_t*     self = (bc_t*) mempool_cget(pool, sizeof(bc_t));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    self->model = model;
+    \LA{}get \code{}node\edoc{}~{\nwtagstyle{}\subpageref{NWmodE-getC-1}}\RA{}
+    \LA{}get variable bindings~{\nwtagstyle{}\subpageref{NWmodE-getL-1}}\RA{}
+    return &(self->element);
+\}
+
+\nwalsodefined{\\{NWmodE-modF-2}\\{NWmodE-modF-3}\\{NWmodE-modF-4}\\{NWmodE-modF-5}}\nwused{\\{NWmodE-modD.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+When we get the node identifier, we just check that the correct
+number of nodes are specified.  We \emph{should} probably also
+check that the node is in the valid range, but I have not done
+that yet.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmodE-getC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-getC-1}}}\moddef{get \code{}node\edoc{}~{\nwtagstyle{}\subpageref{NWmodE-getC-1}}}\endmoddef
+if (mesh_num_param_nodes(mesh) != 1)
+    mesh_error(mesh, "Incorrect number of nodes for anchor");
+self->node = mesh_param_node(mesh, 0);
+
+\nwused{\\{NWmodE-modF-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+We ignore the ``model'' argument, but all the rest of the arguments
+must be variable names and associated values.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmodE-getL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-getL-1}}}\moddef{get variable bindings~{\nwtagstyle{}\subpageref{NWmodE-getL-1}}}\endmoddef
+self->num_vars   = mesh_num_params(mesh);
+self->vars       = mempool_cget( pool, self->num_vars * sizeof(int)    );
+self->var_names  = mempool_cget( pool, self->num_vars * sizeof(char*)  );
+self->var_values = mempool_cget( pool, self->num_vars * sizeof(double) );
+
+j = 0;
+for (i = 0; i < self->num_vars; ++i) \{
+    mesh_param_t* param = mesh_param(mesh, i);
+    if (strcmp(param->name, "model") != 0) \{
+        self->var_names[j]  = param->name;
+        self->var_values[j] = mesh_param_number(mesh, param);
+        ++j;
+    \}
+\}
+
+self->num_vars = j;
+
+\nwused{\\{NWmodE-modF-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmodE-modF-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-modF-2}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodE-modF-1}}}\plusendmoddef
+static void bc_vars(void* pself, vars_mgr_t vars)
+\{
+    int i;
+    bc_t* self = (bc_t*) pself;
+
+    for (i = 0; i < self->num_vars; ++i)
+        self->vars[i] = vars_node(vars, self->node, self->var_names[i]);
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+The {\tt{}displace} model function uses {\tt{}bc{\char95}displace} but not
+{\tt{}bc{\char95}R}; the {\tt{}force} model function is the opposite.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmodE-modF-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-modF-3}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodE-modF-1}}}\plusendmoddef
+static void bc_displace(void* pself, assemble_matrix_t* assembler)
+\{
+    bc_t* self = (bc_t*) pself;
+
+    assemble_matrix_add(assembler, self->vars, self->num_vars, 
+                        self->var_values);
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmodE-modF-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-modF-4}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodE-modF-1}}}\plusendmoddef
+static void bc_R(void* pself, assemble_matrix_t* R, 
+                 assemble_matrix_t* x,
+                 assemble_matrix_t* v,
+                 assemble_matrix_t* a)
+\{
+    int i;
+    bc_t* self = (bc_t*) pself;
+
+    for (i = 0; i < self->num_vars; ++i)
+        assemble_matrix_add(R, self->vars, self->num_vars, 
+                            self->var_values);
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmodE-modF-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-modF-5}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodE-modF-1}}}\plusendmoddef
+static void bc_output(void* pself, netout_t* netout)
+\{
+    int i;
+    bc_t* self = (bc_t*) pself;
+
+    netout_string     (netout, "model", self->model);
+    netout_int_matrix (netout, "node",  &(self->node), 1, 1);
+    netout_int_matrix (netout, "vars",  self->vars, 1, self->num_vars);
+
+    for (i = 0; i < self->num_vars; ++i)
+        netout_double(netout, self->var_names[i], self->var_values[i]);
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmodE-regL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodE-regL-1}}}\moddef{registration function~{\nwtagstyle{}\subpageref{NWmodE-regL-1}}}\endmoddef
+void model_force_register(model_mgr_t model_mgr)
+\{
+    model_element_t model;
+
+    memset(&model, 0, sizeof(model));
+    model.init     = bc_init;
+    model.vars     = bc_vars;
+    model.R        = bc_R;
+    model.output   = bc_output;
+    model_mgr_add_element(model_mgr, "force", &model);
+
+    memset(&model, 0, sizeof(model));
+    model.init     = bc_init;
+    model.vars     = bc_vars;
+    model.displace = bc_displace;
+    model.output   = bc_output;
+    model_mgr_add_element(model_mgr, "displace", &model);
+\}
+
+\nwused{\\{NWmodE-modD.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{get \code{}node\edoc{}}{NWmodE-getC-1}{\nwixu{NWmodE-modF-1}\nwixd{NWmodE-getC-1}}}%
+\nwixlogsorted{c}{{get variable bindings}{NWmodE-getL-1}{\nwixu{NWmodE-modF-1}\nwixd{NWmodE-getL-1}}}%
+\nwixlogsorted{c}{{model functions}{NWmodE-modF-1}{\nwixu{NWmodE-modD.2-1}\nwixd{NWmodE-modF-1}\nwixd{NWmodE-modF-2}\nwixd{NWmodE-modF-3}\nwixd{NWmodE-modF-4}\nwixd{NWmodE-modF-5}}}%
+\nwixlogsorted{c}{{model-force.c}{NWmodE-modD.2-1}{\nwixd{NWmodE-modD.2-1}}}%
+\nwixlogsorted{c}{{model-force.h}{NWmodE-modD-1}{\nwixd{NWmodE-modD-1}}}%
+\nwixlogsorted{c}{{registration function}{NWmodE-regL-1}{\nwixu{NWmodE-modD.2-1}\nwixd{NWmodE-regL-1}}}%
+\nwixlogsorted{c}{{types}{NWmodE-typ5-1}{\nwixu{NWmodE-modD.2-1}\nwixd{NWmodE-typ5-1}}}%
+\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}

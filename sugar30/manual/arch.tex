@@ -1,0 +1,186 @@
+
+\chapter{Code architecture}
+
+\section{Overview}
+
+% SUGAR 3 vs old versions
+%  - core implementation in C
+%  - netlist generation language is Lua
+% Advantages of new implementation
+
+This document describes the newest version of SUGAR.  SUGAR 3.0
+differs substantially from earlier versions: the core functionality
+is implemented in C rather than in Matlab; netlists are described
+in the Lua extension language instead of in the old SUGAR netlist
+language; and the documentation is evolving alongside the
+code itself.
+
+
+\section{Coding techniques}
+
+\subsection{Literate programming}
+
+% Idea of literate programming
+% Brief history and references
+% The noweb system
+
+Donald Knuth coined the term \emph{literate programming} for his
+document-centered programming style.  Though the first literate
+programming system, WEB, was built around the Pascal language,
+the concepts apply to other languages, too.
+A literate program (or ``web'')
+consists of descriptive text intermixed with ``chunks'' of code.
+Code chunks are presented in an order suitable for human readers,
+rather than necessarily in the order in which they must appear for
+use by the machine.  For example, code to check for errors or handle
+exceptional cases can be placed after the code and text describing
+behavior in the common case.
+
+Knuth's musings on literate programming (and related topics) are
+collected in a volume titled ``Literate Programming,'' published by
+Stanford Press~\cite{Knut92}.  Perhaps the most famous literate program, TeX,
+is published separately.  The books 
+\emph{C Interfaces and Implementations}~\cite{Hans96} by Hanson and
+\emph{Building a Compiler in C}~\cite{FrasHans95} by Fraser and Hanson 
+are also literate programs.
+
+The literate programming system used in this implementation is
+Norman Ramsey's \verb|noweb| package \cite{Noweb-url, Rams94}.
+
+
+\subsection{Classes and interfaces in C}
+
+% Opaque objects and data hiding in C
+% Implementing interfaces / virtual methods
+
+Even C code can be object-oriented, though the style requires more work
+than it would in languages like C++ and Java.  After all, the original
+C++ compiler, CFRONT, translated C++ code to C.
+
+We maintain privacy of object data by using opaque pointers.  In C,
+the declaration
+\begin{verbatim}
+    typedef struct foo_struct* foo_t;
+\end{verbatim}
+is valid even if \verb|foo_struct| is not defined.  Consequently,
+we can pass pointers to object data without defining the object
+structure in the header file.  We sometimes fall back to a more
+basic technique of using void pointers, but the compiler does
+not generally catch as many errors involving void pointers as it
+does errors involving typed pointers.
+
+Generic interfaces are implemented using tables of function pointers.
+An object supporting a particular interface is usually represented
+by a structure containing a pointer to a function table of object
+methods and a pointer to some object data.  By convention, the first
+argument to an object method is the data for that object (corresponding
+to the implicit \verb|this| pointer in C++).  We use generic interfaces
+in a variety of places in the SUGAR architecture: materials, elements,
+drawing contexts, and output contexts are all object types with a single
+generic interface to multiple implementations.
+
+
+\section{Core modules}
+
+% Meshes
+% Nodes, elements, and materials
+% Assembly objects
+
+% Mesh = nodes + elements + materials + some auxiliaries
+% Builders
+%  - Provide some mechanism for adding local contributions
+%  - Assembly loop runs through all the elements and calls
+%    one of their cases.  Those cases call back to make
+%    local contribution.
+
+The central data structure in SUGAR is the mesh object.
+A mesh object builds and manages lists of nodes, elements,
+and materials that form the device.  The mesh object
+interacts with various assembly objects, which put together
+some global construct from local contributions.  An assembly 
+object provides a set of methods by which the elements 
+(or materials) can make their local contributions.  The main
+assembly loop then calls a method for each element; the elements
+in turn call the methods of the assembly object to make their
+contributions.
+
+The assembly objects include:
+\begin{itemize}
+
+  \item The \emph{variable manager} object, which is responsible
+        for keeping track of the types of nodal variables,
+        and for assigning global variable indices.
+
+  \item The \emph{assembler} object, which is responsible for
+        building the residual vector and tangent matrix.
+        The assembler object also keeps track of which variables
+        are subject to displacement boundary conditions.
+
+  \item The \emph{mesh output} objects, which are responsible
+        for generating an external representation of the mesh
+        components.  This external representation may be text,
+        or a Matlab data structure.
+
+  \item The \emph{mesh drawing} objects, which are responsible
+        for generating a drawing of the device.  Depending on
+        the mesh drawing object, the device might be drawn
+        to the screen, or a representation might be written to
+        file for later viewing.
+
+\end{itemize}
+
+
+\section{Lua and Matlab}
+
+% Extension and interface language
+% Lua -- brief history and application
+% MEX interface
+% Handles and tags
+
+\emph{Lua}~\cite{Lua01} is an extension language designed at TecGRAF 
+in the early 90s.
+Like LISP, Lua is centered around a single basic data structure.  In LISP,
+the data structure is a list; in Lua, it is an associative array, or table.
+The language has
+\begin{itemize}
+  \item simple syntax -- the Pascal-like grammar fits on a single page,
+  \item flexibility -- the set of types and functions can be extended 
+        almost arbitrarily, and a ``tag method'' system allows existing 
+        syntax to be given new semantics,
+  \item portability -- the implementation is in ANSI C, and 
+  \item speed -- Lua uses a bytecode interpreter.
+\end{itemize}
+Lua has become popular as a scripting language for computer games, and
+has also been used as an input language for several codes,
+including a finite element code.  The SUGAR netlist input language is a
+slight extension of Lua, and there is a Lua-based command-line interactive
+interface to SUGAR (\verb|sugar-lua|).
+
+Mathworks' Matlab environment is well-known in scientific, engineering,
+and computational mathematics for its intuitive, interactive problem-solving
+environment.  The Matlab EXternal interface system (MEX) allows Matlab
+to interact with codes written in C and Fortran.  The SUGAR MEX file
+interface (\verb|sugarmex|) allows Matlab code to access the core C objects.
+Using the MEX interface, SUGAR can be extended with net Matlab models 
+and analysis routines.
+
+While Lua provides a built-in mechanism for referring to C objects,
+Matlab does not.  To refer to SUGAR C objects from Matlab code,
+we use a system of integer handles.  Like Lua user data objects,
+SUGAR MEX handles have associated tags to identify the associated
+data types.  New tags (in Lua or in the MEX handle system) can be
+allocated at any time, and the semantics of a tag are known only
+to the C code.  The MEX handle system is implemented in the \verb|mex-handle|
+module.
+
+New functionality can be added to a Lua registering C functions with
+the interpreter object.  The \verb|sugarmex| interface implements a
+similar system for Matlab, so that once a function ``foo'' has been
+registered with the Matlab interface, a Matlab call to
+\begin{verbatim}
+  sugarmex('foo', 1, 2)
+\end{verbatim}
+will be converted to a call to the C function ``foo'' with two numeric
+Matlab arguments.  Because of this registration system, the Matlab
+interface can be extended with new commands with only minimal modifications
+to the main \verb|sugarmex| file.

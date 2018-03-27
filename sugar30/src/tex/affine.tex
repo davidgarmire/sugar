@@ -1,0 +1,339 @@
+
+\section{Introduction}
+
+An \emph{affine} transformation is a transformation of the form
+\[
+  T(x) = Ax + b
+\]
+The {\tt{}affine} module provides routines to create, apply, and
+manipulate affine transformations on Euclidean 3-space.
+
+
+\section{Interface}
+
+\nwfilename{affine.nw}\nwbegincode{1}\sublabel{NWaff9-aff8-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-aff8-1}}}\moddef{affine.h~{\nwtagstyle{}\subpageref{NWaff9-aff8-1}}}\endmoddef
+#ifndef AFFINE_H
+#define AFFINE_H
+
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWaff9-expI-1}}\RA{}
+
+#endif /* AFFINE_H */
+\nwnotused{affine.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+We represent affine transformations by a 3-by-4 double
+precision matrix in column-major format.  The leading
+3-by-3 submatrix represents the linear part ($A$),
+and the trailing column vector represents the translation
+($b$).
+
+The {\tt{}identity} function initializes the matrix to the
+representation of the identity transform; $A = I$, $b = 0$.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWaff9-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWaff9-expI-1}}}\endmoddef
+void affine_identity(double* T);
+
+\nwalsodefined{\\{NWaff9-expI-2}\\{NWaff9-expI-3}\\{NWaff9-expI-4}}\nwused{\\{NWaff9-aff8-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+There are several functions which modify an existing
+transformation $T$ by composing it with a simple transformation
+$S$ to get a new transformation $ST$. 
+In the {\tt{}translate} and {\tt{}translate{\char95}xyz} functions, $S$ is
+a simple translation ($A = 0$, $b$ is specified by the arguments).
+The {\tt{}rotate{\char95}ox}, {\tt{}rotate{\char95}oy}, and {\tt{}rotate{\char95}oz} functions
+apply rotations by some fixed number of radians about the $x$,
+$y$, and $z$ axes, respectively.  The rotations are oriented
+according to the right hand rule.  The {\tt{}scale}, {\tt{}scale{\char95}x},
+{\tt{}scale{\char95}y}, and {\tt{}scale{\char95}z} apply a scaling, either of all
+variables or just of the individual components.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWaff9-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWaff9-expI-1}}}\plusendmoddef
+void affine_translate    (double* T, double* c);
+void affine_translate_xyz(double* T, double x, double y, double z);
+void affine_rotate_ox    (double* T, double ox);
+void affine_rotate_oy    (double* T, double oy);
+void affine_rotate_oz    (double* T, double oz);
+void affine_scale        (double* T, double s);
+void affine_scale_x      (double* T, double s);
+void affine_scale_y      (double* T, double s);
+void affine_scale_z      (double* T, double s);
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\tt{}compose} function composes two transformations
+to get $S := TS$.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWaff9-expI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-expI-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWaff9-expI-1}}}\plusendmoddef
+void affine_compose(double* T, double* S);
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+There are several versions of the {\tt{}apply} transformation.
+The basic {\tt{}apply} transformation computes $x := T(x)$,
+but there is also {\tt{}apply{\char95}A} to apply just the linear
+part of the transformation ($x := Ax$), and {\tt{}apply{\char95}AT}
+to apply the transpose of the linear part ($x := A^T x$).
+The basic {\tt{}apply} functions assume that the argument vector
+is laid out contiguously in memory, but there are also
+versions of the functions which assume the elements are
+separated by a constant stride.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWaff9-expI-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-expI-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWaff9-expI-1}}}\plusendmoddef
+void affine_apply          (double* T, double* x);
+void affine_apply_stride   (double* T, double* x, int stride);
+void affine_apply_A        (double* T, double* x);
+void affine_apply_A_stride (double* T, double* x, int stride);
+void affine_apply_AT       (double* T, double* x);
+void affine_apply_AT_stride(double* T, double* x, int stride);
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWaff9-aff8.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-aff8.2-1}}}\moddef{affine.c~{\nwtagstyle{}\subpageref{NWaff9-aff8.2-1}}}\endmoddef
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include "affine.h"
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}\RA{}
+\nwnotused{affine.c}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWaff9-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\endmoddef
+void affine_identity(double* T)
+\{
+    memset(T, 0, 12*sizeof(double));
+    T[0] = 1;
+    T[4] = 1;
+    T[8] = 1;
+\}
+
+\nwalsodefined{\\{NWaff9-fun9-2}\\{NWaff9-fun9-3}\\{NWaff9-fun9-4}\\{NWaff9-fun9-5}\\{NWaff9-fun9-6}\\{NWaff9-fun9-7}\\{NWaff9-fun9-8}\\{NWaff9-fun9-9}\\{NWaff9-fun9-A}\\{NWaff9-fun9-B}\\{NWaff9-fun9-C}}\nwused{\\{NWaff9-aff8.2-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+Note that the {\tt{}translate} function overwrites $T$ with
+the composition of translation with $T$, not with the
+composition of $T$ with the translation.  The same holds
+for the rotations.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWaff9-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_translate(double* T, double* c)
+\{
+    T[9 ] += c[0];
+    T[10] += c[1];
+    T[11] += c[2];
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWaff9-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_translate_xyz(double* T, double x, double y, double z)
+\{
+    T[9 ] += x;
+    T[10] += y;
+    T[11] += z;
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+The rotation functions obey the right-hand rule, which usually
+confuses me.  That is why there is a sign reversal on the angle
+for the rotation about the $y$ axis.  Since these are purely
+linear transformations, we just need to transform each column
+of $T$ in turn.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWaff9-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_rotate_ox(double* T, double ox)
+\{
+    double c = cos(ox);
+    double s = sin(ox);
+    int i;
+
+    for (i = 0; i < 4; ++i) \{
+        double y =  c*T[1] + s*T[2];
+        double z = -s*T[1] + c*T[2];
+        T[1] = y;
+        T[2] = z;
+        T += 3;
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWaff9-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_rotate_oy(double* T, double oy)
+\{
+    double c =  cos(oy);
+    double s = -sin(oy);
+    int i;
+
+    for (i = 0; i < 4; ++i) \{
+        double x =  c*T[0] + s*T[2];
+        double z = -s*T[0] + c*T[2];
+        T[0] = x;
+        T[2] = z;
+        T += 3;
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWaff9-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_rotate_oz(double* T, double oz)
+\{
+    double c = cos(oz);
+    double s = sin(oz);
+    int i;
+
+    for (i = 0; i < 4; ++i) \{
+        double x =  c*T[0] + s*T[1];
+        double y = -s*T[0] + c*T[1];
+        T[0] = x;
+        T[1] = y;
+        T += 3;
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The {\tt{}scale} function scales everything in sight by the given constant.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWaff9-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_scale(double* T, double s)
+\{
+    int i;
+    for (i = 0; i < 12; ++i)
+        *T++ *= s;
+\}
+
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+The {\tt{}scale{\char95}x}, {\tt{}scale{\char95}y}, and {\tt{}scale{\char95}z} functions only scale
+the appropriate rows.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWaff9-fun9-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_scale_x(double* T, double s)
+\{
+    int row = 0;
+    \LA{}scale row~{\nwtagstyle{}\subpageref{NWaff9-sca9-1}}\RA{}
+\}
+
+void affine_scale_y(double* T, double s)
+\{
+    int row = 1;
+    \LA{}scale row~{\nwtagstyle{}\subpageref{NWaff9-sca9-1}}\RA{}
+\}
+
+void affine_scale_z(double* T, double s)
+\{
+    int row = 2;
+    \LA{}scale row~{\nwtagstyle{}\subpageref{NWaff9-sca9-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWaff9-sca9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-sca9-1}}}\moddef{scale row~{\nwtagstyle{}\subpageref{NWaff9-sca9-1}}}\endmoddef
+int i;
+for (i = 0; i < 4; ++i, T += 3)
+    T[row] *= s;
+\nwused{\\{NWaff9-fun9-8}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+The {\tt{}compose} function does \emph{not} necessarily do a purely
+linear transformation.  The composition $TS$ will have the form
+\begin{eqnarray*}
+  TS(x) & = & A_T (A_S x + b_S) + b_T \\
+        & = & A_T A_S x + T(b_S)
+\end{eqnarray*}
+So we apply $A_T$ to the first three columns of $S$, and then
+apply $T$ to the last column of $S$.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWaff9-fun9-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_compose(double* T, double* S)
+\{
+    int i;
+    for (i = 0; i < 3; ++i) \{
+        double y[3];
+
+        y[0] = T[0]*S[0] + T[3]*S[1] + T[6]*S[2];
+        y[1] = T[1]*S[0] + T[4]*S[1] + T[7]*S[2];
+        y[2] = T[2]*S[0] + T[5]*S[1] + T[8]*S[2];
+
+        S[0] = y[0];
+        S[1] = y[1];
+        S[2] = y[2];
+
+        S += 3;
+    \}
+
+    affine_apply(T, S);
+\}
+
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+The {\tt{}apply}, {\tt{}apply{\char95}A}, and {\tt{}apply{\char95}AT} functions are
+implemented as simple wrappers around their strided
+counterparts.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWaff9-fun9-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_apply(double* T, double* x)
+\{
+    affine_apply_stride(T, x, 1);
+\}
+
+void affine_apply_stride(double* T, double* x, int stride)
+\{
+    double x0 = x[0*stride];
+    double x1 = x[1*stride];
+    double x2 = x[2*stride];
+
+    x[0*stride] = T[0]*x0 + T[3]*x1 + T[6]*x2 + T[9 ];
+    x[1*stride] = T[1]*x0 + T[4]*x1 + T[7]*x2 + T[10];
+    x[2*stride] = T[2]*x0 + T[5]*x1 + T[8]*x2 + T[11];
+\}
+
+\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWaff9-fun9-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_apply_A(double* T, double* x)
+\{
+    affine_apply_A_stride(T, x, 1);
+\}
+
+void affine_apply_A_stride(double* T, double* x, int stride)
+\{
+    double x0 = x[0*stride];
+    double x1 = x[1*stride];
+    double x2 = x[2*stride];
+
+    x[0*stride] = T[0]*x0 + T[3]*x1 + T[6]*x2;
+    x[1*stride] = T[1]*x0 + T[4]*x1 + T[7]*x2;
+    x[2*stride] = T[2]*x0 + T[5]*x1 + T[8]*x2;
+\}
+
+\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWaff9-fun9-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWaff9-fun9-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWaff9-fun9-1}}}\plusendmoddef
+void affine_apply_AT(double* T, double* x)
+\{
+    affine_apply_AT_stride(T, x, 1);
+\}
+
+void affine_apply_AT_stride(double* T, double* x, int stride)
+\{
+    double x0 = x[0*stride];
+    double x1 = x[1*stride];
+    double x2 = x[2*stride];
+
+    x[0] = T[0]*x0 + T[1]*x1 + T[2]*x2;
+    x[1] = T[3]*x0 + T[4]*x1 + T[5]*x2;
+    x[2] = T[6]*x0 + T[7]*x1 + T[8]*x2;
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{affine.c}{NWaff9-aff8.2-1}{\nwixd{NWaff9-aff8.2-1}}}%
+\nwixlogsorted{c}{{affine.h}{NWaff9-aff8-1}{\nwixd{NWaff9-aff8-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWaff9-expI-1}{\nwixu{NWaff9-aff8-1}\nwixd{NWaff9-expI-1}\nwixd{NWaff9-expI-2}\nwixd{NWaff9-expI-3}\nwixd{NWaff9-expI-4}}}%
+\nwixlogsorted{c}{{functions}{NWaff9-fun9-1}{\nwixu{NWaff9-aff8.2-1}\nwixd{NWaff9-fun9-1}\nwixd{NWaff9-fun9-2}\nwixd{NWaff9-fun9-3}\nwixd{NWaff9-fun9-4}\nwixd{NWaff9-fun9-5}\nwixd{NWaff9-fun9-6}\nwixd{NWaff9-fun9-7}\nwixd{NWaff9-fun9-8}\nwixd{NWaff9-fun9-9}\nwixd{NWaff9-fun9-A}\nwixd{NWaff9-fun9-B}\nwixd{NWaff9-fun9-C}}}%
+\nwixlogsorted{c}{{scale row}{NWaff9-sca9-1}{\nwixu{NWaff9-fun9-8}\nwixd{NWaff9-sca9-1}}}%
+\nwbegindocs{38}\nwdocspar
+
+
+\nwenddocs{}

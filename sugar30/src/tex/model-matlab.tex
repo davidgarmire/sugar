@@ -1,0 +1,417 @@
+
+\section{Introduction}
+
+This module is the C wrapper for the Matlab model interface.
+
+
+\section{Interface}
+
+The {\tt{}model{\char95}matlab{\char95}register} function registers the wrapper model with
+the model manager as the default model.
+
+\nwfilename{model-matlab.nw}\nwbegincode{1}\sublabel{NWmodF-modE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modE-1}}}\moddef{model-matlab.h~{\nwtagstyle{}\subpageref{NWmodF-modE-1}}}\endmoddef
+#ifndef MODEL_MATLAB_H
+#define MODEL_MATLAB_H
+
+#include "modelmgr.h"
+
+void model_matlab_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_MATLAB_H */
+\nwnotused{model-matlab.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmodF-modE.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modE.2-1}}}\moddef{model-matlab.c~{\nwtagstyle{}\subpageref{NWmodF-modE.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include <mex.h>
+
+#include "modelmgr.h"
+#include "mesh.h"
+#include "vars.h"
+#include "assemble.h"
+#include "netdraw.h"
+#include "netout.h"
+
+#include "sugarmex.h"
+#include "mesh-mex.h"
+#include "vars-mex.h"
+#include "assemble-mex.h"
+#include "netdraw-mex.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}\RA{}
+\LA{}model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}\RA{}
+\LA{}registration function~{\nwtagstyle{}\subpageref{NWmodF-regL-1}}\RA{}
+\nwnotused{model-matlab.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The Matlab element type stores the name of the requested model
+and a pointer to a structure for use by the Matlab function.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmodF-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}}\endmoddef
+typedef struct model_matlab_t \{
+    element_t   element;
+    const char* model;
+    mxArray*    data;
+\} model_matlab_t;
+
+\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The initializer function packages the parameters into a structure
+and calls the Matlab model function.  That model function returns
+a Matlab array object, which we make persistent and will pass
+into future calls.
+
+The Matlab model function initialization case requires two arguments:
+the string ``init,'' which specifies that this is the initialization case;
+and the mesh structure handle.  From the mesh structure handle, the
+user can retrieve the parameters and the node numbers.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmodF-modF.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\endmoddef
+static element_t* init(mesh_t mesh, const char* name,
+                       model_element_t* modelfunc)
+\{
+    int i, n, mesh_id;
+    mxArray* prhs[2];
+
+    mempool_t       pool = mesh_pool(mesh);
+    model_matlab_t* self = (model_matlab_t*)
+        mempool_cget(pool, sizeof(struct model_matlab_t));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    if (name == NULL) \{
+        mesh_error(mesh, "Error: model function not specified");
+    \}
+
+    self->model = name;
+    mesh_id = mex_handle_add(mesh, mesh_mex_handle_tag());
+
+    prhs[0] = mxCreateString("init");
+    prhs[1] = mx_from_double(mesh_id);
+
+    if (mexCallMATLAB(1, &(self->data), 2, prhs, name) != 0) \{
+        mexPrintf("Error return from call to %s\\n", name);
+        mesh_error(mesh, "Error calling model function");
+    \}
+    mexMakeArrayPersistent(self->data);
+
+    mxDestroyArray(prhs[1]);
+    mxDestroyArray(prhs[0]);
+
+    mex_handle_remove(mesh_id);
+    return &(self->element);
+\}
+
+\nwalsodefined{\\{NWmodF-modF.2-2}\\{NWmodF-modF.2-3}\\{NWmodF-modF.2-4}\\{NWmodF-modF.2-5}\\{NWmodF-modF.2-6}\\{NWmodF-modF.2-7}\\{NWmodF-modF.2-8}\\{NWmodF-modF.2-9}}\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmodF-modF.2-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-2}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void set_position(void* pself, mesh_t mesh)
+\{
+    mxArray* plhs[1];
+    mxArray* prhs[3];
+    model_matlab_t* self = (model_matlab_t*) pself;
+    int mesh_id;
+
+    mesh_id = mex_handle_add(mesh, mesh_mex_handle_tag());
+
+    prhs[0] = mxCreateString("pos");
+    prhs[1] = self->data;
+    prhs[2] = mx_from_double(mesh_id);
+
+    mexCallMATLAB(1, plhs, 3, prhs, self->model); 
+
+    mxDestroyArray(prhs[2]);
+    mxDestroyArray(prhs[0]);
+
+    mex_handle_remove(mesh_id);
+
+    if (mxGetN(plhs[0]) != 0) \{
+        mxDestroyArray(self->data);
+        self->data = plhs[0];
+        mexMakeArrayPersistent(self->data);
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmodF-modF.2-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-3}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void destroy(void* pself)
+\{
+    model_matlab_t* self = (model_matlab_t*) pself;
+    mxDestroyArray(self->data);
+\}
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+The variable assignment routine calls the model function with the
+``vars'' string and the returned parameters.  The model function
+returns its modified state vector.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmodF-modF.2-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-4}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void vars(void* pself, vars_mgr_t vars)
+\{
+    mxArray* plhs[1];
+    mxArray* prhs[3];
+
+    model_matlab_t* self = (model_matlab_t*) pself;
+    int vars_id;
+
+    vars_id = mex_handle_add(vars, vars_mex_handle_tag());
+
+    prhs[0] = mxCreateString("vars");
+    prhs[1] = self->data;
+    prhs[2] = mx_from_double(vars_id);
+
+    mexCallMATLAB(1, plhs, 3, prhs, self->model); 
+
+    mxDestroyArray(prhs[2]);
+    mxDestroyArray(prhs[0]);
+
+    mex_handle_remove(vars_id);
+
+    if (mxGetN(plhs[0]) != 0) \{
+        mxDestroyArray(self->data);
+        self->data = plhs[0];
+        mexMakeArrayPersistent(self->data);
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+The displacement routine calls the model function with
+the ``displace'' string, the parameter object, and a reference
+to the assembler object.  
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmodF-modF.2-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-5}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void displace(void* pself, assemble_matrix_t* displace)
+\{
+    mxArray* prhs[3];
+    model_matlab_t* self = (model_matlab_t*) pself;
+
+    int displace_id = mex_handle_add(displace, assemble_mex_handle_tag());
+
+    prhs[0] = mxCreateString("displace");
+    prhs[1] = self->data;
+    prhs[2] = mx_from_double(displace_id);
+
+    mexCallMATLAB(0, NULL, 3, prhs, self->model); 
+
+    mxDestroyArray(prhs[2]);
+    mxDestroyArray(prhs[0]);
+
+    mex_handle_remove(displace_id);
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The routines to add to the residual and to the tangent matrix are similar.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmodF-modF.2-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-6}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void add_R(void* pself, assemble_matrix_t* R, 
+                  assemble_matrix_t* x,
+                  assemble_matrix_t* v,
+                  assemble_matrix_t* a)
+\{
+    mxArray* prhs[6];
+    model_matlab_t* self = (model_matlab_t*) pself;
+
+    int R_id = mex_handle_add(R, assemble_mex_handle_tag());
+    int x_id, v_id, a_id;
+
+    prhs[0] = mxCreateString("R");
+    prhs[1] = self->data;
+    prhs[2] = mx_from_double(R_id);
+
+    \LA{}allocate x, v, a handles~{\nwtagstyle{}\subpageref{NWmodF-allO-1}}\RA{}
+    prhs[3] = (x) ? mx_from_double(x_id) : mx_from_nil();
+    prhs[4] = (v) ? mx_from_double(v_id) : mx_from_nil();
+    prhs[5] = (a) ? mx_from_double(a_id) : mx_from_nil();
+
+    mexCallMATLAB(0, NULL, 6, prhs, self->model); 
+
+    mxDestroyArray(prhs[5]);
+    mxDestroyArray(prhs[4]);
+    mxDestroyArray(prhs[3]);
+    mxDestroyArray(prhs[2]);
+    mxDestroyArray(prhs[0]);
+
+    \LA{}free x, v, a handles~{\nwtagstyle{}\subpageref{NWmodF-freK-1}}\RA{}
+    mex_handle_remove(R_id);
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmodF-modF.2-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-7}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void add_dR(void* pself, assemble_matrix_t* dR,
+                   double cx, assemble_matrix_t* x,
+                   double cv, assemble_matrix_t* v,
+                   double ca, assemble_matrix_t* a)
+\{
+    mxArray* prhs[7];
+    model_matlab_t* self = (model_matlab_t*) pself;
+
+    int dR_id = mex_handle_add(dR, assemble_mex_handle_tag());
+    int x_id, v_id, a_id;
+    double* c;
+
+    prhs[0] = mxCreateString("dR");
+    prhs[1] = self->data;
+    prhs[2] = mx_from_double(dR_id);
+
+    prhs[3] = mxCreateDoubleMatrix(1, 3, mxREAL);
+    c = mxGetPr(prhs[3]);
+    c[0] = cx;
+    c[1] = cv;
+    c[2] = ca;
+
+    \LA{}allocate x, v, a handles~{\nwtagstyle{}\subpageref{NWmodF-allO-1}}\RA{}
+    prhs[4] = (x) ? mx_from_double(x_id) : mx_from_nil();
+    prhs[5] = (v) ? mx_from_double(v_id) : mx_from_nil();
+    prhs[6] = (a) ? mx_from_double(a_id) : mx_from_nil();
+
+    mexCallMATLAB(0, NULL, 7, prhs, self->model); 
+
+    mxDestroyArray(prhs[6]);
+    mxDestroyArray(prhs[5]);
+    mxDestroyArray(prhs[4]);
+    mxDestroyArray(prhs[3]);
+    mxDestroyArray(prhs[2]);
+    mxDestroyArray(prhs[0]);
+
+    \LA{}free x, v, a handles~{\nwtagstyle{}\subpageref{NWmodF-freK-1}}\RA{}
+    mex_handle_remove(dR_id);
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmodF-allO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-allO-1}}}\moddef{allocate x, v, a handles~{\nwtagstyle{}\subpageref{NWmodF-allO-1}}}\endmoddef
+if (x) x_id = mex_handle_add(x, assemble_mex_handle_tag());
+if (v) v_id = mex_handle_add(v, assemble_mex_handle_tag());
+if (a) a_id = mex_handle_add(a, assemble_mex_handle_tag());
+\nwused{\\{NWmodF-modF.2-6}\\{NWmodF-modF.2-7}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmodF-freK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-freK-1}}}\moddef{free x, v, a handles~{\nwtagstyle{}\subpageref{NWmodF-freK-1}}}\endmoddef
+if (a) mex_handle_remove(a_id);
+if (v) mex_handle_remove(v_id);
+if (x) mex_handle_remove(x_id);
+\nwused{\\{NWmodF-modF.2-6}\\{NWmodF-modF.2-7}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+
+The drawing routine calls the model function with the ``draw''
+string, the parameter object, and a reference to the graphing
+context.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmodF-modF.2-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-8}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void draw(void* pself, netdraw_gc_t* gc)
+\{
+    mxArray* prhs[4];
+    model_matlab_t* self = (model_matlab_t*) pself;
+    int gc_id;
+    int x_id;
+
+    double* x = NULL;
+    assemble_matrix_t* xassemble = NULL;
+
+    x = netdraw_get_x(gc);
+
+    if (x) \{
+        xassemble = /* FIXME */
+            assembler_dense_getvector(x, INT_MAX, INT_MAX);
+    \}
+
+    gc_id = mex_handle_add(gc, gc_mex_handle_tag());
+    x_id  = mex_handle_add(xassemble, assemble_mex_handle_tag());
+
+    prhs[0] = mxCreateString("draw");
+    prhs[1] = self->data;
+    prhs[2] = mx_from_double(gc_id);
+    prhs[3] = (x ? mx_from_double(x_id) : mx_from_nil());
+
+    mexCallMATLAB(0, NULL, 4, prhs, self->model); 
+
+    mxDestroyArray(prhs[3]);
+    mxDestroyArray(prhs[2]);
+    mxDestroyArray(prhs[0]);
+
+    mex_handle_remove(x_id);
+    mex_handle_remove(gc_id);
+
+    if (x) \{
+        assembler_matrix_free(xassemble);
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+The output routine displays a standard header telling which Matlab
+model function we are using, and then calls the model itself
+to output the rest of the variables.  There is a potential point
+of trouble here, since the C code takes a file handle to which it
+will output, but the Matlab code will just output to the standard
+location.  I'm unsure what the relation is between Matlab's file
+handles and the C {\tt{}FILE*} type, so this is unlikely to be
+remedied in the immediate future.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmodF-modF.2-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-9}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void output(void* pself, netout_t* netout)
+\{
+    mxArray* prhs[3];
+    model_matlab_t* self = (model_matlab_t*) pself;
+    int handle_id = mex_handle_add(netout, netout_mex_tag());
+
+    prhs[0] = mxCreateString("output");
+    prhs[1] = self->data;
+    prhs[2] = mx_from_double(handle_id);
+
+    netout_string(netout, "model", self->model);
+    mexCallMATLAB(0, NULL, 3, prhs, self->model); 
+
+    mxDestroyArray(prhs[2]);
+    mxDestroyArray(prhs[0]);
+
+    mex_handle_remove(handle_id);
+\}
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+Now we register the models as the defaults for the model manager,
+and we are ready to go.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmodF-regL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-regL-1}}}\moddef{registration function~{\nwtagstyle{}\subpageref{NWmodF-regL-1}}}\endmoddef
+void model_matlab_register(model_mgr_t model_mgr)
+\{
+    model_element_t  element;
+
+    memset(&element,  0, sizeof(element));
+
+    element.init         = init;
+    element.destroy      = destroy;
+    element.set_position = set_position;
+    element.vars         = vars;
+    element.displace     = displace;
+    element.R            = add_R;
+    element.dR           = add_dR;
+    element.display      = draw;
+    element.output       = output; 
+
+    model_mgr_add_element(model_mgr, NULL, &element);
+\}
+
+\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{allocate x, v, a handles}{NWmodF-allO-1}{\nwixu{NWmodF-modF.2-6}\nwixu{NWmodF-modF.2-7}\nwixd{NWmodF-allO-1}}}%
+\nwixlogsorted{c}{{free x, v, a handles}{NWmodF-freK-1}{\nwixu{NWmodF-modF.2-6}\nwixu{NWmodF-modF.2-7}\nwixd{NWmodF-freK-1}}}%
+\nwixlogsorted{c}{{model functions}{NWmodF-modF.2-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-modF.2-1}\nwixd{NWmodF-modF.2-2}\nwixd{NWmodF-modF.2-3}\nwixd{NWmodF-modF.2-4}\nwixd{NWmodF-modF.2-5}\nwixd{NWmodF-modF.2-6}\nwixd{NWmodF-modF.2-7}\nwixd{NWmodF-modF.2-8}\nwixd{NWmodF-modF.2-9}}}%
+\nwixlogsorted{c}{{model-matlab.c}{NWmodF-modE.2-1}{\nwixd{NWmodF-modE.2-1}}}%
+\nwixlogsorted{c}{{model-matlab.h}{NWmodF-modE-1}{\nwixd{NWmodF-modE-1}}}%
+\nwixlogsorted{c}{{registration function}{NWmodF-regL-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-regL-1}}}%
+\nwixlogsorted{c}{{types}{NWmodF-typ5-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-typ5-1}}}%
+\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}

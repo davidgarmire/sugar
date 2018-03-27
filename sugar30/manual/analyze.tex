@@ -1,0 +1,261 @@
+
+% \section{Types of analysis}
+% \section{Viewing analysis results}
+% \section{Static analysis}
+% \section{Modal analysis}
+% \section{Steady-state analysis}
+% \section{Transient analysis}
+
+\section{Types of analysis}
+
+SUGAR supports three basic styles of analysis:
+\begin{description}
+\item[Static analysis]:
+  In static analysis, we find the equilibrium state of a device.
+Static analysis is sometimes called DC analysis by analogy to
+the equilibrium analysis for direct current circuits.
+
+\item[Linearized analysis]:
+  A linearized approximation to a system near equilibrium can
+provide valuable information about the stability of the system
+and the nature of small oscillations about equilibrium.  SUGAR
+provides two flavors of linearized analysis:
+\begin{itemize}
+\item In \emph{modal analysis}, the characteristic modes of the
+      system (and their corresponding frequencies) are determined.
+      SUGAR can display the shapes of the displacements corresponding
+      to various modes.
+\item In \emph{steady-state analysis}, SUGAR computes the frequency 
+      response of a user-specified variable when another user-specified
+      variable is sinusoidally excited.  The output of steady
+      state analysis is Bode plots.
+\end{itemize}
+
+\item[Transient analysis]:
+  In transient analysis (or dynamic analysis), the motion of the system
+is integrated forward in time.  Transient analysis in SUGAR is still
+somewhat unreliable; we hope to have better support for it soon.
+
+\end{description}
+
+
+%\section{Viewing analysis results}
+%
+%All the analyses except steady state analysis result in one or more
+%\emph{displacement}, which represent how much the device is displaced
+%from its original state as described in the netlist.  In static analysis,
+%the displacement represents the equilibrium position; in modal analysis,
+%displacements represent the shapes of the fundamental vibrating modes; 
+%and in transient analysis, the displacements represent snapshots of the 
+%device in time.
+
+
+\section{Static analysis}
+
+In static analysis, we attempt to find an equilibrium state for a MEMS
+device.  In the most general case, the equilibrium may not be unique;
+in this case, SUGAR will usually find the equilibrium position closest
+to where it starts looking (which, by default, is the undisplaced position).
+
+The equilibrium state is characterized by a collection of force and moment
+balance equations (and their electrical and thermal analogues):
+\[
+  F(x) = 0
+\]
+where $x$ is a vector of displacements from the original positions
+(and voltages, temperatures, etc) of the device.
+We solve these equations using a standard Newton-Raphson
+iteration.  For linear problems, a Newton-Raphson iteration will converge
+in one steps; for nonlinear problems, the iteration may never converge.
+Currently, SUGAR assumes the iteration has converged when the size of the
+change between iterations is sufficently small in an appropriately scaled
+norm.  If convergence has not set in after 40 iterations, the routine
+exits with a diagnostic message.
+
+The function to perform static analysis is \texttt{cho\_dc}:
+\begin{center}
+\begin{verbatim}
+res = cho_dc(net, q0, is_sp)
+\end{verbatim}
+\end{center}
+The first argument, \texttt{net}, is the netlist structure
+returned from \texttt{cho\_load}.  The other arguments are optional.
+The starting value for the iteration is given by \texttt{q0};
+by default, the iteration starts at the undisplaced position 
+($\mathtt{q0} = 0$).  The flag \texttt{is\_sp} tells the routine
+whether it should use sparse solvers or not; by default, the flag is
+true (sparse solvers are used).  The function returns a vector
+of displacements to reach the computed equilibrium (\texttt{res.q}),
+and a flag that indicates whether the iteration converged 
+(\texttt{res.converged}).
+
+In some cases, it is possible to find tricky equilibrium positions
+by approaching them step-by-step.  For example, suppose we wanted
+to determine the equilibrium position of a device near a pull-in
+voltage.  As we approach the critical voltage, it becomes more
+difficult to find the equilibrium position, and past the critical
+voltage, no equilibrium exists.  If the commands
+\begin{verbatim}
+  params.V = Vfinal;
+  net = cho_load('device.net', params);
+  q = cho_dc(net)
+\end{verbatim}
+fail, we could try
+\begin{verbatim}
+  q = [];
+  for V = 0:.5:Vfinal
+    params.V = V
+    net = cho_load('device.net', params);
+    q = cho_dc(net, q);
+  end
+\end{verbatim}
+Even if we were still unable to find the equilibrium position, we might
+get useful information from seeing how nearly we were able to approach
+the final voltage, and what the equilibrium was at the last point
+where we were able to find it.
+
+There are two ways to view the results of a static analysis:
+\begin{enumerate}
+
+\item 
+We can view individual components of the displacement vector using
+the command \texttt{cho\_dq\_view}:
+\begin{verbatim}
+% Find displacement of the y coordinate at node 'tip'
+tipy = cho_dq_view(q, net, 'tip', 'y');
+\end{verbatim}
+Alternately, we could look up the index of the tip $y$ coordinate,
+and then look at the corresponding entry of the \texttt{q} vector:
+\begin{verbatim}
+% Find displacement of the y coordinate at node 'tip'
+tipy_index = lookup_coord(net, 'tip', 'y');
+tipy = q(tipy_index);
+\end{verbatim}
+
+\item
+We can display the shape of the displaced structure using the
+\texttt{cho\_display} routine:
+\begin{verbatim}
+% Display the undisplaced structure in figure 1,
+% and the displaced structure in figure 2.
+q = cho_dc(net);
+figure(1); cho_display(net);
+figure(2); cho_display(net, q);
+\end{verbatim}
+
+\end{enumerate}
+
+
+\section{Steady-state and Modal Analysis}
+
+We determine system behavior near equilibrium by analyzing the linearized
+system.  In modal analysis, we find the resonant behavior of the structure,
+assuming no damping, by solving the eigenproblem
+\[
+  \det(\lambda^2 M - K) = 0
+\]
+The eigenvalues give the resonant frequencies, and the corresponding
+eigenvectors give the resonant modes.  The routine \verb|cho_mode| returns
+selected frequencies and mode shapes for a structure, along with the
+operating point at which linearization took place.  Mode shapes can
+be viewed graphically using the \verb|cho_modeshape| commands.  For small
+problems, the default dense solvers are adequate; for larger problems,
+users should select the number of modes they want, and those modes
+will be computed using a less expensive iterative method.
+
+To use the steady-state analysis routine, a user specifies a single
+input degree of freedom and a single output degree of freedom,
+usually by naming a nodal variable.  SUGAR then draws a Bode plot
+illustrating the amplitude gain and phase shift between a harmonic
+excitation at the input and a measured harmonic at the output.  Note
+that, unlike the modal analysis routine, the steady state routine
+does not discard damping terms.
+
+%To determine the steady-state response, SUGAR first linearizes the system of
+%ordinary differential equation at the point of static equilibrium. The second
+%order system of ODEs is then converted into first order form given by  
+%\begin{eqnarray}
+%  \dot{x} & = & Ax + Bu \\
+%  y       & = & Cx + Du
+%\end{eqnarray}
+%where $x$ is the system dynamic state variable, $u$ is the sinusoidal external
+%excitation, and $y$ is the system dynamic response. $A$, $B$, $C$, and $D$ are
+%the system, input coupling, output, and feed forward matrices respectively [1].
+%The solution of equation provides Bode plots as well as modal analysis.  
+
+
+\section{Transient Analysis}
+
+\emph{Note: Note yet in SUGAR 3.0}
+
+%The transient solver simulates the dynamic response of a MEMS device.
+%The device model may contain nonlinear elements, non-harmonic excitations,
+%and other features which would make linearized analysis suspect.
+
+%This solver calculates the transient response of a MEMS device, which may
+%contain nonlinear elements and excitations that are functions of time t and
+%state vector q. Several ODE solvers are available, whereby speed may be traded
+%for accuracy and long-term stability. These numerical methods include an
+%implicit second order Rosenbrock solver for stiff problems where low accuracy
+%is acceptable, an explicit Runge-Kutta 4th-5th order solver for non-stiff
+%systems, an implicit multi-step integration method of varying order for stiff
+%problems requiring higher accuracy, and a simple explicit Euler algorithm. The
+%transient solvers require the system ODEs to be in first order form. We do this
+%in the standardized way [2] by introducing a new state vector $Q$ where 
+%\[
+%  \dot{Q} = 
+%    \frac{d}{dt} 
+%      \left( 
+%        \begin{array}{l} 
+%          x \\ 
+%          \dot{x} 
+%        \end{array} 
+%      \right) = f(t,x)
+%\]
+
+
+%\section{Future analysis routines}
+%
+%In the future, we plan to also support \emph{sensitivity analysis}.
+%Sensitivity analysis is not an independent style of analysis as much
+%as it is an extension to the forms of analysis listed above.
+%For example, a static sensitivity analysis might tell how the
+%equilibrium position would change due to variations from the nominal
+%material properties, layer thicknesses, etc.  Similarly, sensitivity
+%analysis used with the linearized analysis routines might tell how the
+%fundamental frequencies of the device would change if the device
+%properties were perturbed, and sensitivity analysis of transient results
+%would tell how the dynamic response would be affected by perturbing
+%device properties.  Some forms of sensitivity analysis were supported
+%in SUGAR 1.01, but that code has not yet been integrated into SUGAR 2.0.
+%
+
+%\section{Sensitivity Analysis}
+
+%The predicted performance of MEMS is subject to process variations that occur
+%during the fabrication stage. Small variations in geometry may lead to
+%performance, which is substantially different from the ideal. SUGAR models this
+%effect by perturbing the system stiffness matrix K. 
+%For static analysis 
+%\[
+%  F = [K(g) + \Delta K(d)] x
+%\]
+%where $g$ contains the ideal layout geometry and process file parameters. $d$
+%is the variation in $g$ given by Gaussian, uniform, or uniform distribution of
+%corners. The perturbation in stiffness, $\Delta K(d)$, is determined by both
+%probabilistic and deterministic techniques. 
+
+%A Monte-Carlo algorithm [3] evaluates the most likely outcome of equation
+%(3.5) by drawing many samples from a random distribution of geometric
+%variables.  Given the bounds on the geometric variables, an Ellipsoidal
+%Calculus technique [4] is used to find the extreme bounds on performance
+%parameters, i.e. the worst-case scenario. 
+
+%  References 
+% 
+% [1]  Norman S.Nise, "Control System engineering,"  The Benjamin/Cummings 
+%      Publishing, Inc, CA (1991) 
+% [2]  S. Sastry, "Nonlinear Systems Analysis, Stabil ity, and Control," Springer (1999) 
+% [3]   D.J.C MacKay, "Introduction to Monte Car lo Methods," M. I. Jordan, (1999) 
+% [4]  G. Calafiore, L. El Ghaoui, "Confidence ellipsoids for uncertain linear equations 
+%      with structure," In Proceedings of the IEEE CDC , (1999) 

@@ -1,0 +1,87 @@
+use("std2cvt.net")
+
+pi = 3.1415926535897932385
+poly = material {
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p1 = material {
+  parent = poly,
+  h = 2e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p2 = material {
+  parent = poly,
+  h = 1.5e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+d2 = material {
+  parent = poly,
+  fluid = 0.75e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+mfanchor {_n("n2"); material = p1, l = 5e-6, oz = 0, w = 10e-6, R = 100}
+mfbeam2d {_n("n2"), _n("n5"); material = p1, l = 150e-6, oz = deg(180), w = 2e-6, R = 1000}
+mfanchor {_n("n3"); material = p1, l = 5e-6, oz = 0, w = 10e-6, R = 100}
+mfbeam2d {_n("n3"), _n("n6"); material = p1, l = 150e-6, oz = deg(180), w = 2e-6, R = 1000}
+mfbeam2d {_n("n5"), _n("n7"); material = p1, l = 50e-6, oz = deg(90), w = 5e-6, R = 500}
+mfbeam2d {_n("n5"), _n("n6"); material = p1, l = 50e-6, oz = -(deg(90)), w = 5e-6, R = 500}
+mfbeam2d {_n("n6"), _n("n8"); material = p1, l = 50e-6, oz = -(deg(90)), w = 5e-6, R = 500}
+mfbeam2d {_n("n7"), _n("n9"); material = p1, l = 150e-6, oz = 0, w = 2e-6, R = 1000}
+mfbeam2d {_n("n8"), _n("n13"); material = p1, l = 150e-6, oz = 0, w = 2e-6, R = 1000}
+mfbeam2d {_n("n9"), _n("n10"); material = p1, l = 50e-6, oz = 0, w = 20e-6, R = 100}
+mfbeam2d {_n("n10"), _n("n16"); material = p1, l = 50e-6, oz = 0, w = 20e-6, R = 100}
+mfbeam2d {_n("n10"), _n("n11"); material = p1, l = 75e-6, oz = -(deg(90)), w = 20e-6, R = 100}
+mfbeam2d {_n("n11"), _n("n12"); material = p1, l = 75e-6, oz = -(deg(90)), w = 20e-6, R = 100}
+mfbeam2d {_n("n13"), _n("n12"); material = p1, l = 50e-6, oz = 0, w = 20e-6, R = 100}
+mfbeam2d {_n("n12"), _n("n17"); material = p1, l = 50e-6, oz = 0, w = 20e-6, R = 100}
+mfbeam2d {_n("n11"), _n("n14"); material = p1, l = 300e-6, oz = 0, w = 2e-6, R = 1500}
+mfbeam2d {_n("n14"), _n("n15"); material = p1, l = 196e-6, oz = 0, w = 116e-6, R = 100}
+relpos_treewalk()

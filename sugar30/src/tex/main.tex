@@ -1,0 +1,229 @@
+\documentclass[10pt]{report}
+\usepackage{noweb}
+\usepackage{fancyhdr}
+\usepackage{amsmath}
+
+\topmargin=-0.25in
+\textheight=9in
+\oddsidemargin=-0.20in
+\evensidemargin=-0.20in
+\textwidth=6.75in
+
+\newcommand{\sugarday}{26 March 2002}
+\newcommand{\sugartitle}{SUGAR 3.0: A MEMS Simulation Program (Implementor's Guide)}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\rightmark}
+\fancyfoot[L]{\sugarday}
+\fancyfoot[R]{\thepage}
+\renewcommand{\footrulewidth}{0.4pt}
+\newcommand{\chap}[1]{\chapter{#1}\markboth{CHAPTER \thechapter: #1}{\rightmark}}
+
+\begin{document}
+
+\title{\sugartitle}
+\date{\sugarday}
+\author{
+Document Author - David Bindel \\
+\\
+\begin{tabular}{l@{\hspace{0in}}r}
+{\bf Principal Investigators} & \\
+Alice M. Agogino \dotfill & \dotfill {\tt aagogino@me.berkeley.edu} \\
+Zhaojun Bai \dotfill & \dotfill {\tt bai@cs.ucdavis.edu} \\
+James Demmel \dotfill & \dotfill {\tt demmel@eecs.berkeley.edu} \\
+Sanjay Govindjee \dotfill & \dotfill {\tt sanjay@ce.berkeley.edu} \\
+Ming Gu \dotfill & \dotfill {\tt mgu@math.berkeley.edu} \\
+Kristofer S. J. Pister \dotfill & \dotfill {\tt pister@eecs.berkeley.edu} \\
+ & \\
+{\bf Graduated Students} & \\
+Ningning Zhou\dotfill & \dotfill {\tt nzhou@bsac.eecs.berkeley.edu} \\ 
+ & \\
+{\bf Graduate Students} & \\
+David Bindel \dotfill & \dotfill {\tt dbindel@cs.berkeley.edu} \\ 
+Jason V. Clark \dotfill & \dotfill {\tt jvclark@bsac.eecs.berkeley.edu} \\
+David Garmire \dotfill & \dotfill {\tt strive@cs.berkeley.edu} \\
+Raffi Kamalian \dotfill & \dotfill {\tt raffi@me.berkeley.edu} \\
+Shyam Lakshmin \dotfill & \dotfill {\tt lakshmin@cs.berkeley.edu} \\
+Jiawang Nie \dotfill & \dotfill {\tt njw@math.berkeley.edu} \\
+ & \\
+{\bf Undergraduate Students} & \\
+Wayne Kao \dotfill & \dotfill {\tt kaotao@usa.net} \\ 
+Ernest Zhu \dotfill & \dotfill \\
+ & \\
+\end{tabular}}
+
+\maketitle
+
+% ==================================
+
+\pagenumbering{roman}
+\tableofcontents
+\newpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\pagestyle{fancy}
+
+% ==================================
+
+\part{Core Modules}
+
+\chapter{Mesh Object}
+\input{mesh.tex}
+
+\chapter{Variable Management}
+\input{vars.tex}
+
+\chapter{Matrix Assembly}
+\input{assemblem.tex}
+
+\chapter{Dense Matrix Assembly}
+\input{assemblem-dense.tex}
+
+\chapter{Sparse Matrix Assembly}
+\input{assemblem-sparse.tex}
+
+\chapter{System Assembly}
+\input{assemble.tex}
+
+\chapter{SuperLU Solver Interface}
+\input{superlu.tex}
+
+
+\part{Output}
+
+\chapter{Netlist External Representation}
+\input{netout.tex}
+
+\chapter{Printing Netlists}
+\input{netout-file.tex}
+
+\chapter{Generating Matlab Structures}
+\input{netout-mlab.tex}
+
+\chapter{Netlist Graphics}
+\input{netdraw.tex}
+
+\chapter{Netlist Graphics in Xt}
+\input{netdraw-xt.tex}
+
+\chapter{Netlist Graphics with FLTK}
+\input{netdraw-fltk.tex}
+
+\chapter{Netlist Graphics in Matlab}
+\input{netdraw-mlab.tex}
+
+\chapter{Netlist Graphics in Java}
+\input{netdraw-java.tex}
+
+
+\part{Models}
+
+\chapter{Model Manager}
+\input{modelmgr.tex}
+
+\chapter{Anchor Model}
+\input{model-anchor.tex}
+
+\chapter{Force Model}
+\input{model-force.tex}
+
+\chapter{Two-dimensional Beam}
+\input{model-beam2d.tex}
+
+\chapter{Rigid Bodies and Rigid-flexible Coupling}
+\input{model-rigid.tex}
+
+\chapter{Electrostatic Gaps}
+\input{model-gap.tex}
+
+\chapter{Default Model}
+\input{model-test.tex}
+
+\chapter{Matlab Interface Model}
+\input{model-matlab.tex}
+
+
+\part{Lua Mesh Generation}
+
+\chapter{Mesh Generation}
+\input{meshgen-lua.tex}
+
+\chapter{Path Management}
+\input{uses-manager-lua.tex}
+
+\chapter{Transformation Stack}
+\input{xformstack.tex}
+
+\chapter{Implicit Node Positioning}
+\input{relpos.tex}
+
+\chapter{Standard Header}
+\input{std-net.tex}
+
+\chapter{Standard Processes}
+\input{process-net.tex}
+
+
+\part{Lua Interactive Interfaces}
+
+\chapter{Text Interface}
+\input{sugar-lua.tex}
+
+\chapter{FLTK Interface}
+\input{sugar-fltk.tex}
+
+\chapter{Mesh Management}
+\input{mesh-lua.tex}
+
+\chapter{Matrix Type}
+\input{matrix-lua.tex}
+
+\chapter{SuperLU Matrix Type}
+\input{superlu-lua.tex}
+
+
+\part{Matlab Interfaces}
+
+\chapter{Main Interface}
+\input{sugarmex.tex}
+
+\chapter{C Object Handles}
+\input{mex-handle.tex}
+
+\chapter{Mesh Management}
+\input{mesh-mex.tex}
+
+\chapter{Assembly Interfaces}
+\input{assemble-mex.tex}
+
+\chapter{Netlist Output Interface}
+\input{netout-mex.tex}
+
+\chapter{Netlist Display Interface}
+\input{netdraw-mex.tex}
+
+
+\part{Auxiliary Data Types}
+
+\chapter{Memory Pool}
+\input{mempool.tex}
+
+\chapter{Affine Transformations}
+\input{affine.tex}
+
+\chapter{Dynamic Arrays}
+\input{dynarray.tex}
+
+\chapter{Hash Tables}
+\input{hash.tex}
+
+\chapter{Path Manager}
+\input{uses-manager.tex}
+
+
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{main}
+
+\end{document}

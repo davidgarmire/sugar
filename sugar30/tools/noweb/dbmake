@@ -1,0 +1,12 @@
+#!/bin/sh
+#if [ $# -eq 0 ]; then set iconlib all install; fi  # "$@" breaks make for empty args
+if [ $# -eq 0 ]; then set all install-code install-man install-tex install-shell; fi  # "$@" breaks make for empty args
+DBBUILD=`pwd`/../build
+chmod +x xdoc/doversion
+mkdir -p $DBBUILD/bin
+mkdir -p $DBBUILD/lib
+mkdir -p $DBBUILD/man
+mkdir -p $DBBUILD/lib/tex/inputs 
+touch shell/notangle
+make BIN=$DBBUILD/bin LIB=$DBBUILD/lib/noweb MAN=$DBBUILD/man TEXINPUTS=$DBBUILD/lib/tex/inputs "$@"
+cp $DBBUILD/lib/tex/inputs/* ../../src/tex/

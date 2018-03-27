@@ -1,0 +1,264 @@
+
+\section{Introduction}
+
+The {\tt{}mex{\char95}handle} module keeps track of C data structures by numeric
+handles, so that Matlab users can refer to C objects by providing a
+handle.
+
+
+\section{Interface}
+
+\nwfilename{mex-handle.nw}\nwbegincode{1}\sublabel{NWmexD-mexC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-mexC-1}}}\moddef{mex-handle.h~{\nwtagstyle{}\subpageref{NWmexD-mexC-1}}}\endmoddef
+#ifndef MEX_HANDLE_H
+#define MEX_HANDLE_H
+
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWmexD-expI-1}}\RA{}
+
+#endif /* MEX_HANDLE_H */
+\nwnotused{mex-handle.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The handle manager object is a statically-allocated singleton.
+It is initialized by {\tt{}create} and destroyed by {\tt{}destroy}.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmexD-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmexD-expI-1}}}\endmoddef
+void mex_handle_create ();
+void mex_handle_destroy();
+
+\nwalsodefined{\\{NWmexD-expI-2}\\{NWmexD-expI-3}}\nwused{\\{NWmexD-mexC-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+Each object stored by the handle manager has a data field
+and a numeric type tag.  New tags can be allocated using
+the {\tt{}new{\char95}tag} routine.  The zero tag is reserved for empty
+handle slots.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmexD-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmexD-expI-1}}}\plusendmoddef
+int   mex_handle_new_tag();
+
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\tt{}add} function allocates a new handle.  The {\tt{}find}
+function locates a handle that has already been allocated.
+Once a handle has been allocated, the associated data and tag fields can
+be retrieved with the {\tt{}data} and {\tt{}tag} methods.  If
+the handle is not valid, {\tt{}data} will return NULL and {\tt{}tag}
+will return zero.  The {\tt{}remove} function deallocates a handle;
+future references to that handle will be invalid.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmexD-expI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-expI-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmexD-expI-1}}}\plusendmoddef
+int   mex_handle_add   (void* data, int tag);
+int   mex_handle_find  (void* data, int tag);
+int   mex_handle_tag   (int handle_id);
+void* mex_handle_data  (int handle_id);
+void* mex_handle_remove(int handle_id);
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmexD-mexC.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-mexC.2-1}}}\moddef{mex-handle.c~{\nwtagstyle{}\subpageref{NWmexD-mexC.2-1}}}\endmoddef
+#include <stdio.h>
+
+#include "mex-handle.h"
+#include "dynarray.h"
+
+typedef struct mex_handle_t \{
+    void* data;
+    int   tag;
+    int   id;
+\} mex_handle_t;
+
+static dynarray_t handles;
+static int next_tag;
+static int next_id;
+static int free_list;
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}\RA{}
+\nwnotused{mex-handle.c}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+The handles are stored in the dynamic array {\tt{}handles}.  Each handle
+has a data pointer, a tag, and a field for the handle identifier.
+The {\tt{}next{\char95}tag} and {\tt{}next{\char95}id} variables keep track of the number
+of tags and handle identifiers that have been allocated over the lifetime
+of the handle manager.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmexD-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}}\endmoddef
+void mex_handle_create()
+\{
+    handles   = dynarray_create(sizeof(mex_handle_t), 16);
+    next_tag  = 1;
+    next_id   = 1;
+    free_list = -1;
+\}
+
+void mex_handle_destroy()
+\{
+    dynarray_destroy(handles);
+\}
+
+\nwalsodefined{\\{NWmexD-fun9-2}\\{NWmexD-fun9-3}\\{NWmexD-fun9-4}\\{NWmexD-fun9-5}\\{NWmexD-fun9-6}\\{NWmexD-fun9-7}}\nwused{\\{NWmexD-mexC.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+Allocating a new tag is just a matter of incrementing the {\tt{}next{\char95}tag} flag.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmexD-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}}\plusendmoddef
+int mex_handle_new_tag()
+\{
+    return next_tag++;
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+At a high level, the {\tt{}add} and {\tt{}remove} operations are simple, too.
+To add a handle, we need only to find a space for it, set the fields,
+and assign an identifier.  To remove a handle, we grab the handle data,
+deallocate the handle, and return the data pointer.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmexD-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}}\plusendmoddef
+int mex_handle_add(void* data, int tag)
+\{
+    int index;
+    mex_handle_t* handle;
+
+    \LA{}allocate handle~{\nwtagstyle{}\subpageref{NWmexD-allF-1}}\RA{}
+    handle->data = data;
+    handle->tag  = tag;
+    handle->id   = \LA{}allocate handle identifier~{\nwtagstyle{}\subpageref{NWmexD-allQ-1}}\RA{}
+
+    return handle->id;
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmexD-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}}\plusendmoddef
+void* mex_handle_remove(int handle_id)
+\{
+    int index;
+    mex_handle_t* handle;
+    void*         data;
+
+    \LA{}find handle identifier~{\nwtagstyle{}\subpageref{NWmexD-finM-1}}\RA{}
+
+    if (handle == NULL)
+        return NULL;
+    else \{
+        data = handle->data;
+        \LA{}deallocate handle~{\nwtagstyle{}\subpageref{NWmexD-deaH-1}}\RA{}
+        return data;
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+The {\tt{}find} function returns the identifier for a handle that has
+already been allocated.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmexD-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}}\plusendmoddef
+int mex_handle_find(void* data, int tag)
+\{
+    int i, n;
+    mex_handle_t* handle_data = dynarray_data(handles);
+
+    n = dynarray_count(handles);
+    for (i = 0; i < n; ++i) \{
+        if (handle_data[i].tag == tag && handle_data[i].data == data)
+            return handle_data[i].id;
+    \}
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+The {\tt{}tag} and {\tt{}data} functions find a handle and return its data
+field (or zero if the handle is invalid).
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmexD-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}}\plusendmoddef
+int mex_handle_tag(int handle_id)
+\{
+    int index;
+    mex_handle_t* handle;
+
+    \LA{}find handle identifier~{\nwtagstyle{}\subpageref{NWmexD-finM-1}}\RA{}
+
+    return (handle != NULL) ? handle->tag : 0;
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmexD-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmexD-fun9-1}}}\plusendmoddef
+void* mex_handle_data(int handle_id)
+\{
+    int index;
+    mex_handle_t* handle;
+
+    \LA{}find handle identifier~{\nwtagstyle{}\subpageref{NWmexD-finM-1}}\RA{}
+
+    return (handle != NULL) ? handle->data : NULL;
+\}
+
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+We keep a free list of deallocated handle slots for re-use, since
+it seems likely that they will be deallocated pretty often.
+The handle {\tt{}id} field is used to point to the next slot on
+the free list, and $-1$ serves the role of a NULL.  If we want
+a new slot and there are none available from the free list, we
+just expand the array to accomodate a new handle.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmexD-allF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-allF-1}}}\moddef{allocate handle~{\nwtagstyle{}\subpageref{NWmexD-allF-1}}}\endmoddef
+if (free_list >= 0) \{
+    index      = free_list;
+    handle     = dynarray_get(handles, index);
+    free_list  = handle->id;
+\} else \{
+    index      = dynarray_count(handles);
+    handle     = dynarray_append(handles, NULL);
+\}
+
+\nwused{\\{NWmexD-fun9-3}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmexD-deaH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-deaH-1}}}\moddef{deallocate handle~{\nwtagstyle{}\subpageref{NWmexD-deaH-1}}}\endmoddef
+handle->tag  = 0;
+handle->data = NULL;
+handle->id   = free_list;
+free_list    = index;
+
+\nwused{\\{NWmexD-fun9-4}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+A natural way to pick handle identifiers would be to use the
+array index of the identifier.  There is a problem
+with this approach, though.  We would like small,
+common numbers like $0$ and $1$ \emph{not} to be valid handles.
+It makes it more difficult for the user to accidentally retrieve 
+a valid handle that was not returned to him.  Similarly, we would
+like the handles not to be too close together, so that taking a
+valid handle and adding one to it doesn't yield another valid handle.
+
+We can get a more scattered space of handles by putting some unique
+identifying information in the high order bits and using the low
+order bits for index information.  For the moment, we'll use the
+lower ten bits for indexing.  I doubt we'll ever have more than 256
+simultaneously active handles, so the for loop used to retrieve
+the handle identifiers will probably never go past the first iteration
+unless there is an error.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmexD-allQ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-allQ-1}}}\moddef{allocate handle identifier~{\nwtagstyle{}\subpageref{NWmexD-allQ-1}}}\endmoddef
+(next_tag++ << 8) + (index & 255);
+\nwused{\\{NWmexD-fun9-3}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWmexD-finM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmexD-finM-1}}}\moddef{find handle identifier~{\nwtagstyle{}\subpageref{NWmexD-finM-1}}}\endmoddef
+for (index = (handle_id & 255);
+     (handle = dynarray_get(handles, index)) != NULL &&
+         handle->id != handle_id;
+     index += 256);
+\nwused{\\{NWmexD-fun9-4}\\{NWmexD-fun9-6}\\{NWmexD-fun9-7}}\nwendcode{}
+
+\nwixlogsorted{c}{{allocate handle}{NWmexD-allF-1}{\nwixu{NWmexD-fun9-3}\nwixd{NWmexD-allF-1}}}%
+\nwixlogsorted{c}{{allocate handle identifier}{NWmexD-allQ-1}{\nwixu{NWmexD-fun9-3}\nwixd{NWmexD-allQ-1}}}%
+\nwixlogsorted{c}{{deallocate handle}{NWmexD-deaH-1}{\nwixu{NWmexD-fun9-4}\nwixd{NWmexD-deaH-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWmexD-expI-1}{\nwixu{NWmexD-mexC-1}\nwixd{NWmexD-expI-1}\nwixd{NWmexD-expI-2}\nwixd{NWmexD-expI-3}}}%
+\nwixlogsorted{c}{{find handle identifier}{NWmexD-finM-1}{\nwixu{NWmexD-fun9-4}\nwixu{NWmexD-fun9-6}\nwixu{NWmexD-fun9-7}\nwixd{NWmexD-finM-1}}}%
+\nwixlogsorted{c}{{functions}{NWmexD-fun9-1}{\nwixu{NWmexD-mexC.2-1}\nwixd{NWmexD-fun9-1}\nwixd{NWmexD-fun9-2}\nwixd{NWmexD-fun9-3}\nwixd{NWmexD-fun9-4}\nwixd{NWmexD-fun9-5}\nwixd{NWmexD-fun9-6}\nwixd{NWmexD-fun9-7}}}%
+\nwixlogsorted{c}{{mex-handle.c}{NWmexD-mexC.2-1}{\nwixd{NWmexD-mexC.2-1}}}%
+\nwixlogsorted{c}{{mex-handle.h}{NWmexD-mexC-1}{\nwixd{NWmexD-mexC-1}}}%
+\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}

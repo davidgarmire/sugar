@@ -1,0 +1,52 @@
+use 'std.net'
+use 'std2.net'
+
+anchor  = mfanchor;
+eground = mfeground;
+beam3d  = mfbeam3d;
+gap2dforce = mfgap2dforce;
+gap3dforce = mfgap3dforce;
+comb2d = mfcomb2d;
+C = mfC;
+R = mfR;
+L = mfL;
+Isrc = mfIsrc;
+Vsrc = mfVsrc;
+f2d = mff2d;
+f3d = mff3d;
+
+subnet beam2de(A, B, material, l, w, h, R, G)
+  R = R or (material.resistivity and (w*h * material.resistivity));
+  if R then
+    mfR {A, B, material; R=R}
+  elseif G then
+    mfR {A, B, material; G=G}
+  end
+  mfbeam2d {A, B, material; l=l, w=w, h=w}
+end
+
+subnet beam3de(A, B, material, l, w, h, R, G)
+  R = R or (material.resistivity and (w*h * material.resistivity));
+  if R then
+    mfR {A, B, material; R=R}
+  elseif G then
+    mfR {A, B, material; G=G}
+  end
+  mfbeam3d {A, B, material; l=l, w=w, h=w}
+end
+
+subnet gap2de(A, B, C, D, material, l, w, w1, w2, h, R, R1, R2, G, G1, G2, gap)
+  beam2de {A, B, material; l=l, w=(w1 or w), h=h, R=(R1 or R), G=(G1 or G)}
+  beam2de {C, D, material; l=l, w=(w2 or w), h=h, R=(R2 or R), G=(G2 or G)}
+  gap2dforce {A, B, C, D, material; l=l, w1=(w1 or w), w2=(w2 or w), h=h,
+              gap=gap}
+end
+
+subnet gap3de(A, B, C, D, material, l, w, w1, w2, h, R, R1, R2, G, G1, G2, gap)
+  beam3de {A, B, material; l=l, w=(w1 or w), h=h, R=(R1 or R), G=(G1 or G)}
+  beam3de {C, D, material; l=l, w=(w2 or w), h=h, R=(R2 or R), G=(G2 or G)}
+  gap3dforce {A, B, C, D, material; l=l, w1=(w1 or w), w2=(w2 or 2), h=h,
+              gap=gap}
+end
+
+

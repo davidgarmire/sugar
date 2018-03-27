@@ -1,0 +1,198 @@
+\section{Introduction}
+
+This module provides an interactive command interface to SUGAR
+using the Lua language.  It defines little functionality on its
+own.
+
+This module provides a Lua interface to the {\tt{}uses} manager
+functionality.
+
+Commands to the interface include
+\begin{itemize}
+  \item {\tt{}use}:
+    Read and execute a Lua script file in the current environment
+  \item {\tt{}addpath}: Add to the search path
+\end{itemize}
+
+Besides these commands, the basic Lua library and the math library
+are included.  All the standard Lua syntax is, of course, available.
+
+
+\section{Interface}
+
+The module provides three functions: one to register the library
+functions with the Lua interpreter, and a setter/getter pair to
+access the uses manager associated with the interpreter.
+
+\nwfilename{uses-manager-lua.nw}\nwbegincode{1}\sublabel{NWuseJ-useI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-useI-1}}}\moddef{uses-manager-lua.h~{\nwtagstyle{}\subpageref{NWuseJ-useI-1}}}\endmoddef
+#ifndef USES_MANAGER_LUA_H
+#define USES_MANAGER_LUA_H
+
+#include "uses-manager.h"
+
+void lua_usesmgrlib(lua_State* L);
+void lua_set_usesmgr(lua_State* L, uses_manager_t uses_mgr);
+uses_manager_t lua_get_usesmgr(lua_State* L);
+
+#endif /* USES_MANAGER_LUA_H */
+\nwnotused{uses-manager-lua.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWuseJ-useI.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-useI.2-1}}}\moddef{uses-manager-lua.c~{\nwtagstyle{}\subpageref{NWuseJ-useI.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lua.h>
+#include <lualib.h>
+
+#include "uses-manager-lua.h"
+
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWuseJ-staG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWuseJ-fun9-1}}\RA{}
+
+\nwnotused{uses-manager-lua.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Accessing the uses manager}
+
+The uses manager is stored in the Lua registry table in the entry
+keyed by ``SUGAR uses manager''.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWuseJ-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWuseJ-fun9-1}}}\endmoddef
+void lua_set_usesmgr(lua_State* L, uses_manager_t uses_mgr)
+\{
+    lua_getregistry(L);
+    lua_pushstring(L, "SUGAR uses manager");
+    lua_pushuserdata(L, uses_mgr);
+    lua_settable(L,-3);
+    lua_pop(L,1);
+\}
+
+\nwalsodefined{\\{NWuseJ-fun9-2}\\{NWuseJ-fun9-3}}\nwused{\\{NWuseJ-useI.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWuseJ-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWuseJ-fun9-1}}}\plusendmoddef
+uses_manager_t lua_get_usesmgr(lua_State* L)
+\{
+    uses_manager_t uses_mgr;
+
+    lua_getregistry(L);
+    lua_pushstring(L, "SUGAR uses manager");
+    lua_gettable(L,-2);
+    if (!lua_isuserdata(L,-1))
+        return NULL;
+    uses_mgr = (uses_manager_t) lua_touserdata(L,-1);
+    lua_pop(L,2);
+    return uses_mgr;
+\}
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{{\tt{}use} command}
+
+The {\tt{}use} command executes a Lua file in the current environment.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWuseJ-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWuseJ-staG-1}}}\endmoddef
+static int use_lua_file(lua_State* L)
+\{
+    uses_manager_t uses_manager = lua_get_usesmgr(L);
+    int n = lua_gettop(L);
+    int i;
+
+    \LA{}Assert presence of uses manager~{\nwtagstyle{}\subpageref{NWuseJ-AssV-1}}\RA{}
+
+    for (i = 1; i <= n; ++i) \{
+        char buf[256];
+        if (!lua_isstring(L,i))
+            lua_error(L, "Invalid argument to 'use'");
+        \LA{}Get complete name of file to use~{\nwtagstyle{}\subpageref{NWuseJ-GetW-1}}\RA{}
+        \LA{}Use lua file~{\nwtagstyle{}\subpageref{NWuseJ-UseC-1}}\RA{}
+    \}
+    return 0;
+\}
+
+\nwalsodefined{\\{NWuseJ-staG-2}}\nwused{\\{NWuseJ-useI.2-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+To get the full file name, including path, we consult 
+the uses manager.  If we find a full name, we store it in {\tt{}buf};
+otherwise, we'd better complain.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWuseJ-AssV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-AssV-1}}}\moddef{Assert presence of uses manager~{\nwtagstyle{}\subpageref{NWuseJ-AssV-1}}}\endmoddef
+if (uses_manager == NULL)
+    lua_error(L, "Uses manager not installed!\\n");
+\nwused{\\{NWuseJ-staG-1}\\{NWuseJ-staG-2}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWuseJ-GetW-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-GetW-1}}}\moddef{Get complete name of file to use~{\nwtagstyle{}\subpageref{NWuseJ-GetW-1}}}\endmoddef
+strncpy(buf, lua_tostring(L,i), sizeof(buf));
+if (uses_manager_search(uses_manager, buf, sizeof(buf)) == NULL)
+    lua_error(L, "Could not open file");
+\nwused{\\{NWuseJ-staG-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWuseJ-UseC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-UseC-1}}}\moddef{Use lua file~{\nwtagstyle{}\subpageref{NWuseJ-UseC-1}}}\endmoddef
+if (lua_dofile(L, buf) != 0)
+    lua_error(L, "Error opening file");
+\nwused{\\{NWuseJ-staG-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWuseJ-regI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-regI-1}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWuseJ-regI-1}}}\endmoddef
+lua_register(L, "use", use_lua_file);
+\nwalsodefined{\\{NWuseJ-regI-2}}\nwused{\\{NWuseJ-fun9-3}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{{\tt{}addpath} command}
+
+The {\tt{}addpath} command adds to the list of paths to search in
+{\tt{}use} commands.  Calls to the {\tt{}uses{\char95}manager{\char95}addpath} command
+prepend to the list of available paths.  Note that you \emph{don't}
+want to try to add multiple paths in the same string (separated by
+a colon as in shell, say).  You can, however, add multiple paths
+in different string arguments in a single call to {\tt{}addpath}
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWuseJ-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWuseJ-staG-1}}}\plusendmoddef
+static int addpath_lua(lua_State* L)
+\{
+    uses_manager_t uses_manager = lua_get_usesmgr(L);
+    int n = lua_gettop(L);
+    int i;
+
+    \LA{}Assert presence of uses manager~{\nwtagstyle{}\subpageref{NWuseJ-AssV-1}}\RA{}
+
+    for (i = 1; i <= n; ++i) \{
+        if (!lua_isstring(L,i))
+            lua_error(L, "Invalid argument to 'use'");
+        uses_manager_addpath(uses_manager, lua_tostring(L,i));
+    \}
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWuseJ-regI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-regI-2}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NWuseJ-regI-1}}}\plusendmoddef
+lua_register(L, "addpath", addpath_lua);
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+
+\subsection{Registration}
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWuseJ-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWuseJ-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWuseJ-fun9-1}}}\plusendmoddef
+void lua_usesmgrlib(lua_State* L)
+\{
+    \LA{}register functions~{\nwtagstyle{}\subpageref{NWuseJ-regI-1}}\RA{}
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{Assert presence of uses manager}{NWuseJ-AssV-1}{\nwixu{NWuseJ-staG-1}\nwixd{NWuseJ-AssV-1}\nwixu{NWuseJ-staG-2}}}%
+\nwixlogsorted{c}{{Get complete name of file to use}{NWuseJ-GetW-1}{\nwixu{NWuseJ-staG-1}\nwixd{NWuseJ-GetW-1}}}%
+\nwixlogsorted{c}{{Use lua file}{NWuseJ-UseC-1}{\nwixu{NWuseJ-staG-1}\nwixd{NWuseJ-UseC-1}}}%
+\nwixlogsorted{c}{{functions}{NWuseJ-fun9-1}{\nwixu{NWuseJ-useI.2-1}\nwixd{NWuseJ-fun9-1}\nwixd{NWuseJ-fun9-2}\nwixd{NWuseJ-fun9-3}}}%
+\nwixlogsorted{c}{{register functions}{NWuseJ-regI-1}{\nwixd{NWuseJ-regI-1}\nwixd{NWuseJ-regI-2}\nwixu{NWuseJ-fun9-3}}}%
+\nwixlogsorted{c}{{static functions}{NWuseJ-staG-1}{\nwixu{NWuseJ-useI.2-1}\nwixd{NWuseJ-staG-1}\nwixd{NWuseJ-staG-2}}}%
+\nwixlogsorted{c}{{uses-manager-lua.c}{NWuseJ-useI.2-1}{\nwixd{NWuseJ-useI.2-1}}}%
+\nwixlogsorted{c}{{uses-manager-lua.h}{NWuseJ-useI-1}{\nwixd{NWuseJ-useI-1}}}%
+\nwbegindocs{24}\nwdocspar
+
+
+\nwenddocs{}

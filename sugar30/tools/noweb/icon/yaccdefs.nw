@@ -1,0 +1,26 @@
+\section{Finding {\tt yacc} definitions}
+<<*>>=
+procedure rcsinfo () 
+  return "$Id: yaccdefs.nw,v 1.3 2002/04/05 09:49:35 strive Exp $" ||
+         "$Name:  $"
+end
+procedure main(args)
+  go()
+end
+
+procedure postpass(name, arg)
+  static kind
+  case name of {
+    "begin" : arg ? kind := tab(upto(' ')|0)
+    "text" : if kind == "code" then arg ?
+        if id := tab(many(&letters)) then {
+          tab(many(' \t'))
+          if =":" & any(&letters ++ ' ([{') then writedefn(id)
+        }
+  }
+  return
+end
+
+procedure prepass(name, arg)
+  if name == "end" then writedefn(&null) # force newline
+end

@@ -1,0 +1,703 @@
+
+\section{Introduction}
+
+The {\tt{}mempool} module manages a region-based allocator,
+or memory pool.  A user can create a region associated with
+some task or data structure and allocate from it freely;
+when the time comes to finish the program task or destroy
+the data structure, the region can be deallocated.
+See Dave Hanson's book ``C Interfaces and Implementations'' %'
+for some further information on region-based allocators.
+
+This particular allocator is not very fancy.  It \emph{does}
+allow us to mark entire data structures as persistent across
+MeX files in Matlab, which is convenient.  It also has special
+support for stack-order allocation / deallocation patterns.
+
+
+\section{Interface}
+
+\nwfilename{mempool.nw}\nwbegincode{1}\sublabel{NWmemA-mem9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-mem9-1}}}\moddef{mempool.h~{\nwtagstyle{}\subpageref{NWmemA-mem9-1}}}\endmoddef
+#ifndef MEMPOOL_H
+#define MEMPOOL_H
+
+typedef struct mempool_struct* mempool_t;
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NWmemA-expE-1}}\RA{}
+\LA{}exported macros~{\nwtagstyle{}\subpageref{NWmemA-expF-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWmemA-expI-1}}\RA{}
+
+#endif /* MEMPOOL_H */
+\nwnotused{mempool.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}mempool{\char95}create} and {\tt{}mempool{\char95}destroy}
+functions create and destroy regions.  When creating a new
+region, you must specify the typical size of a \emph{span},
+or chunk of memory to be allocated contiguously.  New spans
+are allocated as needed, and requests to allocate a contiguous
+chunk of memory larger than the ordinary span size are accomodated
+by special extra-large spans.  The default span size,
+{\tt{}MEMPOOL{\char95}DEFAULT{\char95}SPAN} is 4K.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmemA-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmemA-expI-1}}}\endmoddef
+mempool_t mempool_create (int span_size);
+void      mempool_destroy(mempool_t pool);
+
+\nwalsodefined{\\{NWmemA-expI-2}\\{NWmemA-expI-3}\\{NWmemA-expI-4}\\{NWmemA-expI-5}}\nwused{\\{NWmemA-mem9-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmemA-expF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-expF-1}}}\moddef{exported macros~{\nwtagstyle{}\subpageref{NWmemA-expF-1}}}\endmoddef
+#define MEMPOOL_DEFAULT_SPAN (4096)
+
+\nwused{\\{NWmemA-mem9-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The basic operation on a memory pool is (obviously enough)
+getting memory.  The {\tt{}mempool{\char95}get} function gets a chunk
+of memory from the pool; the {\tt{}mempool{\char95}cget} function gets
+a zero-filled chunk of memory.
+
+It is sometimes convenient to access memory pools using a
+\emph{stack discipline}.  That is, allocation and deletion
+requests can be interlaced in stack order.  The beginning
+of a ``stack frame'' in our memory pool module is marked
+by a \emph{handle}.  The functions {\tt{}mempool{\char95}geth} and
+{\tt{}mempool{\char95}cgeth} are much like {\tt{}mempool{\char95}get} and
+{\tt{}mempool{\char95}cget}, except that the memory returned is associated
+with a handle in the memory pool.  If {\tt{}mempool{\char95}freeh} is
+called on a pointer returned from {\tt{}mempool{\char95}geth}, the memory
+pool is rolled back to the state it was in immediately before
+the corresponding {\tt{}mempool{\char95}geth} call.  This means that not
+only is the memory allocated in that {\tt{}mempool{\char95}geth} call
+freed, but so also is all the memory allocated from the pool
+\emph{after} the call.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmemA-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmemA-expI-1}}}\plusendmoddef
+void* mempool_get  (mempool_t pool, int size);
+void* mempool_cget (mempool_t pool, int size);
+void* mempool_geth (mempool_t pool, int size);
+void* mempool_cgeth(mempool_t pool, int size);
+void  mempool_freeh(void* mem);
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+The standard function {\tt{}strdup} mallocs a buffer and copies
+into it an argument string.  It's a convenient function. %'
+It's also often convenient to copy some more general object %'
+from a temporary buffer into dynamically allocated memory.
+The mempool module supports this functionality with
+{\tt{}mempool{\char95}strdup} and {\tt{}mempool{\char95}memdup}.
+
+Note that if a NULL argument is passed to {\tt{}mempool{\char95}strdup}
+or {\tt{}mempool{\char95}memdup}, the return value will be NULL.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmemA-expI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-expI-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmemA-expI-1}}}\plusendmoddef
+void* mempool_memdup(mempool_t pool, const void* src, int size);
+void* mempool_strdup(mempool_t pool, const char* src);
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+For debugging purposes, the mempool class supports logging.
+The mempool log file is a global object, not associated with
+any particular pool instance.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmemA-expI-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-expI-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmemA-expI-1}}}\plusendmoddef
+void mempool_start_log(char* filename);
+void mempool_end_log  ();
+void mempool_flush_log();
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+In the Matlab environment, by default, memory allocated during an
+invocation of a MEX file is automatically freed after
+the call finishes.  It is possible to override this default
+by explicitly requesting that Matlab make the allocated memory
+persistent across calls.  The {\tt{}mempool{\char95}persist} function
+causes Matlab to mark all memory in a pool as persistent.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmemA-expI-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-expI-5}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWmemA-expI-1}}}\plusendmoddef
+void mempool_persist(mempool_t pool);
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+Memory pool allocations must be properly \emph{aligned} on most
+systems.  There are some other modules that also care about
+alignment.  See the implementation section for details.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmemA-expE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-expE-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NWmemA-expE-1}}}\endmoddef
+\LA{}alignment definitions~{\nwtagstyle{}\subpageref{NWmemA-aliL-1}}\RA{}
+\nwused{\\{NWmemA-mem9-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\section{Implementation}
+
+Besides standard library and memory manipulation routines,
+we will include the SUGAR main header file, which defines
+macros to alias {\tt{}malloc} and {\tt{}free} to the Matlab
+functions {\tt{}mxMalloc} and {\tt{}mxFree}.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmemA-mem9.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-mem9.2-1}}}\moddef{mempool.c~{\nwtagstyle{}\subpageref{NWmemA-mem9.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "mempool.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWmemA-typ5-1}}\RA{}
+\LA{}static data~{\nwtagstyle{}\subpageref{NWmemA-staB-1}}\RA{}
+
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWmemA-staG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}\RA{}
+\nwnotused{mempool.c}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{Alignment}
+
+In order to accomodate arbitrary objects, the memory returned
+by allocation requests to a mempool must be properly aligned.
+The {\tt{}align{\char95}t} union contains the possible basic types;
+the size of an {\tt{}align{\char95}t} structure, indicated by the macro
+{\tt{}align{\char95}size}, determines exactly how little memory can be
+allocated.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmemA-aliL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-aliL-1}}}\moddef{alignment definitions~{\nwtagstyle{}\subpageref{NWmemA-aliL-1}}}\endmoddef
+typedef union \{
+    int i;
+    long l;
+    long* lp;
+    void* p;
+    void (*fp)();
+    float f;
+    double d;
+    long double ld;
+\} align_t;
+
+#define align_size (sizeof(align_t))
+
+\nwused{\\{NWmemA-expE-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+
+\subsection{Creating and destroying pools}
+
+As mentioned in the interface section, a memory pool's space
+consists of a linked list of \emph{spans}.  Spans are further
+subdivided into \emph{blocks}, which are the smallest units
+guaranteed to start at, and end just before, alignment boundaries.
+The first block in each span is reserved for a link to
+the next span.
+
+The mempool structure tracks the typical number of blocks
+to be allocated in ordinary new spans, the number of blocks
+used in the current span, and the locations of the first and
+current span.  In addition, the first field of the mempool
+structure is a ``magic number'' used for debugging purposes.
+The magic number is used for debugging purposes;
+functions expecting a pool argument can use it to check that
+the user did not accidentally pass in a bogus pointer.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmemA-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmemA-typ5-1}}}\endmoddef
+#define MEMPOOL_MAGIC_NUMBER 0x1234
+#define ASSERT_VALID_POOL \\
+    assert(pool != NULL && pool->magic_number == MEMPOOL_MAGIC_NUMBER)
+
+struct mempool_struct \{
+    int magic_number;
+    int blocks_per_span;
+    int blocks_used;
+    align_t* first_span;
+    align_t* current_span;
+\};
+
+\nwalsodefined{\\{NWmemA-typ5-2}}\nwused{\\{NWmemA-mem9.2-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+The local {\tt{}allocate{\char95}span} function allocates and initializes new
+spans to go into pools list.  The {\tt{}blocks{\char95}in{\char95}span} argument
+gives the number of blocks required to accomodate an incoming
+request (recall that requests larger than the typical span size
+sometimes happen)
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmemA-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmemA-staG-1}}}\endmoddef
+static align_t* allocate_span(mempool_t pool, int blocks_in_span)
+\{
+    align_t* span;
+
+    \LA{}allocate memory for the new span~{\nwtagstyle{}\subpageref{NWmemA-allW-1}}\RA{}
+    \LA{}optionally clear the new span~{\nwtagstyle{}\subpageref{NWmemA-optT-1}}\RA{}
+    \LA{}initialize the span~{\nwtagstyle{}\subpageref{NWmemA-iniJ-1}}\RA{}
+
+    \LA{}log span allocation~{\nwtagstyle{}\subpageref{NWmemA-logJ-1}}\RA{}
+
+    return span;
+\}
+
+\nwused{\\{NWmemA-mem9.2-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+When we allocate the memory for the new span, we want to make
+sure that it is sufficient to accomodate extra-large requests.
+For smaller requests, we default to the standard {\tt{}blocks{\char95}per{\char95}span}.
+Note that there will be one extra block in each span to keep
+the ``next'' pointer.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmemA-allW-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-allW-1}}}\moddef{allocate memory for the new span~{\nwtagstyle{}\subpageref{NWmemA-allW-1}}}\endmoddef
+if (blocks_in_span < pool->blocks_per_span)
+    blocks_in_span = pool->blocks_per_span;
+span = (align_t*) malloc((1+blocks_in_span) * align_size);
+\nwused{\\{NWmemA-staG-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+If the {\tt{}MEMPOOL{\char95}CLEAR{\char95}DEBUG} macro is defined, then we zero out
+the new span before proceeding.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmemA-optT-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-optT-1}}}\moddef{optionally clear the new span~{\nwtagstyle{}\subpageref{NWmemA-optT-1}}}\endmoddef
+#ifdef MEMPOOL_CLEAR
+memset(span, 0, (1+blocks_in_span) * align_size);
+#endif
+\nwused{\\{NWmemA-staG-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+Finally, we check to make sure that the allocation request succeeded,
+and then we initialize block 0 (the next pointer) to {\tt{}NULL}.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmemA-iniJ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-iniJ-1}}}\moddef{initialize the span~{\nwtagstyle{}\subpageref{NWmemA-iniJ-1}}}\endmoddef
+assert(span != NULL);
+span[0].p = NULL;
+\nwused{\\{NWmemA-staG-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+{\tt{}mempool{\char95}create} allocates and initializes a new pool
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWmemA-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\endmoddef
+mempool_t mempool_create(int span_size)
+\{
+    mempool_t pool;
+
+    assert( span_size > 0 );
+    assert( pool = (mempool_t) malloc(sizeof(struct mempool_struct)) );
+
+    \LA{}initialize new pool~{\nwtagstyle{}\subpageref{NWmemA-iniJ.2-1}}\RA{}
+    \LA{}log pool creation~{\nwtagstyle{}\subpageref{NWmemA-logH-1}}\RA{}
+
+    return pool;
+\}
+
+\nwalsodefined{\\{NWmemA-fun9-2}\\{NWmemA-fun9-3}\\{NWmemA-fun9-4}\\{NWmemA-fun9-5}\\{NWmemA-fun9-6}\\{NWmemA-fun9-7}\\{NWmemA-fun9-8}\\{NWmemA-fun9-9}\\{NWmemA-fun9-A}\\{NWmemA-fun9-B}\\{NWmemA-fun9-C}}\nwused{\\{NWmemA-mem9.2-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+Note that we start off by allocating an initial span, rather than
+allocating a new span on the first memory request.  That makes it
+so that our list logic doesn't have to deal with the ``add to an
+empty list'' case.  Note that the allocation of the new span
+\emph{must} occur after the {\tt{}blocks{\char95}per{\char95}span} field has been set.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWmemA-iniJ.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-iniJ.2-1}}}\moddef{initialize new pool~{\nwtagstyle{}\subpageref{NWmemA-iniJ.2-1}}}\endmoddef
+pool->magic_number = MEMPOOL_MAGIC_NUMBER;
+pool->blocks_per_span = (span_size + align_size-1)/align_size;
+pool->first_span = allocate_span(pool, 0);
+pool->current_span = pool->first_span;
+pool->blocks_used = 0;
+\nwused{\\{NWmemA-fun9-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+The {\tt{}mempool{\char95}destroy} function frees the pool structure and all spans.
+It also clears the magic number field, so that future (invalid)
+references to this pool will be caught.
+Additionally, if the {\tt{}MEMPOOL{\char95}CLEAR{\char95}DEBUG} macro is defined, 
+{\tt{}mempool{\char95}destroy} also overwrites all the spans with zeros 
+before deleting them.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWmemA-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void mempool_destroy(mempool_t pool)
+\{
+    align_t* next_span;
+
+    ASSERT_VALID_POOL;
+    \LA{}delete all spans in the pool~{\nwtagstyle{}\subpageref{NWmemA-delS-1}}\RA{}
+    pool->magic_number = 0;
+    free(pool);
+
+    \LA{}log pool deletion~{\nwtagstyle{}\subpageref{NWmemA-logH.2-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWmemA-delS-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-delS-1}}}\moddef{delete all spans in the pool~{\nwtagstyle{}\subpageref{NWmemA-delS-1}}}\endmoddef
+next_span = pool->first_span;
+while (next_span != NULL) \{
+    align_t* dead_span = next_span;
+    next_span = (align_t*) next_span[0].p;
+    \LA{}optionally clear dead span~{\nwtagstyle{}\subpageref{NWmemA-optQ-1}}\RA{}
+    free(dead_span);
+\}
+\nwused{\\{NWmemA-fun9-2}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+Recall that there may be spans longer than the standard size of
+{\tt{}1\ +\ pool->blocks{\char95}per{\char95}span}.  In such cases, only the leading
+blocks are cleared.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWmemA-optQ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-optQ-1}}}\moddef{optionally clear dead span~{\nwtagstyle{}\subpageref{NWmemA-optQ-1}}}\endmoddef
+#ifdef MEMPOOL_CLEAR_DEBUG
+memset(dead_span, 0, (1 + pool->blocks_per_span)*align_size);
+#endif
+\nwused{\\{NWmemA-delS-1}\\{NWmemA-freT-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+
+\subsubsection{Basic allocation from the pool}
+
+The most basic allocation function is {\tt{}mempool{\char95}get}.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWmemA-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void* mempool_get(mempool_t pool, int size)
+\{
+    int blocks_requested = (size + align_size-1) / align_size;
+    void* mem;
+
+    ASSERT_VALID_POOL;
+    assert(blocks_requested >= 0);
+
+    \LA{}allocate a new span if necessary~{\nwtagstyle{}\subpageref{NWmemA-allW.2-1}}\RA{}
+    \LA{}allocate blocks from the current span~{\nwtagstyle{}\subpageref{NWmemA-allb-1}}\RA{}
+
+    \LA{}log allocation from span~{\nwtagstyle{}\subpageref{NWmemA-logO-1}}\RA{}
+
+    return mem;
+\}
+
+\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+The {\tt{}mempool{\char95}cget} function is just a convenience function
+that allocates using {\tt{}mempool{\char95}get} and then clears the
+returned space.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWmemA-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void* mempool_cget(mempool_t pool, int size)
+\{
+    void* mem = mempool_get(pool, size);
+    memset(mem, 0, size);
+    return mem;
+\}
+
+\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+The first free block in a span is always at {\tt{}1\ +\ pool->blocks{\char95}used}.
+The extra 1 is to accomodate the initial block containing the link
+to the next span.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWmemA-allb-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-allb-1}}}\moddef{allocate blocks from the current span~{\nwtagstyle{}\subpageref{NWmemA-allb-1}}}\endmoddef
+mem = &(pool->current_span[1 + pool->blocks_used]);
+pool->blocks_used += blocks_requested;
+\nwused{\\{NWmemA-fun9-3}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+We allocate a new span only if the request is too big
+to fit into the remaining blocks in our current span.
+Note that if the last span allocated was extra large to accomodate
+a big allocation request, then {\tt{}pool->blocks{\char95}used\ >\ pool->blocks{\char95}per{\char95}span},
+and we automatically end up allocating a new span.
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWmemA-allW.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-allW.2-1}}}\moddef{allocate a new span if necessary~{\nwtagstyle{}\subpageref{NWmemA-allW.2-1}}}\endmoddef
+if (pool->blocks_used + blocks_requested > pool->blocks_per_span) \{
+    align_t* new_span = allocate_span(pool, blocks_requested);
+    \LA{}link in new span~{\nwtagstyle{}\subpageref{NWmemA-linG-1}}\RA{}
+\}
+\nwused{\\{NWmemA-fun9-3}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWmemA-linG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-linG-1}}}\moddef{link in new span~{\nwtagstyle{}\subpageref{NWmemA-linG-1}}}\endmoddef
+pool->current_span[0].p = new_span;
+pool->current_span = new_span;
+pool->blocks_used = 0;
+\nwused{\\{NWmemA-allW.2-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+
+\subsection{Allocating with handles}
+
+A memory pool handle contains the fields needed to save the state
+of a memory pool (the {\tt{}current{\char95}span} and current {\tt{}blocks{\char95}used}),
+and also a pointer to the pool with which it is associated.
+The memory pool handle structure also contains a magic number field.
+During a handle allocation, the handle goes in the blocks
+immediately \emph{preceding} the returned pointer.
+The {\tt{}MEMPOOL{\char95}HANDLE{\char95}SIZE} macro gives the size of the handle
+rounded up to the nearest multiple of the alignment block size.
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWmemA-typ5-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-typ5-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmemA-typ5-1}}}\plusendmoddef
+#define MEMPOOL_HANDLE_MAGIC_NUMBER 0xA911
+
+#define MEMPOOL_HANDLE_SIZE \\
+   (((sizeof(mempool_handle_t) + align_size-1) / align_size) * align_size)
+
+typedef struct mempool_handle_t \{
+    int magic_number;
+    int blocks_used;
+    align_t* current_span;
+    mempool_t pool;
+\} mempool_handle_t;
+
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWmemA-inij-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-inij-1}}}\moddef{initialize new handle from current pool state~{\nwtagstyle{}\subpageref{NWmemA-inij-1}}}\endmoddef
+new_handle.magic_number = MEMPOOL_HANDLE_MAGIC_NUMBER;
+new_handle.blocks_used  = pool->blocks_used;
+new_handle.current_span = pool->current_span;
+new_handle.pool         = pool;
+\nwused{\\{NWmemA-fun9-5}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+The basic function to allocate with a handle simply allocates
+a somewhat larger chunk of memory than requested using
+{\tt{}mempool{\char95}get}, puts a handle in the leading blocks of
+that memory, and returns a pointer to the remainder
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWmemA-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void* mempool_geth(mempool_t pool, int size)
+\{
+    mempool_handle_t new_handle;
+    char* mem;
+
+    ASSERT_VALID_POOL;
+
+    \LA{}initialize new handle from current pool state~{\nwtagstyle{}\subpageref{NWmemA-inij-1}}\RA{}
+    \LA{}allocate memory and tuck handle into leading blocks~{\nwtagstyle{}\subpageref{NWmemA-allp-1}}\RA{}
+
+    \LA{}log handle allocation~{\nwtagstyle{}\subpageref{NWmemA-logL-1}}\RA{}
+
+    return mem;
+\}
+
+\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWmemA-allp-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-allp-1}}}\moddef{allocate memory and tuck handle into leading blocks~{\nwtagstyle{}\subpageref{NWmemA-allp-1}}}\endmoddef
+mem = (char*) mempool_get(pool, size + MEMPOOL_HANDLE_SIZE);
+*((mempool_handle_t*) mem) = new_handle;
+mem += MEMPOOL_HANDLE_SIZE;
+\nwused{\\{NWmemA-fun9-5}}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+As in the basic allocation case, {\tt{}mempool{\char95}cgeth} is
+a small convenience wrapper around {\tt{}mempool{\char95}geth}.
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NWmemA-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void* mempool_cgeth(mempool_t pool, int size)
+\{
+    void* mem = mempool_geth(pool, size);
+    memset(mem, 0, size);
+    return mem;
+\}
+
+\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+The whole point of allocating with a handle is that you
+should be able to roll back the pool to the state recorded
+in the handle.  The {\tt{}mempool{\char95}freeh} function performs
+this rollback.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NWmemA-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void mempool_freeh(void* mem)
+\{
+    mempool_handle_t handle;
+    mempool_t pool;
+    align_t* next_span;
+
+    \LA{}extract and validate handle~{\nwtagstyle{}\subpageref{NWmemA-extR-1}}\RA{}
+    \LA{}free spans from handle onward~{\nwtagstyle{}\subpageref{NWmemA-freT-1}}\RA{}
+    \LA{}restore pool state~{\nwtagstyle{}\subpageref{NWmemA-resI-1}}\RA{}
+
+    \LA{}optionally clear freed space~{\nwtagstyle{}\subpageref{NWmemA-optS-1}}\RA{}
+
+    \LA{}log handle deallocation~{\nwtagstyle{}\subpageref{NWmemA-logN-1}}\RA{}
+\}
+
+\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+Remember that the handle is stored at {\tt{}mem\ -\ MEMPOOL{\char95}HANDLE{\char95}SIZE}.
+We want a copy of the handle, rather than just a pointer to it,
+since it may live in a span that will be freed during the rollback
+process.
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NWmemA-extR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-extR-1}}}\moddef{extract and validate handle~{\nwtagstyle{}\subpageref{NWmemA-extR-1}}}\endmoddef
+assert(mem != NULL);
+handle = *(mempool_handle_t*) ((char*) mem - MEMPOOL_HANDLE_SIZE);
+pool = handle.pool;
+assert(handle.magic_number == MEMPOOL_HANDLE_MAGIC_NUMBER);
+ASSERT_VALID_POOL;
+\nwused{\\{NWmemA-fun9-7}}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NWmemA-freT-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-freT-1}}}\moddef{free spans from handle onward~{\nwtagstyle{}\subpageref{NWmemA-freT-1}}}\endmoddef
+next_span = handle.current_span[0].p;
+while (next_span != NULL) \{
+    align_t* dead_span = next_span;
+    next_span = next_span[0].p;
+    \LA{}optionally clear dead span~{\nwtagstyle{}\subpageref{NWmemA-optQ-1}}\RA{}
+    free(dead_span);
+\}
+\nwused{\\{NWmemA-fun9-7}}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NWmemA-resI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-resI-1}}}\moddef{restore pool state~{\nwtagstyle{}\subpageref{NWmemA-resI-1}}}\endmoddef
+pool->blocks_used  = handle.blocks_used;
+pool->current_span = handle.current_span;
+pool->current_span[0].p = NULL;
+\nwused{\\{NWmemA-fun9-7}}\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+In addition to all the spans we might have freed,
+there is probably space just freed at the end of the current
+span after rollback.  If the {\tt{}MEMPOOL{\char95}CLEAR{\char95}DEBUG} flag is
+set, we want to clear that, too.
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NWmemA-optS-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-optS-1}}}\moddef{optionally clear freed space~{\nwtagstyle{}\subpageref{NWmemA-optS-1}}}\endmoddef
+#ifdef MEMPOOL_CLEAR_DEBUG
+memset(&(pool->current_span[1 + pool->blocks_used]), 0,
+       (pool->blocks_per_span - pool->blocks_used) * align_size);
+#endif
+\nwused{\\{NWmemA-fun9-7}}\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+
+\subsection{String and buffer duplication}
+
+The {\tt{}mempool{\char95}memdup} function consists only of a {\tt{}mempool{\char95}get}
+and a {\tt{}memcpy}.
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NWmemA-fun9-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void* mempool_memdup(mempool_t pool, const void* src, int size)
+\{
+    if (src == NULL)
+        return NULL;
+    else \{
+        void* dest = mempool_get(pool, size);
+        memcpy(dest, src, size);
+        return dest;
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+The {\tt{}mempool{\char95}strdup} function is a wrapper around {\tt{}mempool{\char95}memdup}.
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NWmemA-fun9-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void* mempool_strdup(mempool_t pool, const char* src)
+\{
+    if (src == NULL)
+        return NULL;
+    return mempool_memdup(pool, src, strlen(src) + 1);
+\}
+
+\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+
+\subsection{Logging}
+
+The {\tt{}mempool{\char95}log{\char95}fp} pointer tracks the current log file.  By default,
+logging is turned off, and {\tt{}mempool{\char95}log{\char95}fp} is {\tt{}NULL}.
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NWmemA-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWmemA-staB-1}}}\endmoddef
+static FILE* mempool_log_fp = NULL;
+\nwused{\\{NWmemA-mem9.2-1}}\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+We are only allowed to start a log if one is not already open,
+and we can only end a log if there is a log to end.  Killing
+the program with an assertion when the log can't be opened
+may seem harsh, but remember that mempool logging will probably
+only be used when debugging.
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NWmemA-fun9-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void mempool_start_log(char* filename)
+\{
+    assert(mempool_log_fp == NULL);
+    mempool_log_fp = fopen(filename, "a");
+    assert(mempool_log_fp != NULL);
+    fprintf(mempool_log_fp, "Memory log started (%s)\\n", filename);
+\}
+
+\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NWmemA-fun9-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void mempool_end_log()
+\{
+    assert(mempool_log_fp != NULL);
+    fprintf(mempool_log_fp, "Closing memory log\\n");
+    fclose(mempool_log_fp);
+    mempool_log_fp = NULL;
+\}
+
+\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+We may periodically want to ensure the mempool log has been flushed
+to disk, particularly since we're most likely to use logging when
+the program is crashing (and so not getting to the {\tt{}mempool{\char95}end{\char95}log}
+call.
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NWmemA-fun9-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-fun9-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmemA-fun9-1}}}\plusendmoddef
+void mempool_flush_log()
+\{
+    assert(mempool_log_fp != NULL);
+    fflush(mempool_log_fp);
+\}
+
+\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+Part of the reason that we don't associate logging with a particular
+pool is that we would also like to log the creation and destruction
+of pool objects.
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NWmemA-logH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-logH-1}}}\moddef{log pool creation~{\nwtagstyle{}\subpageref{NWmemA-logH-1}}}\endmoddef
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "Allocated new mempool (%p), span size %d\\n",
+            (void*) pool, span_size);
+\nwused{\\{NWmemA-fun9-1}}\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NWmemA-logH.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-logH.2-1}}}\moddef{log pool deletion~{\nwtagstyle{}\subpageref{NWmemA-logH.2-1}}}\endmoddef
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "Destroyed mempool (%p)\\n", (void*) pool);
+\nwused{\\{NWmemA-fun9-2}}\nwendcode{}\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}\nwbegincode{87}\sublabel{NWmemA-logJ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-logJ-1}}}\moddef{log span allocation~{\nwtagstyle{}\subpageref{NWmemA-logJ-1}}}\endmoddef
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "%p: Created new span at %p\\n",
+            (void*) pool, (void*) span);
+\nwused{\\{NWmemA-staG-1}}\nwendcode{}\nwbegindocs{88}\nwdocspar
+
+\nwenddocs{}\nwbegincode{89}\sublabel{NWmemA-logO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-logO-1}}}\moddef{log allocation from span~{\nwtagstyle{}\subpageref{NWmemA-logO-1}}}\endmoddef
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Allocated %d bytes / %d blocks at %p\\n",
+            (void*) pool, size, blocks_requested * align_size,
+            mem);
+\nwused{\\{NWmemA-fun9-3}}\nwendcode{}\nwbegindocs{90}\nwdocspar
+
+\nwenddocs{}\nwbegincode{91}\sublabel{NWmemA-logL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-logL-1}}}\moddef{log handle allocation~{\nwtagstyle{}\subpageref{NWmemA-logL-1}}}\endmoddef
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Handle at %p, memory at %p\\n",
+            (void*) pool, (void*) (mem - MEMPOOL_HANDLE_SIZE), (void*) mem);
+\nwused{\\{NWmemA-fun9-5}}\nwendcode{}\nwbegindocs{92}\nwdocspar
+
+\nwenddocs{}\nwbegincode{93}\sublabel{NWmemA-logN-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmemA-logN-1}}}\moddef{log handle deallocation~{\nwtagstyle{}\subpageref{NWmemA-logN-1}}}\endmoddef
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Rollback to handle at %p\\n", (void*) pool,
+            (void*) ((char*) mem - MEMPOOL_HANDLE_SIZE));
+\nwused{\\{NWmemA-fun9-7}}\nwendcode{}
+
+\nwixlogsorted{c}{{alignment definitions}{NWmemA-aliL-1}{\nwixu{NWmemA-expE-1}\nwixd{NWmemA-aliL-1}}}%
+\nwixlogsorted{c}{{allocate a new span if necessary}{NWmemA-allW.2-1}{\nwixu{NWmemA-fun9-3}\nwixd{NWmemA-allW.2-1}}}%
+\nwixlogsorted{c}{{allocate blocks from the current span}{NWmemA-allb-1}{\nwixu{NWmemA-fun9-3}\nwixd{NWmemA-allb-1}}}%
+\nwixlogsorted{c}{{allocate memory and tuck handle into leading blocks}{NWmemA-allp-1}{\nwixu{NWmemA-fun9-5}\nwixd{NWmemA-allp-1}}}%
+\nwixlogsorted{c}{{allocate memory for the new span}{NWmemA-allW-1}{\nwixu{NWmemA-staG-1}\nwixd{NWmemA-allW-1}}}%
+\nwixlogsorted{c}{{delete all spans in the pool}{NWmemA-delS-1}{\nwixu{NWmemA-fun9-2}\nwixd{NWmemA-delS-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWmemA-expI-1}{\nwixu{NWmemA-mem9-1}\nwixd{NWmemA-expI-1}\nwixd{NWmemA-expI-2}\nwixd{NWmemA-expI-3}\nwixd{NWmemA-expI-4}\nwixd{NWmemA-expI-5}}}%
+\nwixlogsorted{c}{{exported macros}{NWmemA-expF-1}{\nwixu{NWmemA-mem9-1}\nwixd{NWmemA-expF-1}}}%
+\nwixlogsorted{c}{{exported types}{NWmemA-expE-1}{\nwixu{NWmemA-mem9-1}\nwixd{NWmemA-expE-1}}}%
+\nwixlogsorted{c}{{extract and validate handle}{NWmemA-extR-1}{\nwixu{NWmemA-fun9-7}\nwixd{NWmemA-extR-1}}}%
+\nwixlogsorted{c}{{free spans from handle onward}{NWmemA-freT-1}{\nwixu{NWmemA-fun9-7}\nwixd{NWmemA-freT-1}}}%
+\nwixlogsorted{c}{{functions}{NWmemA-fun9-1}{\nwixu{NWmemA-mem9.2-1}\nwixd{NWmemA-fun9-1}\nwixd{NWmemA-fun9-2}\nwixd{NWmemA-fun9-3}\nwixd{NWmemA-fun9-4}\nwixd{NWmemA-fun9-5}\nwixd{NWmemA-fun9-6}\nwixd{NWmemA-fun9-7}\nwixd{NWmemA-fun9-8}\nwixd{NWmemA-fun9-9}\nwixd{NWmemA-fun9-A}\nwixd{NWmemA-fun9-B}\nwixd{NWmemA-fun9-C}}}%
+\nwixlogsorted{c}{{initialize new handle from current pool state}{NWmemA-inij-1}{\nwixd{NWmemA-inij-1}\nwixu{NWmemA-fun9-5}}}%
+\nwixlogsorted{c}{{initialize new pool}{NWmemA-iniJ.2-1}{\nwixu{NWmemA-fun9-1}\nwixd{NWmemA-iniJ.2-1}}}%
+\nwixlogsorted{c}{{initialize the span}{NWmemA-iniJ-1}{\nwixu{NWmemA-staG-1}\nwixd{NWmemA-iniJ-1}}}%
+\nwixlogsorted{c}{{link in new span}{NWmemA-linG-1}{\nwixu{NWmemA-allW.2-1}\nwixd{NWmemA-linG-1}}}%
+\nwixlogsorted{c}{{log allocation from span}{NWmemA-logO-1}{\nwixu{NWmemA-fun9-3}\nwixd{NWmemA-logO-1}}}%
+\nwixlogsorted{c}{{log handle allocation}{NWmemA-logL-1}{\nwixu{NWmemA-fun9-5}\nwixd{NWmemA-logL-1}}}%
+\nwixlogsorted{c}{{log handle deallocation}{NWmemA-logN-1}{\nwixu{NWmemA-fun9-7}\nwixd{NWmemA-logN-1}}}%
+\nwixlogsorted{c}{{log pool creation}{NWmemA-logH-1}{\nwixu{NWmemA-fun9-1}\nwixd{NWmemA-logH-1}}}%
+\nwixlogsorted{c}{{log pool deletion}{NWmemA-logH.2-1}{\nwixu{NWmemA-fun9-2}\nwixd{NWmemA-logH.2-1}}}%
+\nwixlogsorted{c}{{log span allocation}{NWmemA-logJ-1}{\nwixu{NWmemA-staG-1}\nwixd{NWmemA-logJ-1}}}%
+\nwixlogsorted{c}{{mempool.c}{NWmemA-mem9.2-1}{\nwixd{NWmemA-mem9.2-1}}}%
+\nwixlogsorted{c}{{mempool.h}{NWmemA-mem9-1}{\nwixd{NWmemA-mem9-1}}}%
+\nwixlogsorted{c}{{optionally clear dead span}{NWmemA-optQ-1}{\nwixu{NWmemA-delS-1}\nwixd{NWmemA-optQ-1}\nwixu{NWmemA-freT-1}}}%
+\nwixlogsorted{c}{{optionally clear freed space}{NWmemA-optS-1}{\nwixu{NWmemA-fun9-7}\nwixd{NWmemA-optS-1}}}%
+\nwixlogsorted{c}{{optionally clear the new span}{NWmemA-optT-1}{\nwixu{NWmemA-staG-1}\nwixd{NWmemA-optT-1}}}%
+\nwixlogsorted{c}{{restore pool state}{NWmemA-resI-1}{\nwixu{NWmemA-fun9-7}\nwixd{NWmemA-resI-1}}}%
+\nwixlogsorted{c}{{static data}{NWmemA-staB-1}{\nwixu{NWmemA-mem9.2-1}\nwixd{NWmemA-staB-1}}}%
+\nwixlogsorted{c}{{static functions}{NWmemA-staG-1}{\nwixu{NWmemA-mem9.2-1}\nwixd{NWmemA-staG-1}}}%
+\nwixlogsorted{c}{{types}{NWmemA-typ5-1}{\nwixu{NWmemA-mem9.2-1}\nwixd{NWmemA-typ5-1}\nwixd{NWmemA-typ5-2}}}%
+\nwbegindocs{94}\nwdocspar
+
+\nwenddocs{}

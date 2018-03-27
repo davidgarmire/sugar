@@ -1,0 +1,374 @@
+
+\section{Introduction}
+
+The [[dynarray]] module implements a grow-able array type.
+It behaves (mostly) like a normal array, but it can be expanded
+when space is needed for more elements.  The index space is
+assumed to be dense, and indexing starts at 0.
+
+Note that objects stored in a dynamic array may change locations
+when the array is forced to grow.  That means that pointer references
+into the array are \emph{not} necessarily valid across calls to add
+more elements.
+
+
+\section{Interface}
+
+<<dynarray.h>>=
+#ifndef DYNARRAY_H
+#define DYNARRAY_H
+
+typedef struct dynarray_t* dynarray_t;
+
+<<exported functions>>
+
+#endif /* DYNARRAY_H */
+@ 
+
+Dynamic arrays are created and destroyed by the functions
+[[dynarray_create]] and [[dynarray_destroy]].
+
+<<exported functions>>=
+dynarray_t dynarray_create (int element_size, int capacity);
+void       dynarray_destroy(dynarray_t self);
+
+@ 
+
+The [[capacity]] argument sets the initial capacity of the
+array.  If the user writes to a location past the number
+of elements indicated by [[capacity]], the array will grow
+to match the new requirements.  It is probably more efficient
+to have a good guess at the capacity from the beginning, though.
+It is an error to have a negative or zero initial capacity.
+
+The [[capacity]] is \emph{not} the same as the number of
+entries in the array.  Regardless of the capacity, the number
+of entries in any newly-created array is zero.
+
+<<exported functions>>=
+void*      dynarray_data  (dynarray_t self);
+void*      dynarray_get   (dynarray_t self, int i);
+void*      dynarray_set   (dynarray_t self, int i, const void* data);
+void*      dynarray_append(dynarray_t self, const void* data);
+
+@ 
+
+The [[dynarray_set]] and [[dynarray_get]] routines respectively
+set and get entries of the dynamic array.  The [[dynarray_append]]
+function is equivalent to [[set]]ting the element one past the
+current end of the array.  The [[dynarray_data]]
+function returns a pointer to the current data array, which can
+be used directly in routines like [[qsort]].  Note that the
+pointer returned by [[dynarray_data]] will not necessarily remain
+valid across calls to [[dynarray_get]] or [[dynarray_append]].
+
+If the index to [[dynarray_get]] is out of bounds, the function will 
+return NULL.  If the index to [[dynarray_set]] is past the current end 
+of the dynamic array, the array will be appropriately expanded to
+accomodate the new element.  It is a checked error to pass a negative
+index to [[dynarray_set]].
+
+If the index to [[dynarray_set]] is more than one past the current
+end of the dynamic array, some new elements will be implicitly created.
+These elements are initialized to zero.
+
+The [[data]] argument to [[dynarray_set]] can also be NULL,
+in which case the desired element is left alone if it existed
+before, or set to zero if it is a new element.
+
+<<exported functions>>=
+int        dynarray_count    (dynarray_t self);
+void       dynarray_set_count(dynarray_t self, int n);
+@ 
+
+The [[dynarray_count]] function returns the number of elements
+currently in the array.  That number of elements can be increased
+or reduced with calls to [[dynarray_set_count]].  Elements newly
+created by expanding the array with [[dynarray_set_count]] are
+initialized to zero.
+
+
+\section{Implementation}
+
+<<dynarray.c>>=
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "dynarray.h"
+
+struct dynarray_t {
+    char*  data;
+    int    element_size;
+    int    count;
+    int    capacity;
+};
+
+<<functions>>
+@ 
+
+There are two pieces to a dynamic array.  The first is the ``handle''
+structure, which resides at a fixed location of memory and keeps
+track of where the array currently lives, how big it is, and how
+many elements it has.  The second piece is the array itself, which
+may be destroyed and reallocated during the course of normal
+operation.
+
+A dynamic array starts out with no elements, but with a user
+specified capacity for storing elements before reallocation
+is necessary.
+
+<<functions>>=
+dynarray_t dynarray_create(int element_size, int capacity)
+{
+    dynarray_t self;
+
+    assert(element_size > 0 && capacity > 0);
+
+    self = (dynarray_t) calloc(1, sizeof(struct dynarray_t));
+    assert(self != NULL);
+
+    self->data = (char*) calloc(capacity, element_size);
+    assert(self->data != NULL);
+
+    self->element_size = element_size;
+    self->capacity = capacity;
+    self->count = 0;
+    return self;
+}
+
+@ 
+
+When we free a dynamic array, we must free both the array and
+the handle object.
+
+<<functions>>=
+void dynarray_destroy(dynarray_t self)
+{
+    free(self->data);
+    free(self);
+}
+
+@ 
+
+The [[data]] function and [[count]] function just retrieve the
+corresponding fields from the handle object.
+
+<<functions>>=
+void* dynarray_data(dynarray_t self)
+{
+    assert(self != NULL);
+    return self->data;
+}
+
+int dynarray_count(dynarray_t self)
+{
+    assert(self != NULL);
+    return self->count;
+}
+
+@ 
+
+The [[set_count]] function expands or contracts the array,
+adding new space if necessary.  When the count is increased,
+the new slots are always empty, even if the expansion did
+not require a reallocation.  We actually do the clear
+operation on \emph{contraction}, though, in order to make
+it simpler to catch errors involving pointers to invalid data
+more quickly.
+
+<<functions>>=
+void dynarray_set_count(dynarray_t self, int n)
+{
+    assert(self != NULL && n >= 0);
+
+    if (n > self->capacity) {
+        <<increase capacity>>
+    }
+
+    if (n < self->count) {
+        <<clear deallocated slots>>
+    }
+
+    self->count = n;
+}
+
+@ 
+
+Every time we run out of room, we try to double our capacity
+(or we reluctantly increase more, if that's necessary).
+Once we have the space, we copy over the data, free the old
+buffer, and update our handle.
+
+<<increase capacity>>=
+int   new_capacity = (n > self->capacity*2) ? n : (self->capacity*2);
+char* new_data     = (char*) calloc(new_capacity, self->element_size);
+
+assert(new_data != NULL);
+memcpy(new_data, self->data, self->count * self->element_size);
+free(self->data);
+
+self->data = new_data;
+self->capacity = new_capacity;
+@ 
+
+<<clear deallocated slots>>=
+memset(&(self->data[n * self->element_size]), 0, 
+        (self->count - n) * self->element_size);
+@ 
+
+The [[get]] function basically just does a check to make sure
+the requested element is within range, and then some pointer
+arithmetic.
+
+<<functions>>=
+void* dynarray_get(dynarray_t self, int i)
+{
+    assert(self != NULL);
+
+    if (i >= self->count || i < 0)
+        return NULL;
+
+    return &(self->data[i * self->element_size]);
+}
+
+@
+
+The [[set]] function is a little more complicated than its
+[[get]] counterpart, since [[set]] might have to expand the
+array.
+
+<<functions>>=
+void* dynarray_set(dynarray_t self, int i, const void* data)
+{
+    assert(self != NULL && i >= 0);
+
+    if (i >= self->count)
+        dynarray_set_count(self, i+1);
+
+    if (data != NULL)
+        memcpy(&(self->data[i * self->element_size]), data, 
+               self->element_size);
+
+    return &(self->data[i * self->element_size]);
+}
+
+@ 
+
+Appending an element really is just setting the element after
+the one that is currently last.
+
+<<functions>>=
+void* dynarray_append(dynarray_t self, const void* data)
+{
+    return dynarray_set(self, self->count, data);
+}
+
+@ 
+
+
+\section{Test program}
+
+<<dynarray-test.c>>=
+#include <stdio.h>
+#include "dynarray.h"
+
+int main()
+{
+    <<test definitions>>
+    <<test code>>
+    return 0;
+}
+@ 
+
+Our test array initially has the capacity to hold four
+entries.
+
+<<test code>>=
+dynarray_t array;
+array = dynarray_create(sizeof(int), 4);
+dynarray_destroy(array);
+array = dynarray_create(sizeof(int), 4);
+@ 
+
+The first thing we do is to populate those entries (and four more)
+using [[append]], then print out the results.
+
+<<test definitions>>=
+int i;
+@ 
+
+<<test code>>=
+for (i = 0; i < 8; ++i)
+    dynarray_append(array, &i);
+
+printf("After appending eight times:");
+<<print array contents>>
+@ 
+
+<<print array contents>>=
+for (i = 0; i < dynarray_count(array); ++i)
+    printf(" %d", *(int*) dynarray_get(array, i));
+printf("\n");
+@ 
+
+At this point, the array should be at capacity.  The border
+case for the expansion code is between doubling the size
+and increasing the size to the number of elements plus 1;
+we test to make sure that we didn't screw up at that border.
+
+<<test code>>=
+i = 16;
+dynarray_set(array, i, &i);
+
+printf("After setting element sixteen:");
+<<print array contents>>
+@ 
+
+Now we shrink the array back to five elements using [[set_count]].
+
+<<test code>>=
+dynarray_set_count(array, 5);
+
+printf("After decreasing to five elements:");
+<<print array contents>>
+@ 
+
+And immediately we shoot back up to sixteen elements to ensure
+that things were properly cleared.
+
+<<test code>>=
+dynarray_set_count(array, 16);
+
+printf("After increasing to 16 elements:");
+<<print array contents>>
+@ 
+
+Now let's see what happens when we try to read elements until we
+starting hitting NULL returns from [[get]].
+
+<<test code>>=
+for (i = 0; dynarray_get(array, i) != NULL; ++i);
+printf("Ran into a NULL get at index %d\n", i);
+@ 
+
+Again, let's make sure that the expansion code does not have an
+off-by-one problem by testing around the boundary of where an expansion
+should occur.
+
+<<test code>>=
+*(int*) dynarray_set(array, 31, NULL) = 31;
+
+printf("After setting element 31:");
+<<print array contents>>
+@ 
+
+Finally, clean up and call it a day.
+
+<<test code>>=
+dynarray_destroy(array);
+@ 
+
+
+
+

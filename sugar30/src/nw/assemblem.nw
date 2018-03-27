@@ -1,0 +1,115 @@
+
+\section{Introduction}
+
+The purpose of the matrix assembly module is to build global matrix 
+and vector data structures from local contributions.  But what sort of global
+matrices should we build?  We might want a dense matrix, or any of
+a variety of sparse formats.  There might be a reordering in effect,
+or there might not.  We might throw away inactive degrees of freedom,
+or we might not.
+
+Since there are a variety of possible data structures we might want
+to build, we make a generic matrix assembler type.  Given a list of
+variable identifiers and a local contribution (a dense vector if we
+are building a vector, and a dense column-major matrix if we are
+building matrices), the assemble method incorporates the local contribution
+into the global structure.  Information can flow the other way as well --
+using the same interface, we can construct ``disassembler'' objects that
+extract the local part from global structures.
+
+
+\section{Interface}
+
+<<assemblem.h>>=
+#ifndef ASSEMBLEM_H
+#define ASSEMBLEM_H
+
+<<exported types>>
+<<exported functions>>
+
+#endif /* ASSEMBLEM_H */
+@ 
+
+<<exported types>>=
+typedef void (*assemble_matrix_fun_t)(void* self, int* vars, int n, 
+                                      double* local);
+
+typedef struct assemble_matrix_t {
+    void*   data;
+    void  (*assemble)(void* self, int* vars, int n, double* local);
+    void  (*destroy) (void* self);
+} assemble_matrix_t;
+
+@ 
+
+The [[assemble_matrix_t]] object interface is the main type
+exported by this module.  The [[assemble]] method
+moves a local contribution into the global data structure
+maintained by the object.  The [[vars]] argument is a vector
+of [[n]] variable indices that identify the global location
+of the local contributions.  The [[local]] field contains
+the contribution itself.  If the assembler object is building
+matrices, the [[local]] field should point to an [[n]] by [[n]]
+matrix in column major order.  If the assembler object builds
+vectors, the [[local]] field should point to a vector of length
+[[n]].
+
+The [[destroy]] method performs any deallocation of the object
+local data.  The [[destroy]] method does not free the data pointed
+to by [[data]] by default.
+
+<<exported functions>>=
+void assemble_matrix_add(assemble_matrix_t* matrix, int* vars, int n, 
+		         double* local);
+void assemble_matrix_add1(assemble_matrix_t* matrix, int var, double local);
+
+@ 
+
+The [[assemble_matrix_add]] function is just a convenient wrapper
+to call the assemble method.  The [[assemble_matrix_add1]] function
+adds a single entry to a vector or matrix.
+
+<<exported functions>>=
+void assembler_matrix_free(assemble_matrix_t* assembler);
+@ 
+
+The destructor [[assembler_matrix_free]] calls the assembler
+object [[destroy]] method (if such a method is defined),
+and then frees the [[assemble_matrix_t]] structure.
+
+
+\section{Implementation}
+
+<<assemblem.c>>=
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "modelmgr.h"
+#include "assemblem.h"
+
+<<functions>>
+@ 
+
+<<functions>>=
+void assemble_matrix_add(assemble_matrix_t* matrix, int* vars, int n, 
+			 double* local)
+{
+    assert(matrix != NULL && matrix->assemble != NULL);
+    matrix->assemble(matrix->data, vars, n, local);
+}
+
+void assemble_matrix_add1(assemble_matrix_t* matrix, int var, double local)
+{
+    assemble_matrix_add(matrix, &var, 1, &local);
+}
+
+void assembler_matrix_free(assemble_matrix_t* matrix)
+{
+    assert(matrix != NULL);
+    if (matrix->destroy)
+	matrix->destroy(matrix->data);
+    free(matrix);
+}
+
+@ 

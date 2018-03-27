@@ -1,0 +1,270 @@
+use("std2cvt.net")
+
+pi = 3.1415926535897932385
+poly = material {
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p1 = material {
+  parent = poly,
+  h = 2e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p2 = material {
+  parent = poly,
+  h = 1.5e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+d2 = material {
+  parent = poly,
+  fluid = 0.75e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+subnet mfbeam2de (a, b, material, l, w, h, R, G, resistivity, density, fluid, viscosity, Youngsmodulus)
+  local parent = material
+  _currnodes["a"] = a
+  _currnodes["b"] = b
+  l = l or (material and material.l)
+  w = w or (material and material.w)
+  h = h or (material and material.h)
+  R = R or (material and material.R)
+  G = G or (material and material.G)
+  resistivity = resistivity or (material and material.resistivity)
+  density = density or (material and material.density)
+  fluid = fluid or (material and material.fluid)
+  viscosity = viscosity or (material and material.viscosity)
+  Youngsmodulus = Youngsmodulus or (material and material.Youngsmodulus)
+assert(((isdef(R)) or (isdef(G))) or (isdef(resistivity)), "R, G, or resistivity must be defined in beam2de")
+  if isdef(R) then
+      mfR {_n("a"), _n("b"); material = parent, R = R}  else
+    if isdef(G) then
+        mfR {_n("a"), _n("b"); material = parent, G = G}    else
+      if (((isdef(resistivity)) and (isdef(l))) and (isdef(w))) and (isdef(h)) then
+          mfR {_n("a"), _n("b"); material = parent, R = ((resistivity)*(l))/((w)*(h))}      else
+assert(0, "R, G, or resistivity must be defined")
+      end
+    end
+  end
+  mfbeam2d {_n("a"), _n("b"); material = parent, l = l, w = w, h = h, density = density, viscosity = viscosity, Youngsmodulus = Youngsmodulus}
+end
+
+subnet mfbeam3de (a, b, material, l, w, h, R, G, resistivity, density, fluid, viscosity, Youngsmodulus)
+  local parent = material
+  _currnodes["a"] = a
+  _currnodes["b"] = b
+  l = l or (material and material.l)
+  w = w or (material and material.w)
+  h = h or (material and material.h)
+  R = R or (material and material.R)
+  G = G or (material and material.G)
+  resistivity = resistivity or (material and material.resistivity)
+  density = density or (material and material.density)
+  fluid = fluid or (material and material.fluid)
+  viscosity = viscosity or (material and material.viscosity)
+  Youngsmodulus = Youngsmodulus or (material and material.Youngsmodulus)
+  if isdef(R) then
+      mfR {_n("a"), _n("b"); material = parent, R = R}  else
+    if isdef(G) then
+        mfR {_n("a"), _n("b"); material = parent, G = G}    else
+      if (((isdef(resistivity)) and (isdef(l))) and (isdef(w))) and (isdef(h)) then
+          mfR {_n("a"), _n("b"); material = parent, R = ((resistivity)*(l))/((w)*(h))}      else
+assert(0, "R, G, or resistivity must be defined")
+      end
+    end
+  end
+  mfbeam3d {_n("a"), _n("b"); material = parent, l = l, w = w, h = h, density = density, viscosity = viscosity, Youngsmodulus = Youngsmodulus}
+end
+
+subnet mfgap2de (a, b, c, d, material, l, w, w1, w2, h, R, R1, R2, G, G1, G2, resistivity, density, fluid, viscosity, Youngsmodulus, gap, permittivity)
+  local parent = material
+  _currnodes["a"] = a
+  _currnodes["b"] = b
+  _currnodes["c"] = c
+  _currnodes["d"] = d
+  l = l or (material and material.l)
+  w = w or (material and material.w)
+  w1 = w1 or (material and material.w1)
+  w2 = w2 or (material and material.w2)
+  h = h or (material and material.h)
+  R = R or (material and material.R)
+  R1 = R1 or (material and material.R1)
+  R2 = R2 or (material and material.R2)
+  G = G or (material and material.G)
+  G1 = G1 or (material and material.G1)
+  G2 = G2 or (material and material.G2)
+  resistivity = resistivity or (material and material.resistivity)
+  density = density or (material and material.density)
+  fluid = fluid or (material and material.fluid)
+  viscosity = viscosity or (material and material.viscosity)
+  Youngsmodulus = Youngsmodulus or (material and material.Youngsmodulus)
+  gap = gap or (material and material.gap)
+  permittivity = permittivity or (material and material.permittivity)
+assert((isdef(w)) or ((isdef(w1)) and (isdef(w2))), "Must define beam widths")
+assert((((isdef(resistivity)) or (isdef(R))) or (isdef(G))) or ((((isdef(R1)) or (isdef(G1))) and (isdef(R2))) or (isdef(G2))), "Must define beam resistivities")
+  local   w1 = ((isdef(w1)) and (w1) or (w))
+  local   w2 = ((isdef(w2)) and (w2) or (w))
+  local   R1 = ((isdef(R1)) and (R1) or (R))
+  local   R2 = ((isdef(R2)) and (R2) or (R))
+  local   G1 = ((isdef(G1)) and (G1) or (G))
+  local   G2 = ((isdef(G2)) and (G2) or (G))
+  local   R1 = (((isdef(R1)) or (isdef(G1))) and (R1) or (((resistivity)*(l))/((w1)*(h))))
+  local   R2 = (((isdef(R2)) or (isdef(G2))) and (R2) or (((resistivity)*(l))/((w2)*(h))))
+  mfbeam2de {_n("a"), _n("b"); material = parent, l = l, w = w1, h = h, density = density, fluid = fluid, viscosity = viscosity, Youngsmodulus = Youngsmodulus, R = R1, G = G1}
+  mfbeam2de {_n("c"), _n("d"); material = parent, l = l, w = w2, h = h, density = density, fluid = fluid, viscosity = viscosity, Youngsmodulus = Youngsmodulus, R = R1, G = G1}
+  mfgap2dforce {_n("a"), _n("b"), _n("c"), _n("d"); material = parent, l = l, w1 = w1, w2 = w2, gap = gap, permittivity = permittivity}
+end
+
+subnet mfgap3de (a, b, c, d, material, l, w, w1, w2, h, R, R1, R2, G, G1, G2, resistivity, density, fluid, viscosity, Youngsmodulus, gap, permittivity)
+  local parent = material
+  _currnodes["a"] = a
+  _currnodes["b"] = b
+  _currnodes["c"] = c
+  _currnodes["d"] = d
+  l = l or (material and material.l)
+  w = w or (material and material.w)
+  w1 = w1 or (material and material.w1)
+  w2 = w2 or (material and material.w2)
+  h = h or (material and material.h)
+  R = R or (material and material.R)
+  R1 = R1 or (material and material.R1)
+  R2 = R2 or (material and material.R2)
+  G = G or (material and material.G)
+  G1 = G1 or (material and material.G1)
+  G2 = G2 or (material and material.G2)
+  resistivity = resistivity or (material and material.resistivity)
+  density = density or (material and material.density)
+  fluid = fluid or (material and material.fluid)
+  viscosity = viscosity or (material and material.viscosity)
+  Youngsmodulus = Youngsmodulus or (material and material.Youngsmodulus)
+  gap = gap or (material and material.gap)
+  permittivity = permittivity or (material and material.permittivity)
+assert((isdef(w)) or ((isdef(w1)) and (isdef(w2))), "Must define beam widths")
+assert((((isdef(resistivity)) or (isdef(R))) or (isdef(G))) or ((((isdef(R1)) or (isdef(G1))) and (isdef(R2))) or (isdef(G2))), "Must define beam resistivities")
+  local   w1 = ((isdef(w1)) and (w1) or (w))
+  local   w2 = ((isdef(w2)) and (w2) or (w))
+  local   R1 = ((isdef(R1)) and (R1) or (R))
+  local   R2 = ((isdef(R2)) and (R2) or (R))
+  local   G1 = ((isdef(G1)) and (G1) or (G))
+  local   G2 = ((isdef(G2)) and (G2) or (G))
+  local   R1 = (((isdef(R1)) or (isdef(G1))) and (R1) or (((resistivity)*(l))/((w1)*(h))))
+  local   R2 = (((isdef(R2)) or (isdef(G2))) and (R2) or (((resistivity)*(l))/((w2)*(h))))
+  mfbeam3de {_n("a"), _n("b"); material = parent, l = l, w = w1, h = h, density = density, fluid = fluid, viscosity = viscosity, Youngsmodulus = Youngsmodulus, R = R1, G = G1}
+  mfbeam3de {_n("c"), _n("d"); material = parent, l = l, w = w2, h = h, density = density, fluid = fluid, viscosity = viscosity, Youngsmodulus = Youngsmodulus, R = R1, G = G1}
+  mfgap3dforce {_n("a"), _n("b"), _n("c"), _n("d"); material = parent, l = l, w1 = w1, w2 = w2, gap = gap, permittivity = permittivity}
+end
+
+subnet mfgap2dV (a, b, c, d, material, l, w, w1, w2, R, R1, R2, G, G1, G2, resistivity, density, fluid, viscosity, Youngsmodulus, gap, permittivity, V)
+  local parent = material
+  _currnodes["a"] = a
+  _currnodes["b"] = b
+  _currnodes["c"] = c
+  _currnodes["d"] = d
+  l = l or (material and material.l)
+  w = w or (material and material.w)
+  w1 = w1 or (material and material.w1)
+  w2 = w2 or (material and material.w2)
+  R = R or (material and material.R)
+  R1 = R1 or (material and material.R1)
+  R2 = R2 or (material and material.R2)
+  G = G or (material and material.G)
+  G1 = G1 or (material and material.G1)
+  G2 = G2 or (material and material.G2)
+  resistivity = resistivity or (material and material.resistivity)
+  density = density or (material and material.density)
+  fluid = fluid or (material and material.fluid)
+  viscosity = viscosity or (material and material.viscosity)
+  Youngsmodulus = Youngsmodulus or (material and material.Youngsmodulus)
+  gap = gap or (material and material.gap)
+  permittivity = permittivity or (material and material.permittivity)
+  V = V or (material and material.V)
+  mfgap2dV {_n("a"), _n("b"), _n("c"), _n("d"); material = parent, l = l, w = w, w1 = w1, w2 = w2, R = R, R1 = R1, R2 = R2, G = G, G1 = G1, G2 = G2, resistivity = resistivity, density = density, fluid = fluid, viscosity = viscosity, Youngsmodulus = Youngsmodulus, gap = gap, permittivity = permittivity}
+  mfVsrc {_n("d"), _n("b"); V = V}
+  mfeground {_n("b"); }
+end
+
+subnet mfgap3dV (a, b, c, d, material, l, w, w1, w2, R, R1, R2, G, G1, G2, resistivity, density, fluid, viscosity, Youngsmodulus, gap, permittivity, V)
+  local parent = material
+  _currnodes["a"] = a
+  _currnodes["b"] = b
+  _currnodes["c"] = c
+  _currnodes["d"] = d
+  l = l or (material and material.l)
+  w = w or (material and material.w)
+  w1 = w1 or (material and material.w1)
+  w2 = w2 or (material and material.w2)
+  R = R or (material and material.R)
+  R1 = R1 or (material and material.R1)
+  R2 = R2 or (material and material.R2)
+  G = G or (material and material.G)
+  G1 = G1 or (material and material.G1)
+  G2 = G2 or (material and material.G2)
+  resistivity = resistivity or (material and material.resistivity)
+  density = density or (material and material.density)
+  fluid = fluid or (material and material.fluid)
+  viscosity = viscosity or (material and material.viscosity)
+  Youngsmodulus = Youngsmodulus or (material and material.Youngsmodulus)
+  gap = gap or (material and material.gap)
+  permittivity = permittivity or (material and material.permittivity)
+  V = V or (material and material.V)
+  mfgap3dV {_n("a"), _n("b"), _n("c"), _n("d"); material = parent, l = l, w = w, w1 = w1, w2 = w2, R = R, R1 = R1, R2 = R2, G = G, G1 = G1, G2 = G2, resistivity = resistivity, density = density, fluid = fluid, viscosity = viscosity, Youngsmodulus = Youngsmodulus, gap = gap, permittivity = permittivity}
+  mfVsrc {_n("d"), _n("b"); V = V}
+  mfeground {_n("b"); }
+end
+
+mfVsrc {_n("A"), _n("f"); V = 10}
+mfeground {_n("f"); }
+mfanchor {_n("A"); material = p1, l = 5u, w = 10u, oz = deg(180)}
+mfbeam2de {_n("A"), _n("b"); material = p1, l = 100u, w = 2u, h = 2u, oz = 0, R = 100}
+mfgap2de {_n("b"), _n("c"), _n("D"), _n("E"); material = p1, l = 100u, w1 = 10u, w2 = 5u, oz = 0, gap = 2u, R1 = 100, R2 = 100}
+mfeground {_n("D"); }
+mfanchor {_n("D"); material = p1, l = 5u, w = 10u, oz = -(deg(90))}
+mfanchor {_n("E"); material = p1, l = 5u, w = 10u, oz = -(deg(90))}
+mfeground {_n("E"); }
+relpos_treewalk()

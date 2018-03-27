@@ -1,0 +1,187 @@
+
+\section{Introduction}
+
+The anchor model is exactly what it sounds like: a mechanical anchor.
+Right now, the anchor model acts as a simple displacement boundary
+condition for all the degrees of freedom at a node.  It has no compliance
+to it.  This may change in the future.
+
+
+\section{Interface}
+
+\nwfilename{model-anchor.nw}\nwbegincode{1}\sublabel{NWmodF-modE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modE-1}}}\moddef{model-anchor.h~{\nwtagstyle{}\subpageref{NWmodF-modE-1}}}\endmoddef
+#ifndef MODEL_ANCHOR_H
+#define MODEL_ANCHOR_H
+
+#include "modelmgr.h"
+
+void model_anchor_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_ANCHOR_H */
+\nwnotused{model-anchor.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmodF-modE.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modE.2-1}}}\moddef{model-anchor.c~{\nwtagstyle{}\subpageref{NWmodF-modE.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "model-anchor.h"
+#include "mesh.h"
+#include "vars.h"
+#include "assemble.h"
+#include "netout.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWmodF-staG-1}}\RA{}
+\LA{}model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}\RA{}
+\LA{}registration function~{\nwtagstyle{}\subpageref{NWmodF-regL-1}}\RA{}
+\nwnotused{model-anchor.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+The anchor model does have length, width, and height parameters, but they
+are mostly for use as a display aid.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmodF-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWmodF-typ5-1}}}\endmoddef
+typedef struct anchor_t \{
+    element_t element;
+    int node;
+    int vars[3];
+    double l;
+    double w;
+    double h;
+\} anchor_t;
+
+\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmodF-modF.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\endmoddef
+static element_t* anchor_init(mesh_t mesh, const char* model,
+                              model_element_t* modelfunc)
+\{
+    anchor_t* self = (anchor_t*) 
+        mempool_cget(mesh_pool(mesh), sizeof(anchor_t));
+    material_t* material = NULL;
+
+    self->element.model = modelfunc;
+    self->element.data = self;
+
+    \LA{}get material~{\nwtagstyle{}\subpageref{NWmodF-getC-1}}\RA{}
+    \LA{}get \code{}node\edoc{}~{\nwtagstyle{}\subpageref{NWmodF-getC.2-1}}\RA{}
+    \LA{}get \code{}l\edoc{}, \code{}w\edoc{}, and \code{}h\edoc{}~{\nwtagstyle{}\subpageref{NWmodF-getR-1}}\RA{}
+    return &(self->element);
+\}
+
+\nwalsodefined{\\{NWmodF-modF.2-2}\\{NWmodF-modF.2-3}\\{NWmodF-modF.2-4}}\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmodF-getC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-getC-1}}}\moddef{get material~{\nwtagstyle{}\subpageref{NWmodF-getC-1}}}\endmoddef
+material = mesh_param_material(mesh, mesh_param_byname(mesh, "material"));
+\nwused{\\{NWmodF-modF.2-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+When we get the node identifier, we just check that the correct
+number of nodes are specified.  We \emph{should} probably also
+check that the node is in the valid range, but I have not done
+that yet.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmodF-getC.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-getC.2-1}}}\moddef{get \code{}node\edoc{}~{\nwtagstyle{}\subpageref{NWmodF-getC.2-1}}}\endmoddef
+if (mesh_num_param_nodes(mesh) != 1)
+    mesh_error(mesh, "Incorrect number of nodes for anchor");
+self->node = mesh_param_node(mesh, 0);
+
+\nwused{\\{NWmodF-modF.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+When we retrieve the length and width, we make no checks other
+than to insure that they are present and of the correct type.
+An additional check to ensure that the sizes are positive might
+be wise.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmodF-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmodF-staG-1}}}\endmoddef
+static double get_num_param(mesh_t mesh,
+                            material_t* material,
+                            const char* name)
+\{
+    mesh_param_t* param = mesh_param_byname(mesh, name);
+    if (param == NULL && material != NULL)
+        param = material_param(material, name);
+    if (param == NULL)
+        return 0;
+    return mesh_param_number(mesh, param);
+\}
+
+\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmodF-getR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-getR-1}}}\moddef{get \code{}l\edoc{}, \code{}w\edoc{}, and \code{}h\edoc{}~{\nwtagstyle{}\subpageref{NWmodF-getR-1}}}\endmoddef
+self->l = get_num_param(mesh, material, "l");
+self->w = get_num_param(mesh, material, "w");
+self->h = get_num_param(mesh, material, "h");
+
+\nwused{\\{NWmodF-modF.2-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmodF-modF.2-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-2}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void anchor_vars(void* pself, vars_mgr_t vars)
+\{
+    anchor_t* self = (anchor_t*) pself;
+    self->vars[0] = vars_node(vars, self->node, "x");
+    self->vars[1] = vars_node(vars, self->node, "y");
+    self->vars[2] = vars_node(vars, self->node, "rz");
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmodF-modF.2-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-3}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void anchor_displace(void* pself, assemble_matrix_t* assembler)
+\{
+    anchor_t* self = (anchor_t*) pself;
+    assemble_matrix_add1(assembler, self->vars[0], 0);
+    assemble_matrix_add1(assembler, self->vars[1], 0);
+    assemble_matrix_add1(assembler, self->vars[2], 0);
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmodF-modF.2-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-modF.2-4}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWmodF-modF.2-1}}}\plusendmoddef
+static void anchor_output(void* pself, netout_t* netout)
+\{
+    anchor_t* self = (anchor_t*) pself;
+
+    netout_string     (netout, "model", "anchor");
+    netout_int_matrix (netout, "node",  &(self->node), 1, 1);
+    netout_double     (netout, "l",     self->l);
+    netout_double     (netout, "w",     self->w);
+    netout_double     (netout, "h",     self->h);
+    netout_int_matrix (netout, "vars",  self->vars, 1, 3);
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmodF-regL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmodF-regL-1}}}\moddef{registration function~{\nwtagstyle{}\subpageref{NWmodF-regL-1}}}\endmoddef
+void model_anchor_register(model_mgr_t model_mgr)
+\{
+    model_element_t model;
+    memset(&model, 0, sizeof(model));
+
+    model.init     = anchor_init;
+    model.vars     = anchor_vars;
+    model.displace = anchor_displace;
+    model.output   = anchor_output;
+
+    model_mgr_add_element(model_mgr, "anchor", &model);
+\}
+
+\nwused{\\{NWmodF-modE.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{get \code{}l\edoc{}, \code{}w\edoc{}, and \code{}h\edoc{}}{NWmodF-getR-1}{\nwixu{NWmodF-modF.2-1}\nwixd{NWmodF-getR-1}}}%
+\nwixlogsorted{c}{{get material}{NWmodF-getC-1}{\nwixu{NWmodF-modF.2-1}\nwixd{NWmodF-getC-1}}}%
+\nwixlogsorted{c}{{get \code{}node\edoc{}}{NWmodF-getC.2-1}{\nwixu{NWmodF-modF.2-1}\nwixd{NWmodF-getC.2-1}}}%
+\nwixlogsorted{c}{{model functions}{NWmodF-modF.2-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-modF.2-1}\nwixd{NWmodF-modF.2-2}\nwixd{NWmodF-modF.2-3}\nwixd{NWmodF-modF.2-4}}}%
+\nwixlogsorted{c}{{model-anchor.c}{NWmodF-modE.2-1}{\nwixd{NWmodF-modE.2-1}}}%
+\nwixlogsorted{c}{{model-anchor.h}{NWmodF-modE-1}{\nwixd{NWmodF-modE-1}}}%
+\nwixlogsorted{c}{{registration function}{NWmodF-regL-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-regL-1}}}%
+\nwixlogsorted{c}{{static functions}{NWmodF-staG-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-staG-1}}}%
+\nwixlogsorted{c}{{types}{NWmodF-typ5-1}{\nwixu{NWmodF-modE.2-1}\nwixd{NWmodF-typ5-1}}}%
+\nwbegindocs{24}\nwdocspar
+
+
+\nwenddocs{}

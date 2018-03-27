@@ -1,0 +1,250 @@
+
+\section{Introduction}
+
+The {\tt{}superlu-lua} module adds Lua support for calls to the SuperLU
+interface defined in {\tt{}superlu.nw}.  Supported functions are
+\begin{itemize}
+  \item {\tt{}A.print()}:   print matrix
+  \item {\tt{}A.factor()}:  factor matrix
+  \item {\tt{}A.solve(x)}:  compute $x := A^{-1}x$
+  \item {\tt{}A.free()}:    free matrix
+\end{itemize}
+
+
+\section{Interface}
+
+\nwfilename{superlu-lua.nw}\nwbegincode{1}\sublabel{NWsupE-supD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-supD-1}}}\moddef{superlu-lua.h~{\nwtagstyle{}\subpageref{NWsupE-supD-1}}}\endmoddef
+#ifndef SUPERLU_LUA_H
+#define SUPERLU_LUA_H 
+
+#include <lua.h>
+#include "superlu.h"
+
+void      lua_superlu_register(lua_State* L);
+void      lua_superlu_push(lua_State* L, superlu_t matrix);
+superlu_t lua_superlu_get(lua_State* L, int index);
+
+#endif /* SUPERLU_LUA_H */
+\nwnotused{superlu-lua.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}lua{\char95}superlu{\char95}register} function registers the functions of
+the module with the Lua interpreter.  The {\tt{}lua{\char95}superlu{\char95}push}
+and {\tt{}lua{\char95}superlu{\char95}get} functions add and get matrices
+on the Lua stack.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWsupE-supD.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-supD.2-1}}}\moddef{superlu-lua.c~{\nwtagstyle{}\subpageref{NWsupE-supD.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include "superlu-lua.h"
+#include "matrix-lua.h"
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NWsupE-staB-1}}\RA{}
+
+#ifdef HAS_SUPERLU
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWsupE-staG-1}}\RA{}
+#endif
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NWsupE-fun9-1}}\RA{}
+\nwnotused{superlu-lua.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Matrix tag}
+
+The {\tt{}lua{\char95}superlu{\char95}tag} is the tag for the Lua SuperLU sparse matrix type.
+Note that you \emph{could} get into trouble
+with this if multiple interpreters are simultaneously active,
+since the different interpreters may not end up allocating the same
+tag value.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWsupE-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWsupE-staB-1}}}\endmoddef
+static int lua_superlu_tag;
+
+\nwused{\\{NWsupE-supD.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{Matrix {\tt{}print} method}
+
+The {\tt{}matrix{\char95}print} routine (also known as the {\tt{}print} method
+for a matrix object) uses {\tt{}print{\char95}matrix} to output a reasonably
+pretty representation of the matrix.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWsupE-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWsupE-staG-1}}}\endmoddef
+static int lua_matrix_print(lua_State* L)
+\{
+    superlu_t A = lua_touserdata(L,-1);
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Wrong number of arguments");
+
+    superlu_print(A);
+
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwalsodefined{\\{NWsupE-staG-2}\\{NWsupE-staG-3}\\{NWsupE-staG-4}\\{NWsupE-staG-5}}\nwused{\\{NWsupE-supD.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Matrix {\tt{}factor} method}
+
+The {\tt{}matrix{\char95}factor} function calls the {\tt{}superlu{\char95}factor}
+wrapper to access SuperLU's factorization routine {\tt{}dgstrf}. %'
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWsupE-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWsupE-staG-1}}}\plusendmoddef
+static int lua_matrix_factor(lua_State* L)
+\{
+    superlu_t A = lua_touserdata(L,-1);
+
+    superlu_factor(A);
+
+    lua_settop(L,0);
+    lua_pushusertag(L, A, lua_superlu_tag);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{Matrix {\tt{}solve} method}
+
+The {\tt{}matrix{\char95}solve} function computes $x := A^{-1} x$ given a factored
+matrix $A$.  If the matrix has not already been factored, it will
+be automatically factored by the SuperLU wrapper.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWsupE-staG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-staG-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWsupE-staG-1}}}\plusendmoddef
+static int lua_matrix_solve(lua_State* L)
+\{
+    superlu_t A = lua_touserdata(L,-1);
+    lua_matrix_t B;
+
+    if (lua_gettop(L) != 2)
+        lua_error(L, "Wrong number of arguments");
+
+    B = lua_matrix_get(L,1);
+
+    if (superlu_n(A) != B->m)
+        lua_error(L, "Dimension mismatch");
+
+    superlu_solve(A, B->data);
+
+    lua_settop(L,0);
+    lua_pushusertag(L, B, lua_superlu_tag);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{Matrix {\tt{}free} method}
+
+The {\tt{}matrix{\char95}free} function (also known as the {\tt{}free} method)
+deallocates the object memory.  It should probably be called on
+Lua garbage collection, but it isn't yet. %'
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWsupE-staG-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-staG-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWsupE-staG-1}}}\plusendmoddef
+static int lua_matrix_free(lua_State* L)
+\{
+    superlu_t A = lua_touserdata(L,-1);
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    superlu_destroy(A);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+
+\subsection{Method recall}
+
+When a matrix object is indexed by a method name string,
+we return a Lua closure that implements the method.
+So when the user requests {\tt{}A.print}, for instance,
+the returned closure object will have {\tt{}A} as its final
+argument when it is called.
+
+On entry, the Lua stack contains the matrix object
+and the name string.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWsupE-staG-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-staG-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWsupE-staG-1}}}\plusendmoddef
+static int lua_matrix_getmethod(lua_State* L)
+\{
+    const char* name = lua_tostring(L,2);
+
+    lua_pop(L,1);
+    if (strcmp(name, "print") == 0)
+        lua_pushcclosure(L, lua_matrix_print, 1);
+    else if (strcmp(name, "free") == 0)
+        lua_pushcclosure(L, lua_matrix_free, 1);
+    else if (strcmp(name, "factor") == 0)
+        lua_pushcclosure(L, lua_matrix_factor, 1);
+    else if (strcmp(name, "solve") == 0)
+        lua_pushcclosure(L, lua_matrix_solve, 1);
+    else
+        lua_error(L, "Invalid method name");
+
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{Setting and removing vectors}
+
+The {\tt{}lua{\char95}superlu{\char95}push} function is a thin wrapper around
+{\tt{}lua{\char95}pushusertag}.  Similarly, {\tt{}lua{\char95}superlu{\char95}get} is a
+thin wrapper around {\tt{}lua{\char95}touserdata}.  The only reason we
+don't want the user to directly use the {\tt{}lua{\char95}pushusertag} and 
+{\tt{}lua{\char95}touserdata} functions is that then we would have
+to expose the matrix tag value to the world.  That wouldn't
+be a tragedy, but it would be nice to keep it private.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWsupE-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsupE-fun9-1}}}\endmoddef
+void lua_superlu_push(lua_State* L, superlu_t matrix)
+\{
+    lua_pushusertag(L, matrix, lua_superlu_tag);
+\}
+
+superlu_t lua_superlu_get(lua_State* L, int index)
+\{
+    if (index > lua_gettop(L))
+        lua_error(L, "Index out of range");
+
+    if (lua_tag(L,index) != lua_superlu_tag)
+        lua_error(L, "Variable is not a SuperLU matrix");
+
+    return lua_touserdata(L,index);
+\}
+
+\nwalsodefined{\\{NWsupE-fun9-2}}\nwused{\\{NWsupE-supD.2-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{Registration functions}
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWsupE-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupE-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsupE-fun9-1}}}\plusendmoddef
+void lua_superlu_register(lua_State* L)
+\{
+    lua_superlu_tag = lua_newtag(L);
+#ifdef HAS_SUPERLU
+    lua_pushcclosure(L, lua_matrix_getmethod, 0);
+    lua_settagmethod(L, lua_superlu_tag, "gettable");
+#endif
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{functions}{NWsupE-fun9-1}{\nwixu{NWsupE-supD.2-1}\nwixd{NWsupE-fun9-1}\nwixd{NWsupE-fun9-2}}}%
+\nwixlogsorted{c}{{static data}{NWsupE-staB-1}{\nwixu{NWsupE-supD.2-1}\nwixd{NWsupE-staB-1}}}%
+\nwixlogsorted{c}{{static functions}{NWsupE-staG-1}{\nwixu{NWsupE-supD.2-1}\nwixd{NWsupE-staG-1}\nwixd{NWsupE-staG-2}\nwixd{NWsupE-staG-3}\nwixd{NWsupE-staG-4}\nwixd{NWsupE-staG-5}}}%
+\nwixlogsorted{c}{{superlu-lua.c}{NWsupE-supD.2-1}{\nwixd{NWsupE-supD.2-1}}}%
+\nwixlogsorted{c}{{superlu-lua.h}{NWsupE-supD-1}{\nwixd{NWsupE-supD-1}}}%
+\nwbegindocs{20}\nwdocspar
+\nwenddocs{}

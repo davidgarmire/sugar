@@ -1,0 +1,277 @@
+
+\section{Introduction}
+
+In previous versions of SUGAR, the preferred way to specify device 
+geometry was by providing the dimensions and orientations of all 
+the structural elements.  From that information, the node positions 
+could be determined.  This module supports that form of 
+implicit node positioning.
+
+The current preferred method of specifying geometry is to specify
+the node positions directly, and possibly infer parameters like beam
+length (instead of vice-versa).  This module exists primarily to
+ease migration.
+
+
+\section{Interface}
+
+Public functions for this module are
+\begin{itemize}
+  \item {\tt{}relpos{\char95}add(n1,\ n2,\ delta)}:
+        indicate the position of node {\tt{}n2} relative to {\tt{}n1}
+        is {\tt{}delta}
+  \item {\tt{}relpos{\char95}dump()}:
+        dump the current table of relative positioning information
+  \item {\tt{}relpos{\char95}treewalk()}:
+        use relative positioning information to determine the
+        actual node positions
+\end{itemize}
+
+
+\section{Implementation}
+
+The {\tt{}relpos{\char95}table} data structure is an adjacency list
+representation of the graph whose edges are known relative
+positions.  For instance, we might have
+\begin{verbatim}
+ relpos_table[n1] = {{dx12, dy12, dz12, n2}, {dx13, dy13, dz13, n3}, ...}
+\end{verbatim}
+to represent known relative positions of node 2, 3, etc. with respect
+to node 1.  The position of node 2 relative to an origin at node 1 is
+$(dx_{12}, dy_{12}, dz_{12})$.
+
+\nwfilename{relpos.nw}\nwbegincode{1}\sublabel{NWrel9-relA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-relA-1}}}\moddef{relpos.lua~{\nwtagstyle{}\subpageref{NWrel9-relA-1}}}\endmoddef
+relpos_table = \{\};
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}\RA{}
+\nwnotused{relpos.lua}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWrel9-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}}\endmoddef
+-- Add edges from node 1 to 2 and vice-versa
+--
+function relpos_add(n1, n2, delta)
+  local elist;
+
+  \LA{}optionally place first node at origin~{\nwtagstyle{}\subpageref{NWrel9-optb-1}}\RA{}
+
+  elist = relpos_get_elist(n1);
+  elist.n = elist.n + 1;
+  elist[elist.n] = \{  delta[1],  delta[2],  delta[3], n2\}
+
+  elist = relpos_get_elist(n2);
+  elist.n = elist.n + 1;
+  elist[elist.n] = \{ -delta[1], -delta[2], -delta[3], n1\}
+
+  return elist;
+end
+
+\nwalsodefined{\\{NWrel9-fun9-2}\\{NWrel9-fun9-3}\\{NWrel9-fun9-4}\\{NWrel9-fun9-5}\\{NWrel9-fun9-6}\\{NWrel9-fun9-7}}\nwused{\\{NWrel9-relA-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+For the purposes of easing the translation of SUGAR 2.0 netlists
+(where basically all the node positions are determined implicitly),
+we drop the first node with relative position information at
+the origin when {\tt{}relpos{\char95}position{\char95}first{\char95}node} is true.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWrel9-optb-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-optb-1}}}\moddef{optionally place first node at origin~{\nwtagstyle{}\subpageref{NWrel9-optb-1}}}\endmoddef
+if relpos_position_first_node then
+  n1[1] = 0;
+  n1[2] = 0;
+  n1[3] = 0;
+  n1.color = 1
+  node_position(n1)
+  relpos_position_first_node = nil;
+end
+\nwused{\\{NWrel9-fun9-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+We use the {\tt{}relpos{\char95}get{\char95}elist} function to get an existing
+adjacency list for a particular node, or to create a new list
+if one does not already exist.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWrel9-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}}\plusendmoddef
+function relpos_get_elist(n)
+  local elist = relpos_table[n];
+  if not elist then
+    elist = \{n = 0\};
+    relpos_table[n] = elist;
+  end
+  return elist;
+end
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+To figure out the node positions, we do a depth-first search
+through the relative position graph.  When we finish the search,
+we do a quick check to make sure that there are no nodes that
+still need to be positioned.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWrel9-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}}\plusendmoddef
+function relpos_treewalk()
+  local stack = \{n = 0\};
+
+  \LA{}push all grey nodes onto the stack~{\nwtagstyle{}\subpageref{NWrel9-pusY-1}}\RA{}
+
+  while stack.n > 0 do
+    local node = stack[stack.n]
+    stack.n = stack.n - 1
+
+    \LA{}visit neighbors~{\nwtagstyle{}\subpageref{NWrel9-visF-1}}\RA{}
+
+    node.color = 2
+  end
+
+  relpos_assert_all_done();
+end
+
+postload('relpos_treewalk()');
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+Recall that in DFS (or any other standard tree search), we can
+color nodes according to how much they have been processed.
+``White'' nodes ({\tt{}color\ ==\ 0}) have not yet been visited.
+``Grey'' nodes ({\tt{}color\ ==\ 1}) have an absolute position,
+but their neighbors have not yet been processed.  ``Black'' nodes
+({\tt{}colore\ ==\ 2}) are completely processed -- they have been
+positioned, and so have all their neighbors.
+
+The grey nodes at the start of the sweep are our initial roots.
+We know their absolute positions from user specification.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWrel9-pusY-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-pusY-1}}}\moddef{push all grey nodes onto the stack~{\nwtagstyle{}\subpageref{NWrel9-pusY-1}}}\endmoddef
+for node, elist in relpos_table do
+  if node.color == 1 then
+    stack.n = stack.n + 1;
+    stack[stack.n] = node;
+  end
+end
+\nwused{\\{NWrel9-fun9-3}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+When we visit the neighbors of the current node, we only need
+to do anything to the ones that have not already been positioned.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWrel9-visF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-visF-1}}}\moddef{visit neighbors~{\nwtagstyle{}\subpageref{NWrel9-visF-1}}}\endmoddef
+local elist = relpos_table[node];
+for k = 1, elist.n do
+  local e   = elist[k];
+  local nbr = e[4]; 
+  if nbr.color == 0 then
+    \LA{}process uncolored neighbor~{\nwtagstyle{}\subpageref{NWrel9-proQ-1}}\RA{}
+  end
+end
+\nwused{\\{NWrel9-fun9-3}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+When we process a white node, we first assign it an absolute position,
+then color it grey and put it on the stack.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWrel9-proQ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-proQ-1}}}\moddef{process uncolored neighbor~{\nwtagstyle{}\subpageref{NWrel9-proQ-1}}}\endmoddef
+nbr[1] = node[1] + e[1];
+nbr[2] = node[2] + e[2];
+nbr[3] = node[3] + e[3];
+node_position(nbr);
+
+nbr.color = 1;
+stack.n = stack.n + 1;
+stack[stack.n] = nbr;
+\nwused{\\{NWrel9-visF-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+We add a wrapper around the node command to mark nodes as 
+grey if a position is specified, white otherwise.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWrel9-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}}\plusendmoddef
+function node(p)
+  if p[1] then
+    p.color = 1
+  else
+    p.color = 0
+  end
+  return %node(p)
+end
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+The {\tt{}relpos{\char95}assert{\char95}all{\char95}done} function just makes sure that
+none of the nodes that appear in the relative positioning graph
+have no absolute position at the end of processing.  If there
+is ever a component of the graph disconnected from one of the
+initially-positioned roots, the netlist is in error.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWrel9-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}}\plusendmoddef
+function relpos_assert_all_done()
+  for node, elist in relpos_table do
+    if node.color == 0 then
+      error("Unpositioned node " .. relpos_node_name(node))
+    end
+  end
+end
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+The {\tt{}relpos{\char95}dump} command is useful for debugging.  It simply
+prints a text representation of the relative positioning graph.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWrel9-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}}\plusendmoddef
+function relpos_dump()
+  for node, elist in relpos_table do
+
+    \LA{}print node name and position~{\nwtagstyle{}\subpageref{NWrel9-priS-1}}\RA{}
+    \LA{}print adjacency list~{\nwtagstyle{}\subpageref{NWrel9-priK-1}}\RA{}
+
+  end
+end
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+If a node in the graph has an associated position, we might as 
+well print that out, too.  But if the node is still colored white,
+we just print the name of the node and skip the position.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWrel9-priS-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-priS-1}}}\moddef{print node name and position~{\nwtagstyle{}\subpageref{NWrel9-priS-1}}}\endmoddef
+if node.color == 0 then
+  print("From " .. relpos_node_name(node) .. ":")
+else
+  print("From " .. relpos_node_name(node) .. " at ("
+        .. node[1] .. ", "
+        .. node[2] .. ", "
+        .. node[3] .. "):")
+end
+\nwused{\\{NWrel9-fun9-6}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+When we print the adjacent nodes, we only print the node
+name and the relative position information (and not the
+associated position, if it has been determined).
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWrel9-priK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-priK-1}}}\moddef{print adjacency list~{\nwtagstyle{}\subpageref{NWrel9-priK-1}}}\endmoddef
+for k = 1, elist.n do
+  local e = elist[k];
+  print("  to " .. relpos_node_name(e[4]) .. ": (" ..
+        e[1] .. ", " ..
+        e[2] .. ", " .. 
+        e[3] .. ")")
+end
+\nwused{\\{NWrel9-fun9-6}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+Some nodes have names; others may not.  We want to output the name
+when it is available, and otherwise just output the node number.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWrel9-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWrel9-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWrel9-fun9-1}}}\plusendmoddef
+function relpos_node_name(n)
+  if n.name then
+    return n.name .. " (" .. n["mesh index"] .. ")"
+  else
+    return "(" .. n["mesh index"] .. ")"
+  end
+end
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{functions}{NWrel9-fun9-1}{\nwixu{NWrel9-relA-1}\nwixd{NWrel9-fun9-1}\nwixd{NWrel9-fun9-2}\nwixd{NWrel9-fun9-3}\nwixd{NWrel9-fun9-4}\nwixd{NWrel9-fun9-5}\nwixd{NWrel9-fun9-6}\nwixd{NWrel9-fun9-7}}}%
+\nwixlogsorted{c}{{optionally place first node at origin}{NWrel9-optb-1}{\nwixu{NWrel9-fun9-1}\nwixd{NWrel9-optb-1}}}%
+\nwixlogsorted{c}{{print adjacency list}{NWrel9-priK-1}{\nwixu{NWrel9-fun9-6}\nwixd{NWrel9-priK-1}}}%
+\nwixlogsorted{c}{{print node name and position}{NWrel9-priS-1}{\nwixu{NWrel9-fun9-6}\nwixd{NWrel9-priS-1}}}%
+\nwixlogsorted{c}{{process uncolored neighbor}{NWrel9-proQ-1}{\nwixu{NWrel9-visF-1}\nwixd{NWrel9-proQ-1}}}%
+\nwixlogsorted{c}{{push all grey nodes onto the stack}{NWrel9-pusY-1}{\nwixu{NWrel9-fun9-3}\nwixd{NWrel9-pusY-1}}}%
+\nwixlogsorted{c}{{relpos.lua}{NWrel9-relA-1}{\nwixd{NWrel9-relA-1}}}%
+\nwixlogsorted{c}{{visit neighbors}{NWrel9-visF-1}{\nwixu{NWrel9-fun9-3}\nwixd{NWrel9-visF-1}}}%
+\nwbegindocs{28}\nwdocspar
+\nwenddocs{}

@@ -1,0 +1,331 @@
+
+\section{Introduction}
+
+An \emph{affine} transformation is a transformation of the form
+\[
+  T(x) = Ax + b
+\]
+The [[affine]] module provides routines to create, apply, and
+manipulate affine transformations on Euclidean 3-space.
+
+
+\section{Interface}
+
+<<affine.h>>=
+#ifndef AFFINE_H
+#define AFFINE_H
+
+<<exported functions>>
+
+#endif /* AFFINE_H */
+@ 
+
+We represent affine transformations by a 3-by-4 double
+precision matrix in column-major format.  The leading
+3-by-3 submatrix represents the linear part ($A$),
+and the trailing column vector represents the translation
+($b$).
+
+The [[identity]] function initializes the matrix to the
+representation of the identity transform; $A = I$, $b = 0$.
+
+<<exported functions>>=
+void affine_identity(double* T);
+
+@ 
+
+There are several functions which modify an existing
+transformation $T$ by composing it with a simple transformation
+$S$ to get a new transformation $ST$. 
+In the [[translate]] and [[translate_xyz]] functions, $S$ is
+a simple translation ($A = 0$, $b$ is specified by the arguments).
+The [[rotate_ox]], [[rotate_oy]], and [[rotate_oz]] functions
+apply rotations by some fixed number of radians about the $x$,
+$y$, and $z$ axes, respectively.  The rotations are oriented
+according to the right hand rule.  The [[scale]], [[scale_x]],
+[[scale_y]], and [[scale_z]] apply a scaling, either of all
+variables or just of the individual components.
+
+<<exported functions>>=
+void affine_translate    (double* T, double* c);
+void affine_translate_xyz(double* T, double x, double y, double z);
+void affine_rotate_ox    (double* T, double ox);
+void affine_rotate_oy    (double* T, double oy);
+void affine_rotate_oz    (double* T, double oz);
+void affine_scale        (double* T, double s);
+void affine_scale_x      (double* T, double s);
+void affine_scale_y      (double* T, double s);
+void affine_scale_z      (double* T, double s);
+@ 
+
+The [[compose]] function composes two transformations
+to get $S := TS$.
+
+<<exported functions>>=
+void affine_compose(double* T, double* S);
+
+@ 
+
+There are several versions of the [[apply]] transformation.
+The basic [[apply]] transformation computes $x := T(x)$,
+but there is also [[apply_A]] to apply just the linear
+part of the transformation ($x := Ax$), and [[apply_AT]]
+to apply the transpose of the linear part ($x := A^T x$).
+The basic [[apply]] functions assume that the argument vector
+is laid out contiguously in memory, but there are also
+versions of the functions which assume the elements are
+separated by a constant stride.
+
+<<exported functions>>=
+void affine_apply          (double* T, double* x);
+void affine_apply_stride   (double* T, double* x, int stride);
+void affine_apply_A        (double* T, double* x);
+void affine_apply_A_stride (double* T, double* x, int stride);
+void affine_apply_AT       (double* T, double* x);
+void affine_apply_AT_stride(double* T, double* x, int stride);
+
+@ 
+
+\section{Implementation}
+
+<<affine.c>>=
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include "affine.h"
+
+<<functions>>
+@ 
+
+<<functions>>=
+void affine_identity(double* T)
+{
+    memset(T, 0, 12*sizeof(double));
+    T[0] = 1;
+    T[4] = 1;
+    T[8] = 1;
+}
+
+@ 
+
+Note that the [[translate]] function overwrites $T$ with
+the composition of translation with $T$, not with the
+composition of $T$ with the translation.  The same holds
+for the rotations.
+
+<<functions>>=
+void affine_translate(double* T, double* c)
+{
+    T[9 ] += c[0];
+    T[10] += c[1];
+    T[11] += c[2];
+}
+
+@ 
+
+<<functions>>=
+void affine_translate_xyz(double* T, double x, double y, double z)
+{
+    T[9 ] += x;
+    T[10] += y;
+    T[11] += z;
+}
+
+@
+
+The rotation functions obey the right-hand rule, which usually
+confuses me.  That is why there is a sign reversal on the angle
+for the rotation about the $y$ axis.  Since these are purely
+linear transformations, we just need to transform each column
+of $T$ in turn.
+
+<<functions>>=
+void affine_rotate_ox(double* T, double ox)
+{
+    double c = cos(ox);
+    double s = sin(ox);
+    int i;
+
+    for (i = 0; i < 4; ++i) {
+        double y =  c*T[1] + s*T[2];
+        double z = -s*T[1] + c*T[2];
+        T[1] = y;
+        T[2] = z;
+        T += 3;
+    }
+}
+
+@ 
+
+<<functions>>=
+void affine_rotate_oy(double* T, double oy)
+{
+    double c =  cos(oy);
+    double s = -sin(oy);
+    int i;
+
+    for (i = 0; i < 4; ++i) {
+        double x =  c*T[0] + s*T[2];
+        double z = -s*T[0] + c*T[2];
+        T[0] = x;
+        T[2] = z;
+        T += 3;
+    }
+}
+
+@ 
+
+<<functions>>=
+void affine_rotate_oz(double* T, double oz)
+{
+    double c = cos(oz);
+    double s = sin(oz);
+    int i;
+
+    for (i = 0; i < 4; ++i) {
+        double x =  c*T[0] + s*T[1];
+        double y = -s*T[0] + c*T[1];
+        T[0] = x;
+        T[1] = y;
+        T += 3;
+    }
+}
+
+@ 
+
+The [[scale]] function scales everything in sight by the given constant.
+
+<<functions>>=
+void affine_scale(double* T, double s)
+{
+    int i;
+    for (i = 0; i < 12; ++i)
+        *T++ *= s;
+}
+
+@
+
+The [[scale_x]], [[scale_y]], and [[scale_z]] functions only scale
+the appropriate rows.
+
+<<functions>>=
+void affine_scale_x(double* T, double s)
+{
+    int row = 0;
+    <<scale row>>
+}
+
+void affine_scale_y(double* T, double s)
+{
+    int row = 1;
+    <<scale row>>
+}
+
+void affine_scale_z(double* T, double s)
+{
+    int row = 2;
+    <<scale row>>
+}
+
+@
+
+<<scale row>>=
+int i;
+for (i = 0; i < 4; ++i, T += 3)
+    T[row] *= s;
+@
+
+The [[compose]] function does \emph{not} necessarily do a purely
+linear transformation.  The composition $TS$ will have the form
+\begin{eqnarray*}
+  TS(x) & = & A_T (A_S x + b_S) + b_T \\
+        & = & A_T A_S x + T(b_S)
+\end{eqnarray*}
+So we apply $A_T$ to the first three columns of $S$, and then
+apply $T$ to the last column of $S$.
+
+<<functions>>=
+void affine_compose(double* T, double* S)
+{
+    int i;
+    for (i = 0; i < 3; ++i) {
+        double y[3];
+
+        y[0] = T[0]*S[0] + T[3]*S[1] + T[6]*S[2];
+        y[1] = T[1]*S[0] + T[4]*S[1] + T[7]*S[2];
+        y[2] = T[2]*S[0] + T[5]*S[1] + T[8]*S[2];
+
+        S[0] = y[0];
+        S[1] = y[1];
+        S[2] = y[2];
+
+        S += 3;
+    }
+
+    affine_apply(T, S);
+}
+
+@ 
+
+The [[apply]], [[apply_A]], and [[apply_AT]] functions are
+implemented as simple wrappers around their strided
+counterparts.
+
+<<functions>>=
+void affine_apply(double* T, double* x)
+{
+    affine_apply_stride(T, x, 1);
+}
+
+void affine_apply_stride(double* T, double* x, int stride)
+{
+    double x0 = x[0*stride];
+    double x1 = x[1*stride];
+    double x2 = x[2*stride];
+
+    x[0*stride] = T[0]*x0 + T[3]*x1 + T[6]*x2 + T[9 ];
+    x[1*stride] = T[1]*x0 + T[4]*x1 + T[7]*x2 + T[10];
+    x[2*stride] = T[2]*x0 + T[5]*x1 + T[8]*x2 + T[11];
+}
+
+@ 
+
+<<functions>>=
+void affine_apply_A(double* T, double* x)
+{
+    affine_apply_A_stride(T, x, 1);
+}
+
+void affine_apply_A_stride(double* T, double* x, int stride)
+{
+    double x0 = x[0*stride];
+    double x1 = x[1*stride];
+    double x2 = x[2*stride];
+
+    x[0*stride] = T[0]*x0 + T[3]*x1 + T[6]*x2;
+    x[1*stride] = T[1]*x0 + T[4]*x1 + T[7]*x2;
+    x[2*stride] = T[2]*x0 + T[5]*x1 + T[8]*x2;
+}
+
+@ 
+
+<<functions>>=
+void affine_apply_AT(double* T, double* x)
+{
+    affine_apply_AT_stride(T, x, 1);
+}
+
+void affine_apply_AT_stride(double* T, double* x, int stride)
+{
+    double x0 = x[0*stride];
+    double x1 = x[1*stride];
+    double x2 = x[2*stride];
+
+    x[0] = T[0]*x0 + T[1]*x1 + T[2]*x2;
+    x[1] = T[3]*x0 + T[4]*x1 + T[5]*x2;
+    x[2] = T[6]*x0 + T[7]*x1 + T[8]*x2;
+}
+
+@ 
+
+

@@ -1,0 +1,552 @@
+
+\section{Introduction}
+
+The Fast Light Tool Kit (FLTK) is a C++ windowing toolkit which works
+under either X or Windows.  The programming interface is similar in
+some ways to the XForms library (or, more generally, any OO event-driven
+interface widget set).  This module implements a graphical shell for
+the SUGAR Lua interfaces.
+
+\emph{Todo: Need to say a little more about what it looks like, 
+      how you might use it, etc.  Probably inscrutable right now.}
+
+
+\section{Implementation}
+
+This implementation is a hacked-up version of the ``editor'' demo application
+that came with the FLTK distribution.  Unlike the rest of SUGAR, it is
+written in C++.  I wrote it for fun on a Friday night (and Saturday morning), 
+so caveat user.
+
+\nwfilename{sugar-fltk.nw}\nwbegincode{1}\sublabel{NWsugD-sugD.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-sugD.2-1}}}\moddef{sugar-fltk.cc~{\nwtagstyle{}\subpageref{NWsugD-sugD.2-1}}}\endmoddef
+\LA{}includes~{\nwtagstyle{}\subpageref{NWsugD-inc8-1}}\RA{}
+\LA{}static data~{\nwtagstyle{}\subpageref{NWsugD-staB-1}}\RA{}
+\LA{}\code{}EditorWindow\edoc{} class~{\nwtagstyle{}\subpageref{NWsugD-**EM-1}}\RA{}
+\LA{}Lua functions~{\nwtagstyle{}\subpageref{NWsugD-LuaD-1}}\RA{}
+\LA{}event handlers~{\nwtagstyle{}\subpageref{NWsugD-eveE-1}}\RA{}
+\LA{}menu data~{\nwtagstyle{}\subpageref{NWsugD-men9-1}}\RA{}
+\LA{}\code{}EditorWindow\edoc{} methods~{\nwtagstyle{}\subpageref{NWsugD-**EO-1}}\RA{}
+\LA{}main routine~{\nwtagstyle{}\subpageref{NWsugD-maiC-1}}\RA{}
+\nwnotused{sugar-fltk.cc}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+We need to wrap several of the header files in an {\tt{}extern\ "C"}
+block to tell the C++ compiler not to do name mangling on the
+symbols they export.  We also use standard headers.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWsugD-inc8-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-inc8-1}}}\moddef{includes~{\nwtagstyle{}\subpageref{NWsugD-inc8-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
+extern "C" \{
+#include <lua.h>
+#include <lualib.h>
+
+#include "modelmgr.h"
+#include "model-test.h"
+#include "vars.h"
+#include "assemble.h"
+#include "uses-manager.h"
+
+#include "uses-manager-lua.h"
+#include "meshgen-lua.h"
+#include "mesh-lua.h"
+#include "matrix-lua.h"
+#include "superlu-lua.h"
+\}
+
+\nwalsodefined{\\{NWsugD-inc8-2}\\{NWsugD-inc8-3}}\nwused{\\{NWsugD-sugD.2-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+For every FLTK widget we use, we need a header file.  It is sort
+of annoying.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWsugD-inc8-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-inc8-2}}}\moddef{includes~{\nwtagstyle{}\subpageref{NWsugD-inc8-1}}}\plusendmoddef
+#include <FL/Fl.H>
+#include <FL/Fl_Group.H>
+#include <FL/Fl_Double_Window.H>
+#include <FL/fl_ask.H>
+#include <FL/Fl_File_Chooser.H>
+#include <FL/Fl_Menu_Bar.H>
+#include <FL/Fl_Input.H>
+#include <FL/Fl_Button.H>
+#include <FL/Fl_Return_Button.H>
+#include <FL/Fl_Text_Buffer.H>
+#include <FL/Fl_Text_Editor.H>
+#include <Fl/Fl_Box.H>
+#include <Fl/fl_draw.H>
+
+\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\tt{}netdraw-fltk} module implements the {\tt{}netdraw} interface
+so that SUGAR can sketch designs to a box in the bottom half of
+the user interface screen.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWsugD-inc8-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-inc8-3}}}\moddef{includes~{\nwtagstyle{}\subpageref{NWsugD-inc8-1}}}\plusendmoddef
+#include "netdraw-fltk.hh"
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Provided Lua functions}
+
+Perhaps the trickiest part of incorporating Lua with FLTK is the
+output and error handling routines.  They are not difficult,
+but there are a couple things to remember:
+\begin{itemize}
+ \item Output cannot go to the standard output.  I send error
+       messages to special alert boxes, and printed output
+       to the user ``command line'' text box.
+ \item Any calls to the Lua interfaces from within widget callbacks
+       should be handled through the {\tt{}lua{\char95}dostring} function
+       or something like it.  Calls should \emph{not} be made
+       directly or using the {\tt{}lua{\char95}rawcall} function.
+       The {\tt{}lua{\char95}dostring} interface handles error cases
+       internally; the {\tt{}lua{\char95}rawcall} interface can result in
+       {\tt{}longjmp} calls that have no appropriate match.  Somehow,
+       that interacts with the FLTK event handler in a bad way.
+       (If nothing else, it can freeze the X server on my laptop).
+\end{itemize}
+
+The {\tt{}{\char95}ALERT} function is used by the Lua error handling routines
+to deliver error and warning messages.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWsugD-regM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-regM-1}}}\moddef{register Lua functions~{\nwtagstyle{}\subpageref{NWsugD-regM-1}}}\endmoddef
+lua_register(L, "_ALERT", lua_alert);
+
+\nwalsodefined{\\{NWsugD-regM-2}\\{NWsugD-regM-3}\\{NWsugD-regM-4}}\nwused{\\{NWsugD-maiC-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWsugD-LuaD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-LuaD-1}}}\moddef{Lua functions~{\nwtagstyle{}\subpageref{NWsugD-LuaD-1}}}\endmoddef
+static int lua_alert(lua_State* L)
+\{
+    int n = lua_gettop(L);  /* number of arguments */
+
+    lua_getglobal(L, "tostring");
+    lua_pushvalue(L, 1);
+    lua_rawcall(L, 1, 1);
+
+    const char* s = lua_tostring(L, -1);
+    if (s != NULL)
+        fl_alert("%s", s);
+
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwalsodefined{\\{NWsugD-LuaD-2}\\{NWsugD-LuaD-3}\\{NWsugD-LuaD-4}\\{NWsugD-LuaD-5}}\nwused{\\{NWsugD-sugD.2-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+Errors reported during mesh generation should also be handled
+using the Lua error handling interface.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWsugD-LuaD-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-LuaD-2}}}\moddef{Lua functions~{\nwtagstyle{}\subpageref{NWsugD-LuaD-1}}}\plusendmoddef
+static void error_handler(void* arg, const char* msg)
+\{
+    lua_State* L = (lua_State*) arg;
+    lua_error(L, msg);
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+We want a new {\tt{}print} implementation that outputs to the 
+text box instead of {\tt{}stdout}.  This code is a hacked-up
+version of the default Lua print implementation.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWsugD-regM-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-regM-2}}}\moddef{register Lua functions~{\nwtagstyle{}\subpageref{NWsugD-regM-1}}}\plusendmoddef
+lua_pushuserdata(L, window->editor);
+lua_pushcclosure(L, lua_print, 1);
+lua_setglobal(L, "print");
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWsugD-LuaD-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-LuaD-3}}}\moddef{Lua functions~{\nwtagstyle{}\subpageref{NWsugD-LuaD-1}}}\plusendmoddef
+static int lua_print(lua_State *L)
+\{
+    int n = lua_gettop(L);  /* number of arguments */
+
+    \LA{}get editor object \code{}e\edoc{}~{\nwtagstyle{}\subpageref{NWsugD-getN-1}}\RA{}
+
+    lua_getglobal(L, "tostring");
+    for (int i=1; i<=n; i++) \{
+        \LA{}convert argument $i$ to string~{\nwtagstyle{}\subpageref{NWsugD-conU-1}}\RA{}
+        \LA{}insert string in text window~{\nwtagstyle{}\subpageref{NWsugD-insS-1}}\RA{}
+        lua_pop(L, 1);
+    \}
+    \LA{}finish line and update window~{\nwtagstyle{}\subpageref{NWsugD-finT-1}}\RA{}
+
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWsugD-conU-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-conU-1}}}\moddef{convert argument $i$ to string~{\nwtagstyle{}\subpageref{NWsugD-conU-1}}}\endmoddef
+lua_pushvalue(L, -1);  /* function to be called */
+lua_pushvalue(L,  i);  /* value to print */
+lua_rawcall(L, 1, 1);
+const char* s = lua_tostring(L, -1);
+\nwused{\\{NWsugD-LuaD-3}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWsugD-getN-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-getN-1}}}\moddef{get editor object \code{}e\edoc{}~{\nwtagstyle{}\subpageref{NWsugD-getN-1}}}\endmoddef
+Fl_Text_Editor* e = (Fl_Text_Editor*) lua_touserdata(L, -1);
+lua_pop(L,1);
+--n;
+\nwused{\\{NWsugD-LuaD-3}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWsugD-insS-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-insS-1}}}\moddef{insert string in text window~{\nwtagstyle{}\subpageref{NWsugD-insS-1}}}\endmoddef
+if (s == NULL)
+    lua_error(L, "`tostring' must return a string to `print'");
+if (i>1) e->insert("\\t");
+e->insert(s);
+\nwused{\\{NWsugD-LuaD-3}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWsugD-finT-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-finT-1}}}\moddef{finish line and update window~{\nwtagstyle{}\subpageref{NWsugD-finT-1}}}\endmoddef
+e->insert("\\n");
+e->show_insert_position();
+\nwused{\\{NWsugD-LuaD-3}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+The {\tt{}cho{\char95}load} function was copied from the {\tt{}sugar-lua} module.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWsugD-regM-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-regM-3}}}\moddef{register Lua functions~{\nwtagstyle{}\subpageref{NWsugD-regM-1}}}\plusendmoddef
+lua_register(L, "cho_load", lua_netload);
+
+\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWsugD-LuaD-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-LuaD-4}}}\moddef{Lua functions~{\nwtagstyle{}\subpageref{NWsugD-LuaD-1}}}\plusendmoddef
+static int lua_netload(lua_State* L)
+\{
+    int n = lua_gettop(L);
+    mesh_t mesh;
+
+    if (n != 1 || !lua_isstring(L,-1))
+        lua_error(L, "Invalid argument to 'cho_load'");
+
+    mesh = mesh_lua_load(L, uses_manager, lua_tostring(L,-1),
+                         model_mgr, error_handler);
+
+    if (mesh == NULL)
+        lua_error(L, "Error opening file");
+
+    lua_settop(L,0);
+    lua_mesh_create(L, mesh);
+    return 1;
+\}
+
+\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+The {\tt{}cho{\char95}display} function updates the mesh displayed in the draw box
+with a call to the {\tt{}set{\char95}mesh} for the {\tt{}DrawBox} class.
+The {\tt{}set{\char95}mesh} method tells the drawing area to use a particular
+mesh for display; if the argument is NULL, the drawing area will
+be empty.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWsugD-regM-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-regM-4}}}\moddef{register Lua functions~{\nwtagstyle{}\subpageref{NWsugD-regM-1}}}\plusendmoddef
+lua_pushuserdata(L, window->drawbox);
+lua_pushcclosure(L, lua_draw, 1);
+lua_setglobal(L, "cho_display");
+
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWsugD-LuaD-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-LuaD-5}}}\moddef{Lua functions~{\nwtagstyle{}\subpageref{NWsugD-LuaD-1}}}\plusendmoddef
+static int lua_draw(lua_State* L)
+\{
+    int n = lua_gettop(L);  /* number of arguments */
+
+    DrawBox* box = (DrawBox*) lua_touserdata(L, -1);
+    lua_pop(L, 1);
+    --n;
+
+    mesh_t  mesh = NULL;
+    double* x    = NULL;
+
+    if (n >= 1) \{
+        mesh = lua_mesh_get(L,1);
+    \}
+    if (n >= 2) \{
+        \LA{}get draw displacement parameter~{\nwtagstyle{}\subpageref{NWsugD-getV-1}}\RA{}
+    \}
+    if (n > 2)
+        lua_error(L, "Too many arguments to cho_display");
+
+    box->set_mesh(mesh);
+    box->set_disp(x);
+
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWsugD-getV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-getV-1}}}\moddef{get draw displacement parameter~{\nwtagstyle{}\subpageref{NWsugD-getV-1}}}\endmoddef
+lua_matrix_t xarg      = lua_matrix_get(L,2);
+vars_mgr_t   vars_mgr  = mesh_vars_mgr(mesh);
+assembler_t  assembler = mesh_assembler(mesh);
+int          nvars     = vars_count(vars_mgr);
+int          nactive   = assemble_get_active(assembler);
+int          i;
+
+double*      displacements = assemble_get_displacements(assembler);
+
+if (xarg->m != nactive || xarg->n != 1)
+    lua_error(L, "State vector is wrong size");
+
+x = (double*) calloc(nvars, sizeof(double));
+memcpy(x, displacements, nvars * sizeof(double));
+memcpy(x, xarg->data, nactive * sizeof(double));
+
+\nwused{\\{NWsugD-LuaD-5}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\subsection{Editor window}
+
+The editor window has two major components: a text editor box, where
+user interaction occurs; and a drawing box, where the current device
+is displayed.  We also have a command menu.  Note that the {\tt{}editor} 
+and {\tt{}drawbox} fields should almost certainly not be public (as they
+currently are).
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWsugD-**EM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-**EM-1}}}\moddef{\code{}EditorWindow\edoc{} class~{\nwtagstyle{}\subpageref{NWsugD-**EM-1}}}\endmoddef
+class EditorWindow : public Fl_Double_Window \{
+public:
+    EditorWindow(int w, int h, const char* t);
+    ~EditorWindow();
+
+    Fl_Text_Editor     *editor;
+    DrawBox            *drawbox;
+\};
+
+\nwused{\\{NWsugD-sugD.2-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWsugD-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWsugD-staB-1}}}\endmoddef
+static lua_State*         L;
+static uses_manager_t     uses_manager;
+static model_mgr_t        model_mgr;
+static Fl_Text_Buffer    *textbuf;
+
+\nwused{\\{NWsugD-sugD.2-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWsugD-**EO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-**EO-1}}}\moddef{\code{}EditorWindow\edoc{} methods~{\nwtagstyle{}\subpageref{NWsugD-**EO-1}}}\endmoddef
+EditorWindow::EditorWindow(int w, int h, const char* t) : 
+    Fl_Double_Window(w, h, t) 
+\{
+    begin();
+
+      Fl_Menu_Bar* m = new Fl_Menu_Bar(0, 0, 512, 30);
+      m->copy(menuitems, this);
+
+      editor = new Fl_Text_Editor(0, 30, 512, 354);
+      editor->buffer(textbuf);
+      editor->textfont(FL_COURIER);
+
+      drawbox = new DrawBox(0, 384, 512, 300);
+
+    end();
+
+    editor->add_key_binding(FL_Enter, FL_TEXT_EDITOR_ANY_STATE,
+                               enter_key_cb);
+
+    resizable(editor);
+    callback((Fl_Callback *)quit_cb, this);
+
+    textbuf->add_modify_callback(changed_cb, this);
+    textbuf->call_modify_callbacks();
+\}
+
+EditorWindow::~EditorWindow() 
+\{
+\}
+
+\nwused{\\{NWsugD-sugD.2-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWsugD-eveE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-eveE-1}}}\moddef{event handlers~{\nwtagstyle{}\subpageref{NWsugD-eveE-1}}}\endmoddef
+static int enter_key_cb(int, Fl_Text_Editor* e)
+\{
+    int old_position = e->insert_position();
+    e->insert("\\n");
+    lua_dostring(L, textbuf->line_text(old_position));
+    e->show_insert_position();
+    return 1;
+\}
+
+static void changed_cb(int, int nInserted, int nDeleted,int, 
+                       const char*, void* v) 
+\{
+    EditorWindow *w = (EditorWindow *)v;
+    w->editor->show_insert_position();
+\}
+
+\nwalsodefined{\\{NWsugD-eveE-2}\\{NWsugD-eveE-3}\\{NWsugD-eveE-4}}\nwused{\\{NWsugD-sugD.2-1}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+The command menu includes options to load and save files,
+create netlists, and quit.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWsugD-men9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-men9-1}}}\moddef{menu data~{\nwtagstyle{}\subpageref{NWsugD-men9-1}}}\endmoddef
+static Fl_Menu_Item menuitems[] = \{
+  \{ "&File",              0, 0, 0, FL_SUBMENU \},
+
+    \LA{}file menu options~{\nwtagstyle{}\subpageref{NWsugD-filH-1}}\RA{}
+    \LA{}netlist menu options~{\nwtagstyle{}\subpageref{NWsugD-netK-1}}\RA{}
+
+    \{ "E&xit", FL_CTRL + 'q', (Fl_Callback *) quit_cb, 0 \},
+    \{ 0 \},
+
+  \{ 0 \}
+\};
+
+\nwused{\\{NWsugD-sugD.2-1}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWsugD-eveE-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-eveE-2}}}\moddef{event handlers~{\nwtagstyle{}\subpageref{NWsugD-eveE-1}}}\plusendmoddef
+static void quit_cb(Fl_Widget*, void*) 
+\{
+    lua_close(L);
+    exit(0);
+\}
+
+\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWsugD-filH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-filH-1}}}\moddef{file menu options~{\nwtagstyle{}\subpageref{NWsugD-filH-1}}}\endmoddef
+\{ "&Open",            FL_CTRL + 'o', (Fl_Callback *) open_cb, 0 \},
+\{ "&Load net",        FL_CTRL + 'l', (Fl_Callback *) load_cb, 0 \},
+\{ "&Save File",       FL_CTRL + 's', (Fl_Callback *) save_cb, 0 \},
+\{ "Save File &As...", FL_CTRL + FL_SHIFT + 's', 
+   (Fl_Callback *)saveas_cb, 0, FL_MENU_DIVIDER \}, 
+
+\nwused{\\{NWsugD-men9-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWsugD-eveE-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-eveE-3}}}\moddef{event handlers~{\nwtagstyle{}\subpageref{NWsugD-eveE-1}}}\plusendmoddef
+static void open_cb(Fl_Widget*, void*) 
+\{
+    char *newfile = fl_file_chooser("Open File?", "*.lua", NULL);
+    if (newfile != NULL) 
+        lua_dofile(L, newfile);
+\}
+
+static void load_cb(Fl_Widget*, void*) 
+\{
+    char *newfile = fl_file_chooser("Open File?", "*.net", NULL);
+    if (newfile != NULL) \{
+        char buf[256];
+        sprintf(buf, "net = cho_load(\\"%s\\"); draw(net);", newfile);
+        lua_dostring(L, buf);
+    \}
+\}
+
+static void save_file(int save_as) 
+\{
+    static char filename[128] = "";
+
+    char* newfile = filename;
+    if (save_as || *filename == '\\0')
+        newfile = fl_file_chooser("Save File As?", "*", filename);
+
+    if (newfile != NULL && textbuf->savefile(newfile))
+        fl_alert("Error writing to file \\'%s\\':\\n%s.", 
+                 newfile, strerror(errno));
+\}
+
+static void saveas_cb(void) 
+\{
+    save_file(1);
+\}
+
+static void save_cb(void) 
+\{
+    save_file(0);
+\}
+
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWsugD-netK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-netK-1}}}\moddef{netlist menu options~{\nwtagstyle{}\subpageref{NWsugD-netK-1}}}\endmoddef
+\{ "&Create netlist...", 0, (Fl_Callback *) new_net_cb, 0, 0 \}, 
+\{ "&End netlist...",    0, (Fl_Callback *) end_net_cb, 0, 
+                        FL_MENU_DIVIDER \}, 
+
+\nwused{\\{NWsugD-men9-1}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWsugD-eveE-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-eveE-4}}}\moddef{event handlers~{\nwtagstyle{}\subpageref{NWsugD-eveE-1}}}\plusendmoddef
+static void new_net_cb(Fl_Widget*, void*)
+\{
+    mesh_t mesh = mesh_create(model_mgr);
+    mesh_set_handlers(mesh, error_handler, NULL, L);
+    lua_meshgen_register(L, mesh);
+
+    lua_mesh_create(L, mesh);
+    lua_setglobal(L, "net");
+
+    lua_dostring(L, "draw(net)");
+    lua_dostring(L, "element = function(p) %element(p); draw(net); end");
+\}
+
+static void end_net_cb(Fl_Widget*, void*)
+\{
+    lua_meshgen_unregister(L);
+
+    lua_getglobal(L, "net");
+    mesh_t mesh = (mesh_t) lua_touserdata(L,-1);
+    lua_pop(L,1);
+
+    vars_get_vartypes(mesh_vars_mgr(mesh));
+    vars_assign      (mesh_vars_mgr(mesh));
+    assemble_displace(mesh_assembler(mesh));
+\}
+
+\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\section{Main routine}
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWsugD-maiC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsugD-maiC-1}}}\moddef{main routine~{\nwtagstyle{}\subpageref{NWsugD-maiC-1}}}\endmoddef
+int main(int argc, char **argv) 
+\{
+    textbuf = new Fl_Text_Buffer;
+    EditorWindow* window = 
+        new EditorWindow(512, 684, "SUGAR interface window");
+
+    window->show(1, argv);
+
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr      = model_mgr_init();
+    uses_manager   = uses_manager_create(pool);
+
+    xtnetdraw_init(argc, argv);
+    model_test_register(model_mgr);
+    model_mgr_standard_register(model_mgr);
+
+    L = lua_open(0);
+
+    lua_matrix_register(L);
+    lua_superlu_register(L);
+    lua_mesh_register(L);
+    lua_usesmgrlib(L);
+    lua_set_usesmgr(L, uses_manager);
+
+    lua_baselibopen(L);
+    lua_mathlibopen(L);
+    lua_iolibopen(L);
+
+    uses_manager_envpath(uses_manager, "SUGAR_LUA_PATH");
+    
+    \LA{}register Lua functions~{\nwtagstyle{}\subpageref{NWsugD-regM-1}}\RA{}
+
+    window->editor->insert("");
+    return Fl::run();
+\}
+
+\nwused{\\{NWsugD-sugD.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{\code{}EditorWindow\edoc{} class}{NWsugD-**EM-1}{\nwixu{NWsugD-sugD.2-1}\nwixd{NWsugD-**EM-1}}}%
+\nwixlogsorted{c}{{\code{}EditorWindow\edoc{} methods}{NWsugD-**EO-1}{\nwixu{NWsugD-sugD.2-1}\nwixd{NWsugD-**EO-1}}}%
+\nwixlogsorted{c}{{Lua functions}{NWsugD-LuaD-1}{\nwixu{NWsugD-sugD.2-1}\nwixd{NWsugD-LuaD-1}\nwixd{NWsugD-LuaD-2}\nwixd{NWsugD-LuaD-3}\nwixd{NWsugD-LuaD-4}\nwixd{NWsugD-LuaD-5}}}%
+\nwixlogsorted{c}{{convert argument $i$ to string}{NWsugD-conU-1}{\nwixu{NWsugD-LuaD-3}\nwixd{NWsugD-conU-1}}}%
+\nwixlogsorted{c}{{event handlers}{NWsugD-eveE-1}{\nwixu{NWsugD-sugD.2-1}\nwixd{NWsugD-eveE-1}\nwixd{NWsugD-eveE-2}\nwixd{NWsugD-eveE-3}\nwixd{NWsugD-eveE-4}}}%
+\nwixlogsorted{c}{{file menu options}{NWsugD-filH-1}{\nwixu{NWsugD-men9-1}\nwixd{NWsugD-filH-1}}}%
+\nwixlogsorted{c}{{finish line and update window}{NWsugD-finT-1}{\nwixu{NWsugD-LuaD-3}\nwixd{NWsugD-finT-1}}}%
+\nwixlogsorted{c}{{get draw displacement parameter}{NWsugD-getV-1}{\nwixu{NWsugD-LuaD-5}\nwixd{NWsugD-getV-1}}}%
+\nwixlogsorted{c}{{get editor object \code{}e\edoc{}}{NWsugD-getN-1}{\nwixu{NWsugD-LuaD-3}\nwixd{NWsugD-getN-1}}}%
+\nwixlogsorted{c}{{includes}{NWsugD-inc8-1}{\nwixu{NWsugD-sugD.2-1}\nwixd{NWsugD-inc8-1}\nwixd{NWsugD-inc8-2}\nwixd{NWsugD-inc8-3}}}%
+\nwixlogsorted{c}{{insert string in text window}{NWsugD-insS-1}{\nwixu{NWsugD-LuaD-3}\nwixd{NWsugD-insS-1}}}%
+\nwixlogsorted{c}{{main routine}{NWsugD-maiC-1}{\nwixu{NWsugD-sugD.2-1}\nwixd{NWsugD-maiC-1}}}%
+\nwixlogsorted{c}{{menu data}{NWsugD-men9-1}{\nwixu{NWsugD-sugD.2-1}\nwixd{NWsugD-men9-1}}}%
+\nwixlogsorted{c}{{netlist menu options}{NWsugD-netK-1}{\nwixu{NWsugD-men9-1}\nwixd{NWsugD-netK-1}}}%
+\nwixlogsorted{c}{{register Lua functions}{NWsugD-regM-1}{\nwixd{NWsugD-regM-1}\nwixd{NWsugD-regM-2}\nwixd{NWsugD-regM-3}\nwixd{NWsugD-regM-4}\nwixu{NWsugD-maiC-1}}}%
+\nwixlogsorted{c}{{static data}{NWsugD-staB-1}{\nwixu{NWsugD-sugD.2-1}\nwixd{NWsugD-staB-1}}}%
+\nwixlogsorted{c}{{sugar-fltk.cc}{NWsugD-sugD.2-1}{\nwixd{NWsugD-sugD.2-1}}}%
+\nwbegindocs{58}\nwdocspar
+\nwenddocs{}

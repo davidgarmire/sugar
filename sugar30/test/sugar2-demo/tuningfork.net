@@ -1,0 +1,10 @@
+uses mumps.net
+
+anchor p1 [substrate]   [l=10u w=10u oz=deg(180)]
+beam3d p1 [substrate A] [l=50u w=2u oz=0]
+beam3d p1 [A B]         [l=50u w=2u oz=0]
+beam3d p1 [B C]         [l=25u w=2u oz=deg(30)]
+beam3d p1 [B D]         [l=25u w=2u oz=-deg(30)]
+beam3d p1 [C C2]        [l=100u w=10u oz=0]
+beam3d p1 [D D2]        [l=100u w=10u oy=0]
+f3d    *  [D2]          [M=5n oz=0]

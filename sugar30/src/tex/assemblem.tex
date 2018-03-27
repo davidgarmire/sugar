@@ -1,0 +1,123 @@
+
+\section{Introduction}
+
+The purpose of the matrix assembly module is to build global matrix 
+and vector data structures from local contributions.  But what sort of global
+matrices should we build?  We might want a dense matrix, or any of
+a variety of sparse formats.  There might be a reordering in effect,
+or there might not.  We might throw away inactive degrees of freedom,
+or we might not.
+
+Since there are a variety of possible data structures we might want
+to build, we make a generic matrix assembler type.  Given a list of
+variable identifiers and a local contribution (a dense vector if we
+are building a vector, and a dense column-major matrix if we are
+building matrices), the assemble method incorporates the local contribution
+into the global structure.  Information can flow the other way as well --
+using the same interface, we can construct ``disassembler'' objects that
+extract the local part from global structures.
+
+
+\section{Interface}
+
+\nwfilename{assemblem.nw}\nwbegincode{1}\sublabel{NWassC-assB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassC-assB-1}}}\moddef{assemblem.h~{\nwtagstyle{}\subpageref{NWassC-assB-1}}}\endmoddef
+#ifndef ASSEMBLEM_H
+#define ASSEMBLEM_H
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NWassC-expE-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWassC-expI-1}}\RA{}
+
+#endif /* ASSEMBLEM_H */
+\nwnotused{assemblem.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWassC-expE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassC-expE-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NWassC-expE-1}}}\endmoddef
+typedef void (*assemble_matrix_fun_t)(void* self, int* vars, int n, 
+                                      double* local);
+
+typedef struct assemble_matrix_t \{
+    void*   data;
+    void  (*assemble)(void* self, int* vars, int n, double* local);
+    void  (*destroy) (void* self);
+\} assemble_matrix_t;
+
+\nwused{\\{NWassC-assB-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The {\tt{}assemble{\char95}matrix{\char95}t} object interface is the main type
+exported by this module.  The {\tt{}assemble} method
+moves a local contribution into the global data structure
+maintained by the object.  The {\tt{}vars} argument is a vector
+of {\tt{}n} variable indices that identify the global location
+of the local contributions.  The {\tt{}local} field contains
+the contribution itself.  If the assembler object is building
+matrices, the {\tt{}local} field should point to an {\tt{}n} by {\tt{}n}
+matrix in column major order.  If the assembler object builds
+vectors, the {\tt{}local} field should point to a vector of length
+{\tt{}n}.
+
+The {\tt{}destroy} method performs any deallocation of the object
+local data.  The {\tt{}destroy} method does not free the data pointed
+to by {\tt{}data} by default.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWassC-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassC-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWassC-expI-1}}}\endmoddef
+void assemble_matrix_add(assemble_matrix_t* matrix, int* vars, int n, 
+                         double* local);
+void assemble_matrix_add1(assemble_matrix_t* matrix, int var, double local);
+
+\nwalsodefined{\\{NWassC-expI-2}}\nwused{\\{NWassC-assB-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\tt{}assemble{\char95}matrix{\char95}add} function is just a convenient wrapper
+to call the assemble method.  The {\tt{}assemble{\char95}matrix{\char95}add1} function
+adds a single entry to a vector or matrix.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWassC-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassC-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWassC-expI-1}}}\plusendmoddef
+void assembler_matrix_free(assemble_matrix_t* assembler);
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+The destructor {\tt{}assembler{\char95}matrix{\char95}free} calls the assembler
+object {\tt{}destroy} method (if such a method is defined),
+and then frees the {\tt{}assemble{\char95}matrix{\char95}t} structure.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWassC-assB.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassC-assB.2-1}}}\moddef{assemblem.c~{\nwtagstyle{}\subpageref{NWassC-assB.2-1}}}\endmoddef
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "modelmgr.h"
+#include "assemblem.h"
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NWassC-fun9-1}}\RA{}
+\nwnotused{assemblem.c}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWassC-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassC-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassC-fun9-1}}}\endmoddef
+void assemble_matrix_add(assemble_matrix_t* matrix, int* vars, int n, 
+                         double* local)
+\{
+    assert(matrix != NULL && matrix->assemble != NULL);
+    matrix->assemble(matrix->data, vars, n, local);
+\}
+
+void assemble_matrix_add1(assemble_matrix_t* matrix, int var, double local)
+\{
+    assemble_matrix_add(matrix, &var, 1, &local);
+\}
+
+void assembler_matrix_free(assemble_matrix_t* matrix)
+\{
+    assert(matrix != NULL);
+    if (matrix->destroy)
+        matrix->destroy(matrix->data);
+    free(matrix);
+\}
+
+\nwused{\\{NWassC-assB.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{assemblem.c}{NWassC-assB.2-1}{\nwixd{NWassC-assB.2-1}}}%
+\nwixlogsorted{c}{{assemblem.h}{NWassC-assB-1}{\nwixd{NWassC-assB-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWassC-expI-1}{\nwixu{NWassC-assB-1}\nwixd{NWassC-expI-1}\nwixd{NWassC-expI-2}}}%
+\nwixlogsorted{c}{{exported types}{NWassC-expE-1}{\nwixu{NWassC-assB-1}\nwixd{NWassC-expE-1}}}%
+\nwixlogsorted{c}{{functions}{NWassC-fun9-1}{\nwixu{NWassC-assB.2-1}\nwixd{NWassC-fun9-1}}}%
+\nwbegindocs{12}\nwdocspar
+\nwenddocs{}

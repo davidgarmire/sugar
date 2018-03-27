@@ -1,0 +1,431 @@
+\section{Introduction}
+
+The [[xtnetdraw]] module is an X toolkit implementation of the
+[[netdraw]] interface.
+
+
+\section{Interface}
+
+<<netdraw-xt.h>>=
+#ifndef NETDRAW_XT_H
+#define NETDRAW_XT_H
+
+#include "mesh.h"
+
+void xtnetdraw_init(int argc, char** argv);
+void xtnetdraw(mesh_t mesh, double* x);
+
+#endif /* NETDRAW_XT_H */
+@ 
+
+
+\section{Implementation}
+
+I am \emph{not} an expert X programmer.  Most of what I know about
+practical X programming is gleaned from manual pages, examples online,
+and experimenting with crossed fingers.  Caveat user.
+
+<<netdraw-xt.c>>=
+#ifdef HAS_X11
+
+#include <stdlib.h>
+#include <assert.h>
+#include <math.h>
+
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <X11/StringDefs.h>
+#include <X11/Intrinsic.h>
+#include <X11/Core.h>
+#include <X11/Xaw/Box.h>
+#include <X11/Xaw/Command.h>
+
+#include "netdraw-xt.h"
+#include "netdraw.h"
+#include "mesh.h"
+#include "affine.h"
+
+<<types>>
+<<macros>>
+<<static data>>
+<<static functions>>
+<<draw functions>>
+<<functions>>
+
+#endif /* HAS_X11 */
+@ 
+
+
+\subsection{Draw commands}
+
+The [[line]] command is our one and only drawing function.  Its only
+exposure to the outside world will be when it is passed into the
+[[draw]] model using the [[netdraw]] interface.
+
+<<static data>>=
+static void line(void* pself, double* x1, double* x2);
+static double* get_x(void* pself);
+
+static netdraw_fun_t xt_draw_fun = {line, NULL, NULL, get_x};
+
+@ 
+
+There are two coordinate frames that we care about when displaying
+a line: global (world) coordinates, and view coordinates.
+There's also the screen coordinates. %'
+
+<<draw functions>>=
+static void line(void* pself, double* x1, double* x2)
+{
+    xtnet_gc_t* self = (xtnet_gc_t*) pself;
+    double pts[6];
+
+    memcpy(pts + 0, x1, 3*sizeof(double));
+    memcpy(pts + 3, x2, 3*sizeof(double));
+
+    affine_apply(self->toview,   pts + 0);
+    affine_apply(self->toscreen, pts + 0);    
+    affine_apply(self->toview,   pts + 3);
+    affine_apply(self->toscreen, pts + 3);
+
+    XDrawLine(self->disp, self->win, self->gc, 
+	      (int) pts[0], (int) pts[1], (int) pts[3], (int) pts[4]);
+}
+
+@ 
+
+<<draw functions>>=
+static double* get_x(void* pself)
+{
+    xtnet_gc_t* self = (xtnet_gc_t*) pself;
+    return self->x;
+}
+
+@ 
+
+
+\subsection{Draw all}
+
+The [[draw_all]] function is called by the main X interface routine
+on display events, and is responsible for drawing the device.
+Naturally, the routine passes the buck on to the model functions.
+
+<<static functions>>=
+static void draw_all(xtnet_gc_t* self)
+{
+    int i, n;
+    netdraw_gc_t netdraw;
+    netdraw.methods = &xt_draw_fun;
+    netdraw.data    = self;
+
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_display( mesh_element(self->mesh, i), &netdraw );
+}
+
+@ 
+
+
+\subsection{X interface routines}
+
+<<static data>>=
+static int    argc;
+static char** argv;
+
+@ 
+
+<<functions>>=
+void xtnetdraw_init(int my_argc, char** my_argv)
+{
+    argc = my_argc;
+    argv = my_argv;
+}
+
+@ 
+
+The main function [[xtnetdraw]] forks a new process to serve
+as the X client, and then sets up the main X loop in the new
+process.
+
+<<functions>>=
+void xtnetdraw(mesh_t mesh, double* x)
+{
+    <<widget declarations>>
+    xtnet_gc_t* self;
+
+    int n;
+    Arg wargs[10];
+
+    if (fork() != 0)
+        return;
+
+    <<initialize [[self]]>>
+    <<initialize X client>>
+}
+
+@ 
+
+The [[xtnet_gc_t]] structure contains information about the
+graphics context needed by the drawing routines.
+The [[mesh]] and [[x]] fields store the mesh pointer and
+displacement vector; the [[toview]] and [[toscreen]] transformations
+describe how to map to view coordinates and to screen coordinates;
+and the [[disp]], [[win]], and [[gc]] fields store the X context
+on which to display.
+
+<<types>>=
+typedef struct xtnet_gc_t {
+    mesh_t mesh;
+    double* x;
+
+    double toview[12];
+    double toscreen[12];
+
+    Display* disp;
+    Window   win;
+    GC       gc;
+} xtnet_gc_t;
+
+@ 
+
+The X context fields are set during the display event, when we actually
+have an X context to work with.  For now, we just save the mesh and
+displacement vectors and initialize the transformations.
+
+<<initialize [[self]]>>=
+self = (xtnet_gc_t*) malloc(sizeof(struct xtnet_gc_t));
+
+self->mesh = mesh;
+self->x    = x;
+
+set_transforms(mesh, self->toview, self->toscreen);
+@ 
+
+<<static functions>>=
+static void set_transforms(mesh_t mesh, double* toview, double* toscreen)
+{
+    int i, n;
+    double xmin, xmax, ymin, ymax, scale;
+
+    <<get coordinate range information>>
+    <<set transformation to view coordinates>>
+    <<set transformation to screen coordinates>>
+}
+
+@ 
+
+The first step in figuring out our transformations is to figure out
+what ranges of coordinate values we'll see.
+
+<<macros>>=
+#define min(a,b) (((a)<(b)) ? (a) : (b))
+#define max(a,b) (((a)>(b)) ? (a) : (b))
+
+@ 
+
+<<get coordinate range information>>=
+xmin = ymin = 1;
+xmax = ymax = -1;
+n = mesh_num_nodes(mesh);
+for (i = 1; i <= n; ++i) {
+    mesh_node_t* node = mesh_node(mesh, i);
+    xmin = min(xmin, node->x[0]);
+    xmax = max(xmax, node->x[0]);
+    ymin = min(ymin, node->x[1]);
+    ymax = max(ymax, node->x[1]);
+}
+
+@ 
+
+Once we have the coordinate ranges, we use them to scale the device
+into the cube $[-0.5, 0.5]^3$.
+There should probably be a check here to ensure
+that the ranges aren't both zero.  We also want the bounding box for the
+device to be reasonably well-centered.
+
+<<set transformation to view coordinates>>=
+scale = 1/max(xmax-xmin, ymax-ymin);
+
+affine_identity(toview);
+affine_translate_xyz(toview, -(xmax+xmin)/2, -(ymax+ymin)/2, 0);
+affine_scale(toview, scale);
+@ 
+
+We need some size information in order to figure out the
+transformation to screen coordinates.  From some experimentation,
+these look like good size values.
+
+<<macros>>=
+#define FRAME_IN_SPACE 100
+#define FRAMEW 510
+#define FRAMEH 510
+
+#define FRAME_INW (FRAMEW - 2*FRAME_IN_SPACE)
+#define FRAME_INH (FRAMEH - 2*FRAME_IN_SPACE)
+
+@ 
+
+To get to the screen coordinates, we first reflect across
+the $y$ axis.  We then translate the
+interval $[-0.5, 0.5]$ into $[0,1]$, scale to screen widths,
+and then translate again to get a little border.
+
+<<set transformation to screen coordinates>>=
+affine_identity(toscreen);
+toscreen[4] = -1;
+
+affine_translate_xyz(toscreen, 0.5, 0.5, 0);
+affine_scale_x(toscreen, FRAME_INW);
+affine_scale_y(toscreen, FRAME_INH);
+affine_translate_xyz(toscreen, FRAME_IN_SPACE, FRAME_IN_SPACE, 0);
+
+@ 
+
+The setup for the X client is pretty standard: we create a top level
+widget, add children and event handlers, and then display the widget
+and enter the Xt event loop.
+
+<<widget declarations>>=
+Widget toplevel;
+@ 
+
+<<initialize X client>>=
+toplevel = XtInitialize(argv[0], "drawing", NULL, 0, &argc, argv);
+
+<<add widgets>>
+<<set frame size>>
+<<add event handlers>>
+
+XtRealizeWidget(toplevel);
+XtMainLoop();
+@ 
+
+There are three widgets in the user interface: a parent box where
+everything lives, a drawing pad, and a ``quit'' button.
+
+<<widget declarations>>=
+Widget box;
+Widget drawing;
+Widget quit;
+@ 
+
+<<add widgets>>=
+box     = XtCreateManagedWidget("box",  boxWidgetClass,  toplevel, NULL, 0);
+drawing = XtCreateManagedWidget("draw", coreWidgetClass,    box, NULL, 0);
+quit    = XtCreateManagedWidget("quit", commandWidgetClass, box, NULL, 0);
+@ 
+
+<<set frame size>>=
+n = 0;
+XtSetArg(wargs[n], XtNheight, FRAMEH); n++;
+XtSetArg(wargs[n], XtNwidth,  FRAMEW); n++;
+XtSetValues(drawing, wargs, n);
+
+@ 
+
+The setup for the ``quit'' button is darned simple -- we just get
+out of dodge.
+
+<<add event handlers>>=
+XtAddCallback(quit, XtNcallback, quit_func, NULL);
+@ 
+
+<<static functions>>=
+static void quit_func(Widget w, XtPointer client, XtPointer call)
+{
+    exit(0);
+}
+
+@ 
+
+The redraw event simply sets the appropriate fields in the [[self]]
+record, creates a new graphics context, and then calls the 
+[[draw_all]] routine to do most of the work.
+
+<<add event handlers>>=
+XtAddEventHandler(drawing, ExposureMask, FALSE,
+                  (XtEventHandler) redisplay_event, self);
+@ 
+
+<<static functions>>=
+static void redisplay_event(Widget w, XtPointer client, XExposeEvent* ev,
+                            Boolean* continue_dispatch)
+{
+    xtnet_gc_t* self = (xtnet_gc_t*) client;
+
+    if (ev->count != 0)
+        return;
+
+    self->disp = XtDisplay(w);
+    self->win  = XtWindow(w);
+    XClearWindow(self->disp, self->win);
+
+    self->gc = XCreateGC(self->disp, self->win, 0, NULL);
+    XSetForeground(self->disp, self->gc, 1);
+    XSetBackground(self->disp, self->gc, 0);
+    draw_all(self);
+    XFreeGC(self->disp, self->gc);
+}
+
+@ 
+
+<<clear and redraw>>=
+self->disp = XtDisplay(w);
+self->win  = XtWindow(w);
+XClearWindow(self->disp, self->win);
+
+self->gc = XCreateGC(self->disp, self->win, 0, NULL);
+XSetForeground(self->disp, self->gc, 1);
+XSetBackground(self->disp, self->gc, 0);
+draw_all(self);
+XFreeGC(self->disp, self->gc);
+@ 
+
+The key press event handler rotates the displayed device by
+composing the transformation to view coordinates with a
+rotation.  Up and down arrows rotate about the $x$ axis;
+left and right arrows about the $y$ axis; and page up and
+page down about the $z$ axis.
+
+<<add event handlers>>=
+XtAddEventHandler(drawing, KeyPressMask, FALSE,
+                  (XtEventHandler) keypress_event, self);
+@
+
+<<static functions>>=
+static void keypress_event(Widget w, XtPointer client, XKeyEvent* ev,
+                           Boolean* continue_dispatch)
+{
+    xtnet_gc_t* self = (xtnet_gc_t*) client;
+    double inc = (M_PI / 18);
+
+    switch (ev->keycode) {
+        case 98:    /* Up    */
+            affine_rotate_ox(self->toview, -inc);
+            break;
+
+        case 104:   /* Down  */
+            affine_rotate_ox(self->toview, inc);
+            break;
+            
+        case 100:   /* Left  */
+            affine_rotate_oy(self->toview, inc);
+            break;
+            
+        case 102:   /* Right */
+            affine_rotate_oy(self->toview, -inc);
+            break;
+
+        case 99:    /* PgUp  */
+            affine_rotate_oz(self->toview, -inc);
+            break;
+
+        case 105:   /* PgDn  */
+            affine_rotate_oz(self->toview, inc);
+            break;
+    }
+
+    <<clear and redraw>>
+}
+@ 

@@ -1,0 +1,33 @@
+
+-- Header file for auto-converted SUGAR 2.0 netlists
+
+use("std.net")
+
+_currnodes = {}
+function _n(name)
+  if not _currnodes[name] then
+    _currnodes[name] = node {name = name}
+  end
+  return _currnodes[name]
+end
+
+function isdef(x)   return x                   end
+function deg(d)     return d * pi / 180        end
+function sin(x)     return %sin(x * 180/pi)    end
+function cos(x)     return %cos(x * 180/pi)    end
+function tan(x)     return %tan(x * 180/pi)    end
+function acos(t)    return %acos(t)/180 * pi   end
+function asin(t)    return %asin(t)/180 * pi   end
+function atan(t)    return %atan(t)/180 * pi   end
+
+function subnetize(f)
+  f = %subnetize(f)
+  return function(p)
+    local _saved_currnodes = _currnodes
+    _currnodes = {}
+    %f(p)
+    _currnodes = _saved_currnodes
+  end
+end
+
+use("std2.net")

@@ -1,0 +1,112 @@
+% -*- mode: Noweb; noweb-code-mode: icon-mode -*-
+\section{Eliding unwanted code chunks}
+
+This filter removes from the [[markup]] token stream any code chunk
+    whose name matches any of the ``globbing'' patterns given it as
+    arguments.  These are the familiar file name globbing patterns.  For
+    example: [[elide 'RefMan_Ch*']] will prevent weaving a chunk
+    defined as ``\LA{}RefMan\_Chapter\_14\RA{}''.
+
+You could also use this filter when tangling, but it's not clear why you'd want to.
+
+@
+\subsection{Eliding}
+The main loop simply copies the input to the output.
+We stop only if we see [[@begin code]], because that means we might
+need to elide.
+<<*>>=
+procedure main(args)
+  elide := []
+  every put(elide, globpat(!args))
+  while line := read() do
+    if match("@begin code ", line) then 
+      {<<see about eliding this chunk>>}
+    else {
+      write(line)
+      if match("@fatal ", line) then exit(1)
+    }
+  return
+end
+@
+To see about eliding, we accumulate lines until we see [[@defn]].
+At that point we can either keep the chunk, which means printing the
+accumulated lines and returning to the main loop, or elide it, which
+means draining the input until the next [[@end code]].
+<<see about eliding this chunk>>=
+accum := [line]
+while line := read() & not match("@defn ", line) do
+  put(accum, line)
+line ? {
+  ="@defn " | fatal("This can't happen")
+  if globmatch(!elide) then {
+    while line := get(accum) | read() & not match("@end code ", line) do # drain
+      if line == "@nl" then write("@index nl")  # grotesque, but may keep lines right
+  } else
+    every write(!accum | line)
+}
+@
+\subsection{Globbing}
+
+I do globbing in two stages: first I turn the globbing string into
+a pattern.  A pattern is a list of the following kinds of data items:
+\begin{quote}
+\begin{tabular}{ll}
+string&match that string\\
+cset&match one character in that cset\\
+nil&match anything\\
+\end{tabular}
+\end{quote}
+[[globpat]] turns a globbing string into a pattern.
+It doesn't handle the {\tt [} metacharacter, but it might one day.
+<<*>>=
+procedure globpat(s)
+  static specials
+  initial specials := '?*\\'
+  l := []
+  s ?
+    while not pos(0) do
+      put(l, 
+        if not any(specials) then
+          tab(upto(specials)|0)
+        else case move(1) of {
+          "?" : &cset
+          "*" : &null
+          "\\" : move(1)
+        })
+  return l
+end
+@
+Giving a globbing pattern [[pat]] and an index [[i]], [[doglobmatch]]
+returns the string (if any) matched by [[pat[i:0]]].
+[[doglobmatch]] scans the current subject.
+<<*>>=
+procedure doglobmatch(pat, i)
+  local p
+  suspend if p := pat[i] then
+    case type(p) of {
+      "string" : =p
+      "cset"   : tab(any(p))
+      "null"   : tab(&pos to *&subject+1)
+    } || doglobmatch(pat, i+1)
+  else (pos(0), "")
+end
+@
+[[globmatch(p)]] matches the pattern [[p]] against the current
+subject, or a subject can be supplied as the second argument.
+<<*>>=
+procedure globmatch(pattern, s)
+  return if \s then s ? doglobmatch(pattern, 1)
+         else doglobmatch(pattern, 1)
+end
+<<*>>=
+procedure fatal(L[])
+  write!(["@fatal elide "] ||| L)
+  write!([&errout, "noweb error in elide: "] ||| L)
+  exit(1)
+end
+<<*>>=
+procedure rcsinfo () 
+  return "$Id: elide.nw,v 1.3 2002/04/05 09:49:35 strive Exp $" ||
+         "$Name:  $"
+end
+@

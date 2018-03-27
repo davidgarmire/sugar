@@ -1,0 +1,421 @@
+
+\section{Introduction}
+
+The assembly module is responsible for building global entities
+from local contributions, and for extracting the local part of
+global structures.  In particular, this module builds the tangent
+stiffness matrix and load vector.
+
+
+\section{Interface}
+
+\nwfilename{assemble.nw}\nwbegincode{1}\sublabel{NWassB-assA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-assA-1}}}\moddef{assemble.h~{\nwtagstyle{}\subpageref{NWassB-assA-1}}}\endmoddef
+#ifndef ASSEMBLE_H
+#define ASSEMBLE_H
+
+#include "mempool.h"
+#include "mesh.h"
+#include "vars.h"
+
+#include "assemblem.h"
+#include "assemblem-sparse.h"
+#include "assemblem-dense.h"
+#include "superlu.h"
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NWassB-expE-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWassB-expI-1}}\RA{}
+
+#endif /* ASSEMBLE_H */
+\nwnotused{assemble.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+An assembler object requires a mesh and a variable manager.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWassB-expE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-expE-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NWassB-expE-1}}}\endmoddef
+typedef struct assembler_struct* assembler_t;
+
+\nwused{\\{NWassB-assA-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWassB-expI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-expI-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWassB-expI-1}}}\endmoddef
+assembler_t assemble_pcreate(mempool_t pool, mesh_t mesh);
+assembler_t assemble_create (mesh_t mesh);
+void        assemble_destroy(assembler_t self);
+
+\nwalsodefined{\\{NWassB-expI-2}\\{NWassB-expI-3}}\nwused{\\{NWassB-assA-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\tt{}add{\char95}displace} method applies displacement boundary conditions
+to a specified degree of freedom.  The {\tt{}displace} method builds
+a global list of displacement boundary conditions.  Inactive degrees
+of freedom are permuted to the end of the list.
+The displacement vector and the number of active degrees of 
+freedom after boundary conditions can be retrieved using 
+{\tt{}get{\char95}displacements} and {\tt{}get{\char95}active}, respectively.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWassB-expI-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-expI-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWassB-expI-1}}}\plusendmoddef
+void    assemble_add_displace(assembler_t self, int var_id, double value);
+void    assemble_displace    (assembler_t self);
+
+double* assemble_get_displacements(assembler_t self);
+int     assemble_get_active       (assembler_t self);
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+{\tt{}assemble{\char95}R} and {\tt{}assemble{\char95}dR} put together the global version
+of the (reduced) residual and stiffness.   The {\tt{}assemble{\char95}dR{\char95}csc} function
+builds a compressed sparse column representation of the matrix.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWassB-expI-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-expI-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWassB-expI-1}}}\plusendmoddef
+void assemble_R   (assembler_t self, double* x, double* v, double* a,
+                   double* R, int Rsize);
+void assemble_dR  (assembler_t self,
+                   double cx, double* x, 
+                   double cv, double* v, 
+                   double ca, double* a, 
+                   double* dR,
+                   int dRsize);
+superlu_t assemble_dR_csc(assembler_t self,
+                          double cx, double* x, 
+                          double cv, double* v, 
+                          double ca, double* a,
+                          int dRsize);
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWassB-assA.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-assA.2-1}}}\moddef{assemble.c~{\nwtagstyle{}\subpageref{NWassB-assA.2-1}}}\endmoddef
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "modelmgr.h"
+#include "assemble.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWassB-typ5-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}\RA{}
+\nwnotused{assemble.c}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWassB-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWassB-typ5-1}}}\endmoddef
+struct assembler_struct \{
+    \LA{}\code{}assembler{\char95}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWassB-**aN-1}}\RA{}
+\};
+
+\nwused{\\{NWassB-assA.2-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+Right now, the ``by pool'' allocation option is pretty useless,
+since we end up allocating all our temporary space using {\tt{}malloc}.
+The only piece that is actually allocated on the pool is the
+{\tt{}assembler{\char95}t} structure itself.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWassB-**aN-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-**aN-1}}}\moddef{\code{}assembler{\char95}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWassB-**aN-1}}}\endmoddef
+mesh_t     mesh;
+vars_mgr_t vars_mgr;
+int        via_pool;
+\nwalsodefined{\\{NWassB-**aN-2}}\nwused{\\{NWassB-typ5-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWassB-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\endmoddef
+assembler_t assemble_create(mesh_t mesh)
+\{
+    assembler_t self = calloc(1, sizeof(*self));
+    self->mesh       = mesh;
+    self->vars_mgr   = mesh_vars_mgr(mesh);
+    self->via_pool   = 0;
+    return self;
+\}
+
+\nwalsodefined{\\{NWassB-fun9-2}\\{NWassB-fun9-3}\\{NWassB-fun9-4}\\{NWassB-fun9-5}\\{NWassB-fun9-6}\\{NWassB-fun9-7}\\{NWassB-fun9-8}}\nwused{\\{NWassB-assA.2-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWassB-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\plusendmoddef
+assembler_t assemble_pcreate(mempool_t pool, mesh_t mesh)
+\{
+    assembler_t self = (assembler_t) mempool_cget(pool, sizeof(*self));
+    self->mesh       = mesh;
+    self->vars_mgr   = mesh_vars_mgr(mesh);
+    self->via_pool   = 1;
+    return self;
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWassB-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\plusendmoddef
+void assemble_destroy(assembler_t self)
+\{
+    \LA{}destroy assembler variables~{\nwtagstyle{}\subpageref{NWassB-desR-1}}\RA{}
+
+    if (!self->via_pool) \{
+        free(self);
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+We need some internal storage when we assemble displacement boundary
+conditions.  We store the number of variables, total and active,
+in {\tt{}num{\char95}vars} and {\tt{}num{\char95}active}.  We keep track of which variables
+have been fixed by displacement boundary conditions using the
+logical {\tt{}is{\char95}displaced} vector, and we keep track of the
+displacement values in the {\tt{}displacements} vector.  The
+{\tt{}is{\char95}displaced} vector becomes redundant after we generate
+a {\tt{}permutation} vector that moves all the inactive degrees
+of freedom to the end of the list.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWassB-**aN-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-**aN-2}}}\moddef{\code{}assembler{\char95}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWassB-**aN-1}}}\plusendmoddef
+int        num_vars;
+int        num_active;
+double*    displacements;
+\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWassB-desd-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-desd-1}}}\moddef{destroy displacement assembly variables~{\nwtagstyle{}\subpageref{NWassB-desd-1}}}\endmoddef
+if (self->displacements) free(self->displacements);
+\nwused{\\{NWassB-desR-1}\\{NWassB-fun9-4}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWassB-desR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-desR-1}}}\moddef{destroy assembler variables~{\nwtagstyle{}\subpageref{NWassB-desR-1}}}\endmoddef
+\LA{}destroy displacement assembly variables~{\nwtagstyle{}\subpageref{NWassB-desd-1}}\RA{}
+\nwused{\\{NWassB-fun9-3}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWassB-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\plusendmoddef
+void assemble_displace(assembler_t self)
+\{
+    int i, n, active_id, inactive_id;
+    assemble_matrix_t* bc_assembler;
+    int*  permutation;
+    char* has_bc;
+
+    \LA{}destroy displacement assembly variables~{\nwtagstyle{}\subpageref{NWassB-desd-1}}\RA{}
+
+    self->num_vars      = vars_count(self->vars_mgr);
+    self->displacements = calloc(self->num_vars, sizeof(double));
+    permutation         = calloc(self->num_vars, sizeof(int));
+    has_bc              = calloc(self->num_vars, 1);
+    bc_assembler = assembler_bc(self->displacements, has_bc, self->num_vars);
+
+    \LA{}call element \code{}displace\edoc{} cases~{\nwtagstyle{}\subpageref{NWassB-calV-1}}\RA{}
+    \LA{}count active degrees of freedom~{\nwtagstyle{}\subpageref{NWassB-couV-1}}\RA{}
+    \LA{}bucket sort inactive variables to the end~{\nwtagstyle{}\subpageref{NWassB-bucf-1}}\RA{}
+    \LA{}rearrange entries of \code{}displacements\edoc{}~{\nwtagstyle{}\subpageref{NWassB-reac-1}}\RA{}
+
+    vars_permute(self->vars_mgr, permutation);
+    assembler_matrix_free(bc_assembler);
+    free(permutation);
+    free(has_bc);
+\}
+
+\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+The main assembly loop calls the {\tt{}displace} method for each
+element that has one.  Those routines in turn call {\tt{}add{\char95}displace},
+which records the boundary condition in the {\tt{}is{\char95}displaced} and
+{\tt{}displacements} vectors.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWassB-calV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-calV-1}}}\moddef{call element \code{}displace\edoc{} cases~{\nwtagstyle{}\subpageref{NWassB-calV-1}}}\endmoddef
+n = mesh_num_elements(self->mesh);
+for (i = 1; i <= n; ++i)
+    element_displace( mesh_element(self->mesh, i), bc_assembler );
+
+\nwused{\\{NWassB-fun9-4}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+We build the permutation vector using a simple bucket sort.  Among
+other things, that means the permutation retains the relative ordering
+of the active variables among themselves and of the inactive variables
+among themselves.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWassB-couV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-couV-1}}}\moddef{count active degrees of freedom~{\nwtagstyle{}\subpageref{NWassB-couV-1}}}\endmoddef
+self->num_active = 0;
+for (i = 0; i < self->num_vars; ++i)
+    if (!has_bc[i])
+        self->num_active++;
+\nwused{\\{NWassB-fun9-4}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWassB-bucf-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-bucf-1}}}\moddef{bucket sort inactive variables to the end~{\nwtagstyle{}\subpageref{NWassB-bucf-1}}}\endmoddef
+active_id   = 0;
+inactive_id = self->num_active;
+for (i = 0; i < self->num_vars; ++i) \{
+    if (has_bc[i])
+        permutation[i] = inactive_id++;
+    else
+        permutation[i] = active_id++;
+\}
+\nwused{\\{NWassB-fun9-4}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+Why can we do this?  Because we know that the inactive degrees of freedom
+are shifted to the end, and that their relative order does not change.
+That means that for all the inactive variables, $\pi(i) >= i$.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWassB-reac-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-reac-1}}}\moddef{rearrange entries of \code{}displacements\edoc{}~{\nwtagstyle{}\subpageref{NWassB-reac-1}}}\endmoddef
+for (i = self->num_vars - 1; i >= 0; --i) \{
+    if (permutation[i] >= self->num_active) \{
+        self->displacements[permutation[i]] = self->displacements[i];
+    \}
+\}
+memset(self->displacements, 0, self->num_active * sizeof(double));
+\nwused{\\{NWassB-fun9-4}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWassB-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\plusendmoddef
+double* assemble_get_displacements(assembler_t self)
+\{
+    return self->displacements;
+\}
+
+int assemble_get_active(assembler_t self)
+\{
+    return self->num_active;
+\}
+
+\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+The {\tt{}R} and {\tt{}dR} routines loop through the element model
+functions and call their {\tt{}R} and {\tt{}dR} model cases.  Those functions
+in turn call {\tt{}add{\char95}R} and {\tt{}add{\char95}dR} to add their
+local contributions to the global matrix.  In the process, they
+may need to get information from the global $x$ vector using {\tt{}xlocal}.
+While we are doing the assembly, we keep pointers to the global $x$
+vector and to the output matrix in fields in the assembler object,
+so that we can get at them readily from {\tt{}add{\char95}R} and {\tt{}add{\char95}dR}.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWassB-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\plusendmoddef
+void assemble_R(assembler_t self, double* x, double* v, double* a, double* R,
+                int Rsize)
+\{
+    int i, n;
+
+    assemble_matrix_t* assembler_x;
+    assemble_matrix_t* assembler_v;
+    assemble_matrix_t* assembler_a;
+    assemble_matrix_t* assembler_R;
+
+    assembler_x = (x == NULL) ? NULL : 
+        assembler_dense_getvector(x, self->num_vars, self->num_vars);
+
+    assembler_v = (v == NULL) ? NULL : 
+        assembler_dense_getvector(v, self->num_vars, self->num_vars);
+
+    assembler_a = (a == NULL) ? NULL : 
+        assembler_dense_getvector(a, self->num_vars, self->num_vars);
+
+    assembler_R = 
+        assembler_dense_vector(R, Rsize, Rsize);
+
+    memset(R, 0, self->num_active * sizeof(double));
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_R( mesh_element(self->mesh, i), assembler_R, 
+                   assembler_x, assembler_v, assembler_a );
+
+    assembler_matrix_free(assembler_R);
+    if (assembler_a) assembler_matrix_free(assembler_a);
+    if (assembler_v) assembler_matrix_free(assembler_v);
+    if (assembler_x) assembler_matrix_free(assembler_x);
+\}
+
+\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWassB-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\plusendmoddef
+void assemble_dR(assembler_t self, 
+                 double cx, double* x, 
+                 double cv, double* v, 
+                 double ca, double* a, 
+                 double* dR,
+                 int dRsize)
+\{
+    int i, n;
+
+    assemble_matrix_t* assembler_x;
+    assemble_matrix_t* assembler_v;
+    assemble_matrix_t* assembler_a;
+    assemble_matrix_t* assembler_dR;
+
+    assembler_x = (x == NULL) ? NULL : 
+        assembler_dense_getvector(x, self->num_vars, self->num_vars);
+
+    assembler_v = (v == NULL) ? NULL : 
+        assembler_dense_getvector(v, self->num_vars, self->num_vars);
+
+    assembler_a = (a == NULL) ? NULL : 
+        assembler_dense_getvector(a, self->num_vars, self->num_vars);
+
+    assembler_dR = 
+        assembler_dense_matrix(dR, dRsize, dRsize);
+
+    memset(dR, 0, self->num_active * self->num_active * sizeof(double));
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_dR( mesh_element(self->mesh, i), assembler_dR, 
+                    cx, assembler_x,
+                    cv, assembler_v,
+                    ca, assembler_a );
+
+    assembler_matrix_free(assembler_dR);
+    if (assembler_a) assembler_matrix_free(assembler_a);
+    if (assembler_v) assembler_matrix_free(assembler_v);
+    if (assembler_x) assembler_matrix_free(assembler_x);
+\}
+
+\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWassB-fun9-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWassB-fun9-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWassB-fun9-1}}}\plusendmoddef
+superlu_t assemble_dR_csc(assembler_t self,
+                          double cx, double* x, 
+                          double cv, double* v, 
+                          double ca, double* a,
+                          int dRsize)
+\{
+#ifdef HAS_SUPERLU
+    int i, n;
+    superlu_t dRsuper;
+
+    assemble_matrix_t* assembler_x;
+    assemble_matrix_t* assembler_v;
+    assemble_matrix_t* assembler_a;
+    assemble_matrix_t* assembler_dR;
+
+    assembler_x = (x == NULL) ? NULL : 
+        assembler_dense_getvector(x, self->num_vars, self->num_vars);
+
+    assembler_v = (v == NULL) ? NULL : 
+        assembler_dense_getvector(v, self->num_vars, self->num_vars);
+
+    assembler_a = (a == NULL) ? NULL : 
+        assembler_dense_getvector(a, self->num_vars, self->num_vars);
+
+    assembler_dR = 
+        assembler_sparse_matrix(dRsize, dRsize);
+
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_dR( mesh_element(self->mesh, i), assembler_dR, 
+                    cx, assembler_x,
+                    cv, assembler_v,
+                    ca, assembler_a);
+
+    assembler_sparse_csc(assembler_dR);
+    dRsuper = superlu_create(assembler_dR, dRsize);
+
+    assembler_matrix_free(assembler_dR);
+    if (assembler_a) assembler_matrix_free(assembler_a);
+    if (assembler_v) assembler_matrix_free(assembler_v);
+    if (assembler_x) assembler_matrix_free(assembler_x);
+
+    return dRsuper;
+#else
+    printf("Library not compiled with SuperLU support\\n");
+    assert(0);
+#endif
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{assemble.c}{NWassB-assA.2-1}{\nwixd{NWassB-assA.2-1}}}%
+\nwixlogsorted{c}{{assemble.h}{NWassB-assA-1}{\nwixd{NWassB-assA-1}}}%
+\nwixlogsorted{c}{{\code{}assembler{\char95}t\edoc{} entries}{NWassB-**aN-1}{\nwixu{NWassB-typ5-1}\nwixd{NWassB-**aN-1}\nwixd{NWassB-**aN-2}}}%
+\nwixlogsorted{c}{{bucket sort inactive variables to the end}{NWassB-bucf-1}{\nwixu{NWassB-fun9-4}\nwixd{NWassB-bucf-1}}}%
+\nwixlogsorted{c}{{call element \code{}displace\edoc{} cases}{NWassB-calV-1}{\nwixu{NWassB-fun9-4}\nwixd{NWassB-calV-1}}}%
+\nwixlogsorted{c}{{count active degrees of freedom}{NWassB-couV-1}{\nwixu{NWassB-fun9-4}\nwixd{NWassB-couV-1}}}%
+\nwixlogsorted{c}{{destroy assembler variables}{NWassB-desR-1}{\nwixu{NWassB-fun9-3}\nwixd{NWassB-desR-1}}}%
+\nwixlogsorted{c}{{destroy displacement assembly variables}{NWassB-desd-1}{\nwixd{NWassB-desd-1}\nwixu{NWassB-desR-1}\nwixu{NWassB-fun9-4}}}%
+\nwixlogsorted{c}{{exported functions}{NWassB-expI-1}{\nwixu{NWassB-assA-1}\nwixd{NWassB-expI-1}\nwixd{NWassB-expI-2}\nwixd{NWassB-expI-3}}}%
+\nwixlogsorted{c}{{exported types}{NWassB-expE-1}{\nwixu{NWassB-assA-1}\nwixd{NWassB-expE-1}}}%
+\nwixlogsorted{c}{{functions}{NWassB-fun9-1}{\nwixu{NWassB-assA.2-1}\nwixd{NWassB-fun9-1}\nwixd{NWassB-fun9-2}\nwixd{NWassB-fun9-3}\nwixd{NWassB-fun9-4}\nwixd{NWassB-fun9-5}\nwixd{NWassB-fun9-6}\nwixd{NWassB-fun9-7}\nwixd{NWassB-fun9-8}}}%
+\nwixlogsorted{c}{{rearrange entries of \code{}displacements\edoc{}}{NWassB-reac-1}{\nwixu{NWassB-fun9-4}\nwixd{NWassB-reac-1}}}%
+\nwixlogsorted{c}{{types}{NWassB-typ5-1}{\nwixu{NWassB-assA.2-1}\nwixd{NWassB-typ5-1}}}%
+\nwbegindocs{46}\nwdocspar
+\nwenddocs{}

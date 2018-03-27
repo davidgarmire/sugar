@@ -1,0 +1,158 @@
+\subsection{Introduction}
+
+The {\tt{}subnetize} file includes Lua code related to turning an ordinary
+function into a subnet.  Internally, the code segment
+\begin{verbatim}
+subnet foo(A, material, l)
+  -- stuff --
+end
+\end{verbatim}
+is equivalent to
+\begin{verbatim}
+function foo(args)
+  local A        = args[1] or args.A or 
+                   (args.material and args.material.A)
+  local material = args[2] or args.material or 
+                   (args.material and args.material.material)
+  local l        = args[3] or args.l or 
+                   (args.material and args.material.l)
+end
+foo = subnetize(foo)
+\end{verbatim}
+
+Thus, almost all the work of making a subnet be a subnet goes
+into the {\tt{}subnetize} function.  This module defines the
+standard version of {\tt{}subnetize}, which maintains a heirarchical
+namespace for nodes declared in subnets and maintains the stack
+of nested local coordinate systems defined in the {\tt{}xformstack}
+module.
+
+
+\subsection{Implementation}
+
+\nwfilename{subnetize.nw}\nwbegincode{1}\sublabel{NWsubC-subD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsubC-subD-1}}}\moddef{subnetize.lua~{\nwtagstyle{}\subpageref{NWsubC-subD-1}}}\endmoddef
+use("xformstack.lua")
+
+\LA{}initialize data structures~{\nwtagstyle{}\subpageref{NWsubC-iniQ-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWsubC-fun9-1}}\RA{}
+\nwnotused{subnetize.lua}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}namestack} is a stack of prefixes for names declared in the
+current scope.  For the global scope, the stack entry is an empty
+string (when you say ``foo'', you mean ``foo'').  Inside of a subnet
+instance ``bar,'' though, when you make a node named ``foo'' you actually
+get ``bar.foo.''  Therefore, the prefix ``bar.'' is stored on the
+stack while processing the subnet instance.
+
+The {\tt{}localnames} is a table of names for local nodes (nodes in the current
+scope).
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWsubC-iniQ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsubC-iniQ-1}}}\moddef{initialize data structures~{\nwtagstyle{}\subpageref{NWsubC-iniQ-1}}}\endmoddef
+-- Stack of node name prefixes
+_namestack = \{""; n = 1, nanon = 0\};
+
+-- Table of node names in the current scope
+_localnames = \{\};
+
+\nwused{\\{NWsubC-subD-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The {\tt{}subnetize} function transforms a function that creates a substructure
+into a function that creates a substructure in a nested coordinate frame.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWsubC-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsubC-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsubC-fun9-1}}}\endmoddef
+function subnetize(f)
+  return function(p)
+    \LA{}add name of current subnet instance to stack~{\nwtagstyle{}\subpageref{NWsubC-addi-1}}\RA{}
+
+    local old_localnames = _localnames
+    _localnames = \{\};
+
+    \LA{}form $T$ from \code{}ox\edoc{}, \code{}oy\edoc{}, and \code{}oz\edoc{}~{\nwtagstyle{}\subpageref{NWsubC-fore-1}}\RA{}
+    xform_push(T)
+
+    %f(p)
+
+    xform_pop()
+    _localnames = old_localnames
+    _namestack.n = _namestack.n - 1
+  end
+end
+
+\nwalsodefined{\\{NWsubC-fun9-2}}\nwused{\\{NWsubC-subD-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+When we add a new subnet instance, we store its extended name on
+the stack.  If it has no name, it is assigned a name beginning
+with the tag ``anon.''
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWsubC-addi-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsubC-addi-1}}}\moddef{add name of current subnet instance to stack~{\nwtagstyle{}\subpageref{NWsubC-addi-1}}}\endmoddef
+local name = p.name
+if not name then
+  name = "anon" .. _namestack.nanon
+  _namestack.nanon = _namestack.nanon + 1
+end
+_namestack[_namestack.n + 1] = _namestack[_namestack.n] .. name .. "."
+_namestack.n = _namestack.n + 1
+
+if p.name then
+  p.name = _namestack[_namestack.n-1] .. name
+end
+\nwused{\\{NWsubC-fun9-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+When setting up coordinate transformations,
+we rotate about the $y$ axis, then $z$, then $x$.  I am unsure why
+that convention was chosen, but it is the same convention used in
+SUGAR 2.0.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWsubC-fore-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsubC-fore-1}}}\moddef{form $T$ from \code{}ox\edoc{}, \code{}oy\edoc{}, and \code{}oz\edoc{}~{\nwtagstyle{}\subpageref{NWsubC-fore-1}}}\endmoddef
+local T = xform_identity()
+
+if p.oy then
+  T = xform_compose(T, xform_oy(p.oy))
+  p.oy = nil
+end
+
+if p.oz then
+  T = xform_compose(T, xform_oz(p.oz))
+  p.oz = nil
+end
+
+if p.ox then
+  T = xform_compose(T, xform_ox(p.ox))
+  p.ox = nil
+end
+
+\nwused{\\{NWsubC-fun9-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWsubC-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWsubC-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsubC-fun9-1}}}\plusendmoddef
+-- Create a new node.  If something with the same name
+-- already exists in the current scope, use that.
+--
+function node(args)
+  if type(args) == "string" then
+    args = \{name = args\}
+  end
+
+  local name = args.name
+  if not name then
+    name = "anon" .. _namestack.nanon
+    _namestack.nanon = _namestack.nanon + 1
+  end
+
+  if not _localnames[name] then 
+    args.name = _namestack[_namestack.n] .. name
+    _localnames[name] = %node(args)
+  end
+
+  return _localnames[name]
+end
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{add name of current subnet instance to stack}{NWsubC-addi-1}{\nwixu{NWsubC-fun9-1}\nwixd{NWsubC-addi-1}}}%
+\nwixlogsorted{c}{{form $T$ from \code{}ox\edoc{}, \code{}oy\edoc{}, and \code{}oz\edoc{}}{NWsubC-fore-1}{\nwixu{NWsubC-fun9-1}\nwixd{NWsubC-fore-1}}}%
+\nwixlogsorted{c}{{functions}{NWsubC-fun9-1}{\nwixu{NWsubC-subD-1}\nwixd{NWsubC-fun9-1}\nwixd{NWsubC-fun9-2}}}%
+\nwixlogsorted{c}{{initialize data structures}{NWsubC-iniQ-1}{\nwixu{NWsubC-subD-1}\nwixd{NWsubC-iniQ-1}}}%
+\nwixlogsorted{c}{{subnetize.lua}{NWsubC-subD-1}{\nwixd{NWsubC-subD-1}}}%
+\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}

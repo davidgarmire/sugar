@@ -1,0 +1,108 @@
+The BSD License is attached at the end. 
+By using this software you have read and understood the license implications.
+
+The sugar30 subdirectory is organized as follows:
+
+manual/    -- User's Guide
+
+src/       -- Contains the main SUGAR sources
+  nw/      -- Sources written in Noweb
+  c/       -- C sources           (mostly generated from noweb)
+  lua/     -- Lua sources         (mostly generated from noweb)
+  matlab/  -- Matlab sources      (mostly generated from noweb)
+  tex/     -- Implementor's Guide (mostly generated from noweb)
+
+test/      -- Test files
+  misc/
+
+tools/     -- Imported tools
+  lua/     -- Modified version of Lua used by SUGAR
+  noweb/   -- Noweb version 2.10a
+
+To build:
+
+1. Build the codes in the tools subdirectory.  
+
+   To build Lua, change to the lua subdirectory and type "make".  
+   On most systems, nothing more will be required.  If something 
+   breaks, there is a README file -- go ahead and read it!
+
+   To build noweb, change to the noweb subdirectory and do
+   the following:
+
+   - Type "sh awkname gawk" or something equivalent, where "gawk"
+     is the name of the most modern AWK variant on your platform.
+     The default is "nawk."  On many platforms, "sh awkname awk"
+     will be adequate.
+
+   - Type "sh dbmake" to make Noweb and install it into tools/build.
+     This is the location where the sample make.inc file expects
+     noweb to live.
+
+   As with the Lua code, there is a README file (and an INSTALL file)
+   that comes with the Noweb distribution.
+
+2. Set up your make.inc file.
+
+   In the src subdirectory, there is a file called "make.inc.sample".
+   Copy that file to "make.inc" and make any appropriate changes.
+   Strictly speaking, only the Lua interpreter and noweb are required
+   to do a build; however, note that you will not be able to do much
+   of interest unless you have some additional packages (like LAPACK
+   and SuperLU).
+
+3. Generate the sources from noweb.
+
+   From the src subdirectory, type "make src".  This will generate C,
+   Lua, Matlab, and TeX files from their noweb sources.
+
+4. Build an executable.
+
+   If you type "make" from the src subdirectory, you will build the
+   sugar-lua executable (the simple Lua interface).  To build the MEX
+   interface and the FLTK interface, type "make sugar-lua" and
+   "make sugar-fltk", respectively.
+
+5. Set up your paths and run the program!
+
+   You can make it a little easier to use SUGAR by setting appropriate
+   path environment variables.  The SUGAR_LUA_PATH environment variable
+   points to the location of standard Lua sources; a reasonable value
+   for SUGAR_LUA_PATH would be something like "sugar/sugar30/src/lua".
+   The MATLABPATH environment variable tells Matlab where to look for
+   m-files and MEX files; you may want to add "sugar/sugar30/src/matlab"
+   to your MATLABPATH.  Both the Lua interface and Matlab provide means
+   to add entries to the path on the fly in case you forget (the addpath
+   function in Lua and cho_addpath in Matlab add to the Lua search path;
+   addpath in Matlab adds to the Matlab search path).
+
+
+BSD License:
+
+Copyright (c) 2002, Regents of the University of California
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without
+modification, are permitted provided that the following conditions are met:
+
+ - Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+
+ - Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+
+ - Neither the name of the University of California, Berkeley nor the names of
+   its contributors may be used to endorse or promote products derived from
+   this software without specific prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
+AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
+IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE
+FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
+DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
+SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
+CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
+OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.

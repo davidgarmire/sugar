@@ -1,0 +1,139 @@
+
+\section{Introduction}
+
+The {\tt{}netout-file} module transfers a netlist data structure to
+a file.
+
+
+\section{Interface}
+
+\nwfilename{netout-file.nw}\nwbegincode{1}\sublabel{NWnetE-netD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetE-netD-1}}}\moddef{netout-file.h~{\nwtagstyle{}\subpageref{NWnetE-netD-1}}}\endmoddef
+#ifndef NETOUT_FILE_H
+#define NETOUT_FILE_H
+
+#include <stdio.h>
+#include "mesh.h"
+
+void netout_file(FILE* fp, mesh_t mesh);
+
+#endif /* NETOUT_FILE_H */
+\nwnotused{netout-file.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWnetE-netD.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetE-netD.2-1}}}\moddef{netout-file.c~{\nwtagstyle{}\subpageref{NWnetE-netD.2-1}}}\endmoddef
+#include "netout.h"
+#include "netout-file.h"
+
+\LA{}\code{}netout\edoc{} functions~{\nwtagstyle{}\subpageref{NWnetE-**nK-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWnetE-fun9-1}}\RA{}
+\nwnotused{netout-file.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWnetE-**nK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetE-**nK-1}}}\moddef{\code{}netout\edoc{} functions~{\nwtagstyle{}\subpageref{NWnetE-**nK-1}}}\endmoddef
+static void write_string(void* pself, const char* name, const char* s)
+\{
+    FILE* fp = (FILE*) pself;
+    fprintf(fp, "  %s = '%s'\\n", name, s);
+\}
+
+static void write_double(void* pself, const char* name, double d)
+\{
+    FILE* fp = (FILE*) pself;
+    fprintf(fp, "  %s = %g\\n", name, d);
+\}
+
+static void write_int(void* pself, const char* name, int i)
+\{
+    FILE* fp = (FILE*) pself;
+    fprintf(fp, "  %s = %d\\n", name, i);
+\}
+
+\nwalsodefined{\\{NWnetE-**nK-2}}\nwused{\\{NWnetE-netD.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWnetE-**nK-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetE-**nK-2}}}\moddef{\code{}netout\edoc{} functions~{\nwtagstyle{}\subpageref{NWnetE-**nK-1}}}\plusendmoddef
+static void write_double_matrix(void* pself, const char* name,
+                                double* darray, int m, int n)
+\{
+    FILE* fp = (FILE*) pself;
+    int i, j;
+
+    fprintf(fp, "  %s = [\\n", name);
+    for (i = 0; i < m; ++i) \{
+        fprintf(fp, "    ");
+        for (j = 0; j < n; ++j)
+            fprintf(fp, "%g ", darray[j*m+i]);
+        fprintf(fp, "\\n");
+    \}
+    fprintf(fp, "  ]\\n");
+\}
+
+static void write_int_matrix(void* pself, const char* name,
+                             int* iarray, int m, int n)
+\{
+    FILE* fp = (FILE*) pself;
+    int i, j;
+
+    fprintf(fp, "  %s = [\\n", name);
+    for (i = 0; i < m; ++i) \{
+        fprintf(fp, "    ");
+        for (j = 0; j < n; ++j)
+            fprintf(fp, "%d ", iarray[j*m+i]);
+        fprintf(fp, "\\n");
+    \}
+    fprintf(fp, "  ]\\n");
+\}
+
+\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWnetE-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWnetE-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWnetE-fun9-1}}}\endmoddef
+void netout_file(FILE* fp, mesh_t mesh)
+\{
+    int i, n;
+    netout_fun_t funs;
+    netout_t     self;
+
+    funs.write_string = write_string;
+    funs.write_double = write_double;
+    funs.write_int    = write_int;
+    funs.write_double_matrix = write_double_matrix;
+    funs.write_int_matrix    = write_int_matrix;
+
+    self.methods = &funs;
+    self.data    = fp;
+
+    n = mesh_num_nodes(mesh);
+    for (i = 1; i <= n; ++i) \{
+        mesh_node_t* node = mesh_node(mesh, i);
+        fprintf(fp, "%d: %s = [%g, %g, %g]\\n", i, 
+                (node->name == NULL ? "(anon)" : node->name),
+                node->x[0], node->x[1], node->x[2]);
+    \}
+    fprintf(fp, "\\n");
+
+    n = mesh_num_materials(mesh);
+    for (i = 1; i <= n; ++i) \{
+        material_t* material = mesh_material(mesh, i);
+        fprintf(fp, "material \{\\n");
+        material_output(material, &self);
+        fprintf(fp, "\}\\n\\n");
+    \}
+
+    n = mesh_num_elements(mesh);
+    for (i = 1; i <= n; ++i) \{
+        element_t* element = mesh_element(mesh, i);
+        fprintf(fp, "element \{\\n");
+        element_output(element, &self);
+        fprintf(fp, "\}\\n\\n");
+    \}
+\}
+
+\nwused{\\{NWnetE-netD.2-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{functions}{NWnetE-fun9-1}{\nwixu{NWnetE-netD.2-1}\nwixd{NWnetE-fun9-1}}}%
+\nwixlogsorted{c}{{\code{}netout\edoc{} functions}{NWnetE-**nK-1}{\nwixu{NWnetE-netD.2-1}\nwixd{NWnetE-**nK-1}\nwixd{NWnetE-**nK-2}}}%
+\nwixlogsorted{c}{{netout-file.c}{NWnetE-netD.2-1}{\nwixd{NWnetE-netD.2-1}}}%
+\nwixlogsorted{c}{{netout-file.h}{NWnetE-netD-1}{\nwixd{NWnetE-netD-1}}}%
+\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}

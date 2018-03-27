@@ -1,0 +1,778 @@
+
+\section{Introduction}
+
+The mesh module describes and manipulates the basic mesh data
+structure.  This module is only responsible for keeping track
+of and providing access to the data structures, and does
+\emph{not} handle any particularly sophisticated functions.
+
+There are three main users of this module:
+\begin{itemize}
+ \item Mesh generation routines
+ \item Model initialization routines
+ \item Routines to process the constructed mesh
+\end{itemize}
+
+
+\section{Interface}
+
+<<mesh.h>>=
+#ifndef MESH_H
+#define MESH_H
+
+#include "mempool.h"
+#include "modelmgr.h"
+
+typedef struct mesh_struct* mesh_t;
+
+<<exported types>>
+<<exported functions>>
+
+#endif /* MESH_H */
+@ 
+
+
+\subsection{Types}
+
+A node in the mesh is described by a [[mesh_node_t]] structure.
+Nodes have names and positions, but that's about it.  A node may %'
+be anonymous (when the [[name]] field is NULL).  There may also
+be nodes whose position is unimportant.  In that case, the default
+location of the node is at the origin.
+
+<<exported types>>=
+typedef struct mesh_node_t {
+    const char* name;
+    double x[3];
+} mesh_node_t;
+
+@ 
+
+In C++, ``material'' and ``element'' would be abstract base classes.
+In Java, they would probably be interfaces.  In C, we require a bit
+more typing to achieve the same effect.  Material and element models are
+defined by function tables (see [[modelmgr]] for details).  Particular
+instances of materials and elements are defined by a function table plus
+some data for the particular instance.  The semantics of the data
+describing each instance is known only to the model writer.
+
+In addition to the basic mesh object types, we define one more type
+for convenience: a tagged union type with a label to represent
+named parameters.  Types are characters strings ([[type == 's']]);
+numbers ([[type == 'd']]); and matrices ([[type == 'm']]).
+
+<<exported types>>=
+enum {
+    MESH_PARAM_NUMBER,
+    MESH_PARAM_STRING,
+    MESH_PARAM_MATRIX
+};
+
+typedef struct mesh_param_t {
+    int tag;
+    const char* name;
+    union {
+        double d;
+        const char* s;
+	struct {
+	    int m, n;
+	    double* data;
+	} m;
+    } val;
+} mesh_param_t;
+
+@ 
+
+
+\subsection{Functions}
+
+The [[mesh_create]] and [[mesh_destroy]] functions respectively
+create and destroy mesh objects.
+The [[mesh_create]] function takes a pointer to a model manager
+(see the [[modelmgr]] file).
+
+<<exported functions>>=
+mesh_t mesh_create(model_mgr_t model_mgr);
+void   mesh_destroy(mesh_t self);
+
+@ 
+
+Each mesh is allocated on a memory pool, which can be accessed via
+the [[mesh_pool]] function.  Model functions should allocate memory
+for local storage from this pool.
+
+<<exported functions>>=
+mempool_t mesh_pool(mesh_t self);
+
+@ 
+
+A mesh can have associated handlers for errors and warnings.
+A handler consists of a function pointer and a pointer
+to data needed by the handler.  The default handler for a
+warning simply prints an error message to the standard output;
+the default error handler is simpler, but it additionally
+aborts the program.  The default behavior can be stored by
+passing in a NULL function.
+
+<<exported functions>>=
+void mesh_set_handlers(mesh_t self,
+                       void (*error_handler)  (void* arg, const char* msg),
+                       void (*warning_handler)(void* arg, const char* msg),
+                       void* arg);
+void mesh_error       (mesh_t self, const char* msg);
+void mesh_warning     (mesh_t self, const char* msg);
+
+
+@ 
+
+The [[mesh_add_param_string]] and [[mesh_add_param_number]] functions
+add named string and number parameters to the list of parameters
+used by the next material or element.  The parameter list is
+cleared after any call to [[mesh_add_element]] or [[mesh_add_material]].
+
+The [[mesh_add_param_node]] adds to the list of nodes used by the next
+element.  The node list is cleared after any call to [[mesh_add_element]].
+
+<<exported functions>>=
+void mesh_add_param_string(mesh_t self, const char* name, const char* s);
+void mesh_add_param_number(mesh_t self, const char* name, double d);
+void mesh_add_param_matrix(mesh_t self, const char* name, int m, int n,
+			   double* data);
+void mesh_add_param_node  (mesh_t self, int node_id);
+
+@ 
+
+The current list of named parameters and node identifiers can
+later be accessed through [[mesh_param]], [[mesh_param_byname]],
+and [[mesh_param_node]].  [[mesh_num_params]] and [[mesh_num_param_nodes]]
+will give the number of named parameters and nodes, respectively.
+The arrays of named parameters and element nodes use zero-based
+indexing.  The functions to access the current parameter lists will
+primarily be of interest to model function writers.
+
+<<exported functions>>=
+mesh_param_t* mesh_param       (mesh_t self, int index);
+mesh_param_t* mesh_param_byname(mesh_t self, const char* name);
+int           mesh_param_node  (mesh_t self, int index);
+
+@ 
+
+<<exported functions>>=
+int mesh_num_params     (mesh_t self);
+int mesh_num_param_nodes(mesh_t self);
+
+@ 
+
+After a mesh generation error, we may be left with unprocessed
+arguments not cleared from the stack.  The current solution is
+the [[mesh_params_clear]] routine; a better future solution might
+be to separate the argument stack handler into its own module
+and independent data structure.
+
+<<exported functions>>=
+void mesh_params_clear(mesh_t self);
+
+@ 
+
+Often, we know what type the parameters \emph{should} be,
+and it is an error if we see anything else.  The
+[[mesh_param_string]], [[mesh_param_number]], and
+[[mesh_param_int]] functions report a ``parameter missing''
+error if the requested parameter is unavailable and a
+``wrong type'' error if the parameter is invalid.  If
+the parameter is legitimate, they return the value.
+
+The [[mesh_param_material]] function takes a material identifier,
+checks its validity (is it an in-range integer?) and returns a
+pointer to the material.  Note that the pointer is \emph{only} valid
+until a new material is added, since the data structure in which
+the materials are stored may be shifted around dynamically.
+
+The mesh argument is provided only for its error handling
+routines.
+
+<<exported functions>>=
+const char*      mesh_param_string  (mesh_t self, mesh_param_t* param);
+double           mesh_param_number  (mesh_t self, mesh_param_t* param);
+int              mesh_param_int     (mesh_t self, mesh_param_t* param);
+material_t*      mesh_param_material(mesh_t self, mesh_param_t* param);
+
+@ 
+
+The [[mesh_add_node]] function adds a node to the global list.
+The return value is the identifier for that node.
+The [[mesh_add_element]] and [[mesh_add_material]] add to the list of
+elements and materials used in the mesh.  Both functions return
+identifiers for the newly created objects.
+
+<<exported functions>>=
+int mesh_add_node    (mesh_t self, const char* name, 
+                      double x, double y, double z);
+int mesh_add_element (mesh_t self, const char* model);
+int mesh_add_material(mesh_t self, const char* model);
+
+@ 
+
+The [[mesh_node]], [[mesh_element]], and [[mesh_material]] functions
+retrieve the nodes, elements, and material objects by their
+identifiers.  Note that the pointers returned are \emph{not} guaranteed
+to remain valid as new entries are added into the mesh.
+
+<<exported functions>>=
+mesh_node_t*  mesh_node    (mesh_t self, int id);
+element_t*    mesh_element (mesh_t self, int id);
+material_t*   mesh_material(mesh_t self, int id);
+
+@ 
+
+The [[mesh_num_nodes]], [[mesh_num_elements]], and [[mesh_num_materials]]
+functions return the number of nodes, elements, and materials present
+in the mesh.
+
+<<exported functions>>=
+int mesh_num_nodes    (mesh_t self);
+int mesh_num_elements (mesh_t self);
+int mesh_num_materials(mesh_t self);
+
+@ 
+
+The [[mesh_vars_mgr]] and [[mesh_assembler]] getter functions return
+the variable manager and assembler objects owned by the mesh.
+
+<<exported functions>>=
+struct vars_mgr_struct* mesh_vars_mgr(mesh_t self);
+struct assembler_struct* mesh_assembler(mesh_t self);
+@ 
+
+
+\section{Implementation}
+
+<<mesh.c>>=
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include "mempool.h"
+#include "hash.h"
+#include "mesh.h"
+#include "vars.h"
+#include "assemble.h"
+#include "dynarray.h"
+
+<<types>>
+<<constants>>
+<<static functions>>
+<<functions>>
+@ 
+
+<<types>>=
+struct mesh_struct {
+    <<[[mesh_t]] data>>
+};
+
+@ 
+
+
+\subsection{Mesh data structure}
+
+The main point of the mesh object is to track the nodes, elements,
+and materials that make up the device description.
+
+<<[[mesh_t]] data>>=
+dynarray_t nodes;
+dynarray_t elements;
+dynarray_t materials;
+@ 
+
+The [[param_nodes]] and [[params]] entries are used as storage
+for the list of node identifiers and named parameters to be passed
+to an element or a material.
+
+<<[[mesh_t]] data>>=
+dynarray_t param_nodes;
+dynarray_t params;
+@ 
+
+We keep around a pool object to give the models a place to allocate
+their local data.  We also keep around a string tables so that we
+don't have to store ``Youngsmodulus'' more than once. %'
+
+<<[[mesh_t]] data>>=
+mempool_t pool;
+hash_t strings;
+@ 
+
+<<[[mesh_t]] data>>=
+model_mgr_t model_mgr;
+@ 
+
+The information for the current error handler consists of three
+variables: a function for reporting errors, another for reporting 
+warnings, and an opaque data pointer so that the error handlers
+have something to do when they report.
+
+<<[[mesh_t]] data>>=
+void (*error_handler)(void* arg, const char* msg);
+void (*warning_handler)(void* arg, const char* msg);
+void* handler_arg;
+@ 
+
+Variable index assignment is handled by a separate object (a
+[[vars_mgr_t]]), but we keep a pointer to that object with the
+mesh information.  We can access the object with a simple
+getter function.
+
+<<[[mesh_t]] data>>=
+vars_mgr_t vars_mgr;
+assembler_t assembler;
+@ 
+
+<<functions>>=
+vars_mgr_t mesh_vars_mgr(mesh_t self)
+{
+    return self->vars_mgr;
+}
+
+assembler_t mesh_assembler(mesh_t self)
+{
+    return self->assembler;
+}
+
+@ 
+
+
+The default sizes of the various tables and initial array capacities
+are off the top of my head.  A mesh with 128 nodes and elements sounds
+like a reasonable size for something small; ditto with 16 materials.
+And we probably won't have many single elements with nearly 27 %'
+nodes (the number of nodes in a 3-d second-order Lagrangian brick),
+nor anything with 64 parameters.  Note, though, that the data structures
+we're using will work fine even if something larger than the specified %'
+capacity is used.  They will just have to grow.
+
+<<constants>>=
+#define NODES_SIZ      128
+#define ELEMENT_SIZ    128
+#define MATERIAL_SIZ   16
+#define ELT_NODES_SIZ  27
+#define PARAMS_SIZ     64
+#define STRINGS_SIZ    500
+
+@ 
+
+<<functions>>=
+mesh_t mesh_create(model_mgr_t model_mgr)
+{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    mesh_t    self = (mesh_t) mempool_get(pool, sizeof(struct mesh_struct));
+
+    self->nodes     = dynarray_create(sizeof(mesh_node_t), NODES_SIZ);
+    self->elements  = dynarray_create(sizeof(element_t*),  ELEMENT_SIZ);
+    self->materials = dynarray_create(sizeof(material_t*), MATERIAL_SIZ);
+
+    self->param_nodes = dynarray_create(sizeof(int), ELT_NODES_SIZ);
+    self->params = dynarray_create(sizeof(mesh_param_t), PARAMS_SIZ);
+
+    self->pool      = pool;
+    self->strings   = hstrings_pcreate(pool, STRINGS_SIZ);
+    self->model_mgr = model_mgr;
+
+    mesh_set_handlers(self, NULL, NULL, NULL);
+
+    self->vars_mgr  = vars_create(self);
+    self->assembler = assemble_create(self);
+
+    return self;
+}
+
+@ 
+
+<<functions>>=
+void mesh_destroy(mesh_t self)
+{
+    int i, n;
+
+    assemble_destroy(self->assembler);
+    vars_destroy(self->vars_mgr);
+
+    <<destroy element data>>
+
+    <<destroy material data>>
+
+    dynarray_destroy(self->params);
+    dynarray_destroy(self->param_nodes);
+
+    dynarray_destroy(self->materials);
+    dynarray_destroy(self->elements);
+    dynarray_destroy(self->nodes);
+
+    mempool_destroy(self->pool);
+}
+
+@ 
+
+<<destroy element data>>=
+n = mesh_num_elements(self);
+for (i = 1; i <= n; ++i)
+    element_destroy( mesh_element(self, i) );
+@ 
+
+<<destroy material data>>=
+n = mesh_num_materials(self);
+for (i = 1; i <= n; ++i)
+    material_destroy( mesh_material(self, i) );
+@ 
+
+<<functions>>=
+mempool_t mesh_pool(mesh_t self)
+{
+    return self->pool;
+}
+
+@ 
+
+
+\subsection{Error handlers}
+
+The only really noteworthy thing about setting the handlers is the
+case when a NULL argument is passed in to indicate that we want
+to use the default handler.
+
+<<functions>>=
+void mesh_set_handlers(mesh_t self,
+                       void (*error_handler)(void* arg, const char* msg),
+                       void (*warning_handler)(void* arg, const char* msg),
+                       void* arg)
+{
+    self->error_handler = 
+        (error_handler == NULL) ? default_error_handler : error_handler;
+    self->warning_handler = 
+        (error_handler == NULL) ? default_warning_handler : warning_handler;
+    self->handler_arg = arg;
+}
+
+@ 
+
+Generating a warning or an error is simply a matter of calling the
+current handler.
+
+<<functions>>=
+void mesh_error(mesh_t self, const char* msg)
+{
+    (self->error_handler)(self->handler_arg, msg);
+}
+
+void mesh_warning(mesh_t self, const char* msg)
+{
+    (self->warning_handler)(self->handler_arg, msg);
+}
+
+@ 
+
+By default, we print the error or warning message to the standard
+error stream, then abort on error or return on warning.
+
+<<static functions>>=
+static void default_error_handler(void* arg, const char* msg)
+{
+    fprintf(stderr, "%s\n", msg);
+    abort();
+}
+
+static void default_warning_handler(void* arg, const char* msg)
+{
+    fprintf(stderr, "%s\n", msg);
+}
+
+@ 
+
+
+\subsection{Parameters}
+
+The [[mesh_add_param_string]] and [[mesh_add_param_number]] functions simply
+append new parameters to the [[params]] array.  Note that any new strings
+that we might need to keep around (like names of parameters or string
+parameter values) are immediately copied into the string table.
+
+<<functions>>=
+void mesh_add_param_number(mesh_t self, const char* name, double d)
+{
+    mesh_param_t param;
+    param.name  = hstrings_add(self->strings, name);
+    param.tag   = MESH_PARAM_NUMBER;
+    param.val.d = d;
+    dynarray_append(self->params, &param);
+}
+
+@ 
+
+<<functions>>=
+void mesh_add_param_string(mesh_t self, const char* name, const char* s)
+{
+    mesh_param_t param;
+    param.name  = hstrings_add(self->strings, name);
+    param.tag   = MESH_PARAM_STRING;
+    param.val.s = hstrings_add(self->strings, s);
+    dynarray_append(self->params, &param);
+}
+
+@ 
+
+<<functions>>=
+void mesh_add_param_matrix(mesh_t self, const char* name, int m, int n,
+			   double* data)
+{
+    mesh_param_t param;
+    param.name = hstrings_add(self->strings, name);
+    param.tag  = MESH_PARAM_MATRIX;
+    param.val.m.m = m;
+    param.val.m.n = n;
+    param.val.m.data = mempool_memdup(self->pool, data, m*n * sizeof(double));
+    dynarray_append(self->params, &param);
+}
+
+@ 
+
+The [[mesh_add_param_node]] function is very similar in nature to the
+other [[mesh_add_param]] functions, but it addes nodes rather than named
+parameters.  The order in which nodes are added matters, obviously.
+
+<<functions>>=
+void mesh_add_param_node(mesh_t self, int node_id)
+{
+    if (node_id <= 0 || node_id > mesh_num_nodes(self))
+        mesh_error(self, "Invalid node identifier");
+    dynarray_append(self->param_nodes, &node_id);
+}
+
+@ 
+
+The [[mesh_param]] and [[mesh_param_node]] functions are little
+more than wrappers around [[dynarray_get]].
+
+<<functions>>=
+mesh_param_t* mesh_param(mesh_t self, int index)
+{
+    return dynarray_get(self->params, index);
+}
+
+int mesh_param_node(mesh_t self, int index)
+{
+    int* n = (int*) dynarray_get(self->param_nodes, index);
+    return (n == NULL) ? 0 : *n;
+}
+
+@ 
+
+The [[mesh_param_byname]] runs through the parameters and checks if
+any have matching name.  We do not currently check if either the 
+name argument to the function or the names of the parameters in the 
+array are NULL.  If there is no match for the name, we return NULL.
+
+<<functions>>=
+mesh_param_t* mesh_param_byname(mesh_t self, const char* name)
+{
+    mesh_param_t* params = (mesh_param_t*) dynarray_data(self->params);
+    int n = dynarray_count(self->params);
+    int i;
+    for (i = 0; i < n; ++i) {
+        if (strcmp(params[i].name, name) == 0)
+            return &(params[i]);
+    }
+    return NULL;
+}
+
+@ 
+
+<<functions>>=
+int mesh_num_params(mesh_t self)
+{
+    return dynarray_count(self->params);
+}
+
+int mesh_num_param_nodes(mesh_t self)
+{
+    return dynarray_count(self->param_nodes);
+}
+
+@ 
+
+<<functions>>=
+void mesh_params_clear(mesh_t self)
+{
+    dynarray_set_count(self->params, 0);
+    dynarray_set_count(self->param_nodes, 0);
+}
+
+@ 
+
+The parameter conversion routines [[mesh_param_string]],
+[[mesh_param_number]], and [[mesh_param_int]] check parameter
+validity and then pull out the desired value.  Ideally, this
+routine would provide a little more information in its error
+messages (like what the name of the parameter is).  I should
+probably switch over to using variable argument list error
+reporting routines that call [[vfprintf]] (for instance),
+or add a [[mesh_message]] routine in addition to [[mesh_error]]
+and [[mesh_warning]] so that I could assemble the error messages
+before calling [[mesh_error]].  Either way, it would then be
+possible to have a little more flexibility in the error messages.
+
+<<functions>>=
+const char* mesh_param_string(mesh_t self, mesh_param_t* param)
+{
+    if (param == NULL) {
+        mesh_error(self, "Missing parameter");
+        return NULL;
+    } else if (param->tag != MESH_PARAM_STRING) {
+        mesh_error(self, "Parameter should be a string");
+        return NULL;
+    } else
+        return param->val.s;
+}
+
+@ 
+
+<<functions>>=
+double mesh_param_number(mesh_t self, mesh_param_t* param)
+{
+    if (param == NULL) {
+        mesh_error(self, "Missing parameter");
+        return 0;
+    } else if (param->tag != MESH_PARAM_NUMBER) {
+        mesh_error(self, "Parameter should be numeric");
+        return 0;
+    } else 
+        return param->val.d;
+}
+
+@ 
+
+<<functions>>=
+int mesh_param_int(mesh_t self, mesh_param_t* param)
+{
+    double v = mesh_param_number(self, param);
+    if (v != (int) v)
+        mesh_error(self, "Number is not an integer");
+    return (int) v;
+}
+
+@ 
+
+The [[mesh_param_material]] function just checks that the material
+identifier is in range and, if so, passes the pointer onward.
+We might be friendly here and allow the possibility of a name lookup
+as well; that is, if the parameter was a string, we would check
+to see if any of the available materials had a name that matched that
+string.
+
+<<functions>>=
+material_t* mesh_param_material(mesh_t self, mesh_param_t* param)
+{
+    int material_id = mesh_param_int(self, param);
+    if (material_id <= 0 || material_id > mesh_num_materials(self)) {
+        mesh_error(self, "Invalid material identifier");
+        return NULL;
+    } else
+        return mesh_material(self, material_id);
+}
+
+@ 
+
+
+\subsection{Accessing nodes, elements, and materials}
+
+The functions to add to the list of nodes, elements, and materials
+also only do a little more than append to dynamic arrays.  The identifiers
+are the array indices plus one.  We clear the parameter array
+after initializing a new element or material, and we clear the element
+nodes array after initializing a new element.  Note also that we make
+a duplicate of element and material model names to keep in the string table.
+
+<<functions>>=
+int mesh_add_node(mesh_t self, const char* name, double x, double y, double z)
+{
+    mesh_node_t node;
+    node.name = hstrings_add(self->strings, name);
+    node.x[0] = x;
+    node.x[1] = y;
+    node.x[2] = z;
+    dynarray_append(self->nodes, &node);
+    return dynarray_count(self->nodes);
+}
+
+@ 
+
+<<functions>>=
+int mesh_add_element(mesh_t self, const char* model)
+{
+    element_t* element;
+    model = hstrings_add(self->strings, model);
+    element = element_init(self->model_mgr, self, model);
+    dynarray_set_count(self->params, 0);
+    dynarray_set_count(self->param_nodes, 0);
+    dynarray_append(self->elements, &element);
+    return dynarray_count(self->elements);
+}
+
+@ 
+
+<<functions>>=
+int mesh_add_material(mesh_t self, const char* model)
+{
+    material_t* material;
+    model = hstrings_add(self->strings, model);
+    material = material_init(self->model_mgr, self, model);
+    dynarray_set_count(self->params, 0);
+    dynarray_append(self->materials, &material);
+    return dynarray_count(self->materials);
+}
+
+@ 
+
+The functions [[mesh_node]], [[mesh_element]], and [[mesh_material]]
+are little more than wrappers around the corresponding [[dynarray]]
+functions.  Note that a zero or negative index in any case will trigger
+a failed assertion, since the [[dynarray]] module does not permit
+negative indices.
+
+<<functions>>=
+mesh_node_t* mesh_node(mesh_t self, int node_id)
+{
+    return dynarray_get(self->nodes, node_id-1);
+}
+
+element_t* mesh_element(mesh_t self, int element_id)
+{
+    return *(element_t**) dynarray_get(self->elements, element_id-1);
+}
+
+material_t* mesh_material(mesh_t self, int material_id)
+{
+    return *(material_t**) dynarray_get(self->materials, material_id-1);
+}
+
+@ 
+
+Similarly, the [[mesh_num_nodes]], [[mesh_num_elements]], and
+[[mesh_num_materials]] functions are simply wrappers around
+the [[dynarray_count]] function.
+
+<<functions>>=
+int mesh_num_nodes(mesh_t self)
+{
+    return dynarray_count(self->nodes);
+}
+
+int mesh_num_elements(mesh_t self)
+{
+    return dynarray_count(self->elements);
+}
+
+int mesh_num_materials(mesh_t self)
+{
+    return dynarray_count(self->materials);
+}
+
+@ 

@@ -1,0 +1,771 @@
+
+\section{Introduction}
+
+The {\tt{}mesh{\char95}mex} module provides the Matlab interface to the 
+mesh routines.
+
+
+\section{Interface}
+
+\nwfilename{mesh-mex.nw}\nwbegincode{1}\sublabel{NWmesB-mesA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mesA-1}}}\moddef{mesh-mex.h~{\nwtagstyle{}\subpageref{NWmesB-mesA-1}}}\endmoddef
+#ifndef MESH_MEX_H
+#define MESH_MEX_H
+
+#include <mex.h>
+#include "mesh.h"
+
+void mesh_mex_register();
+void mesh_mex_shutdown();
+int  mesh_mex_handle_tag();
+
+mesh_t       mx_to_mesh    (const mxArray* array);
+mesh_node_t* mx_to_node    (mesh_t mesh, const mxArray* array);
+material_t*  mx_to_material(mesh_t mesh, const mxArray* array);
+mxArray*     mx_from_param (mesh_param_t* param);
+mxArray*     mx_from_params(mesh_t mesh);
+
+#endif /* MESH_MEX_H */
+\nwnotused{mesh-mex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}mesh{\char95}mex{\char95}register} command registers {\tt{}addpath},
+{\tt{}use}, {\tt{}freemesh}, and {\tt{}printmesh} commands with
+the main MEX routine.
+
+The {\tt{}mesh{\char95}mex{\char95}shutdown} command frees the local memory
+associated with the {\tt{}mesh{\char95}mex} routines.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWmesB-mesA.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mesA.2-1}}}\moddef{mesh-mex.c~{\nwtagstyle{}\subpageref{NWmesB-mesA.2-1}}}\endmoddef
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lua.h>
+#include <lualib.h>
+
+#include "modelmgr.h"
+#include "model-test.h"
+#include "model-matlab.h"
+#include "uses-manager.h"
+#include "netout.h"
+#include "netout-file.h"
+#include "netout-mlab.h"
+
+#include "mex-handle.h"
+#include "sugarmex.h"
+#include "mesh-mex.h"
+
+#include "uses-manager-lua.h"
+#include "meshgen-lua.h"
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NWmesB-staB-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}\RA{}
+\LA{}mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}\RA{}
+\nwnotused{mesh-mex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Mesh reader data structures}
+
+The {\tt{}pool}, {\tt{}model{\char95}mgr}, and {\tt{}uses{\char95}mgr} are the main memory
+pool, model manager, and path manager, respectively.  It makes sense
+for each of those objects to have global lifetime, so this is not
+a terrible place for them.
+
+The handle tag type for a mesh handle is {\tt{}mesh{\char95}handle{\char95}tag}.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWmesB-staB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staB-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWmesB-staB-1}}}\endmoddef
+static mempool_t       pool;
+static model_mgr_t     model_mgr;
+static uses_manager_t  uses_mgr;
+static int             mesh_handle_tag;
+
+\nwused{\\{NWmesB-mesA.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWmesB-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\endmoddef
+void mesh_mex_register()
+\{
+    pool      = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr = model_mgr_init();
+    uses_mgr  = uses_manager_create(pool);
+
+    uses_manager_envpath(uses_mgr, "SUGAR_LUA_PATH");
+
+    model_test_register         (model_mgr);
+    model_matlab_register       (model_mgr);
+    model_mf2wrap_register      (model_mgr);
+    model_mgr_standard_register (model_mgr);
+
+    mesh_handle_tag = mex_handle_new_tag();
+    \LA{}register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}\RA{}
+\}
+
+\nwalsodefined{\\{NWmesB-fun9-2}\\{NWmesB-fun9-3}\\{NWmesB-fun9-4}\\{NWmesB-fun9-5}\\{NWmesB-fun9-6}\\{NWmesB-fun9-7}\\{NWmesB-fun9-8}}\nwused{\\{NWmesB-mesA.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWmesB-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\plusendmoddef
+void mesh_mex_shutdown()
+\{
+    mempool_destroy   (pool);
+    model_mgr_destroy (model_mgr);
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWmesB-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\plusendmoddef
+int mesh_mex_handle_tag()
+\{
+    return mesh_handle_tag;
+\}
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\subsection{Conversion functions}
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWmesB-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\plusendmoddef
+mesh_t mx_to_mesh(const mxArray* array)
+\{
+    return mx_to_handle(array, mesh_handle_tag, "Invalid mesh handle");
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWmesB-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\plusendmoddef
+mesh_node_t* mx_to_node(mesh_t mesh, const mxArray* array)
+\{
+    int node_id;
+    mesh_node_t* node;
+
+    if (!mxIsNumeric(array))
+        mexErrMsgTxt("Invalid node identifier");
+
+    node_id = (int) mx_to_double(array);
+    node = mesh_node(mesh, node_id);
+    if (node == NULL)
+        mexErrMsgTxt("Invalid node identifier");
+
+    return node;
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWmesB-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\plusendmoddef
+material_t* mx_to_material(mesh_t mesh, const mxArray* array)
+\{
+    int material_id;
+    material_t* material;
+
+    if (!mxIsNumeric(array))
+        mexErrMsgTxt("Invalid material identifier");
+
+    material_id = (int) mx_to_double(array);
+    material = mesh_material(mesh, material_id);
+    if (material == NULL)
+        mexErrMsgTxt("Invalid node identifier");
+
+    return material;
+\}
+
+\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWmesB-fun9-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\plusendmoddef
+mxArray* mx_from_param(mesh_param_t* param)
+\{
+    mxArray* value;
+
+    if (param == NULL) \{
+        value = mxCreateDoubleMatrix(0, 0, mxREAL);
+    \} else if (param->tag == MESH_PARAM_NUMBER) \{
+        value = mx_from_double(param->val.d);
+    \} else if (param->tag == MESH_PARAM_STRING) \{
+        value = mxCreateString(param->val.s);
+    \} else if (param->tag == MESH_PARAM_MATRIX) \{
+        value = mxCreateDoubleMatrix(param->val.m.m, param->val.m.n, mxREAL);
+        memcpy(mxGetPr(value), param->val.m.data,
+               param->val.m.m * param->val.m.n * sizeof(double));
+    \} else
+        mxAssert(0, "Invalid SUGAR parameter type");
+    
+    return value;
+\}
+
+\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWmesB-fun9-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-fun9-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWmesB-fun9-1}}}\plusendmoddef
+mxArray* mx_from_params(mesh_t mesh)
+\{
+    int i, n;
+    const char** names;
+    mxArray* result;
+
+    n     = mesh_num_params(mesh);
+    names = mxCalloc(n, sizeof(char*));
+    for (i = 0; i < n; ++i)
+        names[i] = mesh_param(mesh, i)->name;
+
+    result = mxCreateStructMatrix(1,1,n,names);
+    mxFree(names);
+
+    for (i = 0; i < n; ++i)
+        mxSetFieldByNumber(result, 0, i, mx_from_param(mesh_param(mesh, i)));
+
+    return result;
+\}
+
+\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+
+\subsection{{\tt{}addpath} command}
+
+The {\tt{}addpath(path)} function adds {\tt{}path} to the 
+{\tt{}uses} manager search path.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWmesB-choD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choD-1}}}\moddef{cho-addpath.m~{\nwtagstyle{}\subpageref{NWmesB-choD-1}}}\endmoddef
+function cho_addpath(path)
+sugarmex('addpath', path);
+\nwnotused{cho-addpath.m}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWmesB-regM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\endmoddef
+mexmgr_add("addpath", mex_addpath);
+\nwalsodefined{\\{NWmesB-regM-2}\\{NWmesB-regM-3}\\{NWmesB-regM-4}\\{NWmesB-regM-5}\\{NWmesB-regM-6}\\{NWmesB-regM-7}\\{NWmesB-regM-8}\\{NWmesB-regM-9}\\{NWmesB-regM-A}\\{NWmesB-regM-B}}\nwused{\\{NWmesB-fun9-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWmesB-mexD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\endmoddef
+static void mex_addpath(int nlhs, mxArray* plhs[],
+                        int nrhs, const mxArray* prhs[])
+\{
+    int i;
+    for (i = 0; i < nrhs; ++i) \{
+        char* name = mx_to_string(prhs[i]);
+        uses_manager_addpath(uses_mgr, name);
+        mxFree(name);
+    \}
+\}
+
+\nwalsodefined{\\{NWmesB-mexD-2}\\{NWmesB-mexD-3}\\{NWmesB-mexD-4}\\{NWmesB-mexD-5}\\{NWmesB-mexD-6}\\{NWmesB-mexD-7}\\{NWmesB-mexD-8}\\{NWmesB-mexD-9}\\{NWmesB-mexD-A}\\{NWmesB-mexD-B}\\{NWmesB-mexD-C}}\nwused{\\{NWmesB-mesA.2-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+
+\subsection{{\tt{}load} command}
+
+The {\tt{}load(file)} function finds the (Lua) netlist {\tt{}file} and
+executes it.  The function returns a handle to the generated mesh.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWmesB-choA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choA-1}}}\moddef{cho-load.m~{\nwtagstyle{}\subpageref{NWmesB-choA-1}}}\endmoddef
+function [handle] = cho_load(file, params)
+if nargin == 1
+  handle = sugarmex('use', file);
+else
+  handle = sugarmex('use', file, params);
+end
+\nwnotused{cho-load.m}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWmesB-regM-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-2}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("use", mex_use);
+\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWmesB-mexD-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-2}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_use(int nlhs, mxArray* plhs[],
+                    int nrhs, const mxArray* prhs[])
+\{
+    char        name[256];
+    mesh_t      mesh;
+    lua_State*  L;
+
+    if (nrhs < 1 || !mxIsChar(prhs[0]))
+        mexErrMsgTxt("Syntax: sugarmex('use', filename, [params])");
+
+    mxGetString(prhs[0], name, sizeof(name));
+    if (uses_manager_search(uses_mgr, name, sizeof(name)) == NULL) \{
+        mexPrintf("Could not find %s\\n", name);
+        mexErrMsgTxt("Error loading file");
+    \}
+    
+    L = lua_open(0);
+
+    lua_usesmgrlib(L);
+    lua_set_usesmgr(L, uses_mgr);
+    lua_baselibopen(L);
+    lua_mathlibopen(L);
+    lua_register(L, "_ALERT", lua_alert);
+
+    if (nrhs >= 2) \{
+        if (mxIsStruct(prhs[1])) \{
+            \LA{}transfer parameters to Lua environment~{\nwtagstyle{}\subpageref{NWmesB-trac-1}}\RA{}
+        \} else \{
+            lua_close(L);
+            mexErrMsgTxt("Parameters must be passed via structure");
+        \}
+    \}
+
+    mesh = mesh_lua_load(L, uses_mgr, name, model_mgr, lua_mesh_error_handler);
+    lua_close(L);
+
+    if (mesh == NULL)
+        mexErrMsgTxt("Error while interpreting net file");
+
+    if (nlhs == 0) \{
+        mesh_destroy(mesh);
+    \} else \{
+        mesh_set_handlers(mesh, matlab_mesh_error_handler, 
+                          matlab_mesh_warning_handler, NULL);
+        plhs[0] = mx_from_double(mex_handle_add(mesh, mesh_handle_tag));
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWmesB-trac-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-trac-1}}}\moddef{transfer parameters to Lua environment~{\nwtagstyle{}\subpageref{NWmesB-trac-1}}}\endmoddef
+const mxArray* params = prhs[1];
+int nfields = mxGetNumberOfFields(params);
+int ifield;
+
+for (ifield = 0; ifield < nfields; ++ifield) \{
+    const char* name = mxGetFieldNameByNumber(params, ifield);
+    mxArray* field = mxGetFieldByNumber(params, 0, ifield);
+    if (mxIsChar(field)) \{
+        lua_pushstring(L, mx_to_string(field));
+    \} else if (mxIsDouble(field)) \{
+        lua_pushnumber(L, *mxGetPr(field));
+    \} else \{
+        lua_close(L);
+        mexErrMsgTxt("Only real scalars and strings allowed");
+    \}
+    lua_setglobal(L, name);
+\}
+
+\nwused{\\{NWmesB-mexD-2}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+After the initial phase where we use Lua, we want any mesh errors
+to be reported via the standard Matlab reporting functions.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWmesB-staG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\endmoddef
+static void matlab_mesh_error_handler(void* arg, const char* msg)
+\{
+    mexErrMsgTxt(msg);
+\}
+
+static void matlab_mesh_warning_handler(void* arg, const char* msg)
+\{
+    mexPrintf("Warning: %s\\n", msg);
+\}
+
+\nwalsodefined{\\{NWmesB-staG-2}\\{NWmesB-staG-3}}\nwused{\\{NWmesB-mesA.2-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+When we are inside Lua, we make mesh errors generate Lua errors.
+The Lua errors in turn generate calls to {\tt{}{\char95}ALERT}, which prints
+using the MEX version of {\tt{}printf}.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWmesB-staG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static void lua_mesh_error_handler(void* arg, const char* msg)
+\{
+    lua_State* L = (lua_State*) arg;
+    lua_error(L, msg);
+\}
+
+\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWmesB-staG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-staG-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWmesB-staG-1}}}\plusendmoddef
+static int lua_alert(lua_State* L)
+\{
+    int n = lua_gettop(L);  /* number of arguments */
+    const char* s;
+
+    lua_getglobal(L, "tostring");
+    lua_pushvalue(L, 1);
+    lua_rawcall(L, 1, 1);
+
+    s = lua_tostring(L, -1);
+    if (s != NULL)
+        mexPrintf("%s", s);
+
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+
+\subsection{{\tt{}freemesh} command}
+
+The {\tt{}mesh{\char95}free(handle)} function frees the mesh indicated by {\tt{}handle}.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWmesB-choF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choF-1}}}\moddef{cho-mesh-free.m~{\nwtagstyle{}\subpageref{NWmesB-choF-1}}}\endmoddef
+function cho_mesh_free(handle)
+sugarmex('mesh_free', handle);
+\nwnotused{cho-mesh-free.m}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWmesB-regM-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-3}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_free", mex_mesh_free);
+\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWmesB-mexD-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-3}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_mesh_free(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    mesh_destroy(mx_to_mesh(prhs[0]));
+\}
+
+\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+
+\subsection{{\tt{}printmesh} command}
+
+The {\tt{}cho{\char95}mesh{\char95}print(handle)} function prints a text representation of the
+mesh indicated by {\tt{}handle}.
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWmesB-choG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choG-1}}}\moddef{cho-mesh-print.m~{\nwtagstyle{}\subpageref{NWmesB-choG-1}}}\endmoddef
+function cho_mesh_print(handle)
+sugarmex('mesh_print', handle);
+\nwnotused{cho-mesh-print.m}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWmesB-regM-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-4}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_print", mex_printmesh);
+\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWmesB-mexD-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-4}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_printmesh(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    netout_file(stdout, mx_to_mesh(prhs[0]));
+\}
+
+\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+
+\subsection{{\tt{}mesh{\char95}to{\char95}matlab} command}
+
+The {\tt{}mesh{\char95}to{\char95}matlab(mesh)} command generates a Matlab data structure
+representing the mesh.  The generated structure has the same entries
+as the output from a {\tt{}mesh{\char95}print} command.
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWmesB-choK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choK-1}}}\moddef{cho-mesh-to-matlab.m~{\nwtagstyle{}\subpageref{NWmesB-choK-1}}}\endmoddef
+function [meshm] = cho_mesh_to_matlab(handle)
+meshm = sugarmex('mesh_to_matlab', handle);
+\nwnotused{cho-mesh-to-matlab.m}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWmesB-regM-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-5}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_to_matlab", mex_mesh_to_matlab);
+\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NWmesB-mexD-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-5}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_mesh_to_matlab(int nlhs, mxArray* plhs[],
+                               int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = netout_mlab(mx_to_mesh(prhs[0]));
+\}
+
+\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+
+\subsection{{\tt{}mesh{\char95}nelements}, {\tt{}mesh{\char95}nnodes}, 
+             and {\tt{}mesh{\char95}nmaterials} commands}
+
+The commands {\tt{}mesh{\char95}nelements(mesh{\char95}handle)}, {\tt{}mesh{\char95}nnodes(mesh{\char95}handle)},
+and {\tt{}mesh{\char95}nmaterials(mesh{\char95}handle)} get the number of elements, nodes,
+and materials in the mesh.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NWmesB-choK.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choK.2-1}}}\moddef{cho-mesh-nelements.m~{\nwtagstyle{}\subpageref{NWmesB-choK.2-1}}}\endmoddef
+function [count] = cho_mesh_nnodes(handle)
+count = sugarmex('mesh_nelements', handle);
+\nwnotused{cho-mesh-nelements.m}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NWmesB-choL-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choL-1}}}\moddef{cho-mesh-nmaterials.m~{\nwtagstyle{}\subpageref{NWmesB-choL-1}}}\endmoddef
+function [count] = cho_mesh_nmaterials(handle)
+count = sugarmex('mesh_nmaterials', handle);
+\nwnotused{cho-mesh-nmaterials.m}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NWmesB-choH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choH-1}}}\moddef{cho-mesh-nnodes.m~{\nwtagstyle{}\subpageref{NWmesB-choH-1}}}\endmoddef
+function [count] = cho_mesh_nnodes(handle)
+count = sugarmex('mesh_nnodes', handle)
+\nwnotused{cho-mesh-nnodes.m}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NWmesB-regM-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-6}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_nelements",  mex_num_elements );
+mexmgr_add("mesh_nmaterials", mex_num_materials);
+mexmgr_add("mesh_nnodes",     mex_num_nodes    );
+\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NWmesB-mexD-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-6}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_num_elements(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_elements(mx_to_mesh(prhs[0])));
+\}
+
+static void mex_num_materials(int nlhs, mxArray* plhs[],
+                              int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_materials(mx_to_mesh(prhs[0])));
+\}
+
+static void mex_num_nodes(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_nodes(mx_to_mesh(prhs[0])));
+\}
+
+\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+
+\subsection{{\tt{}mesh{\char95}node{\char95}pos} and {\tt{}mesh{\char95}node{\char95}name} commands}
+
+The {\tt{}mesh{\char95}node{\char95}pos(mesh{\char95}handle,\ node{\char95}id)} and 
+{\tt{}mesh{\char95}node{\char95}name(mesh{\char95}handle,\ node{\char95}id)} commands find the name
+and position of an indicated node.
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NWmesB-choF.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choF.2-1}}}\moddef{cho-mesh-node.m~{\nwtagstyle{}\subpageref{NWmesB-choF.2-1}}}\endmoddef
+function [node] = cho_mesh_node(handle, node_id)
+
+node.name = sugarmex('mesh_node_name', handle, node_id);
+node.x    = sugarmex('mesh_node_pos',  handle, node_id);
+\nwnotused{cho-mesh-node.m}\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NWmesB-regM-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-7}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_node_pos", mex_get_node_pos);
+mexmgr_add("mesh_node_name", mex_get_node_name);
+\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NWmesB-mexD-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-7}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_get_node_name(int nlhs, mxArray* plhs[],
+                              int nrhs, const mxArray* prhs[])
+\{
+    mesh_t       mesh;
+    mesh_node_t* node;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+    node = mx_to_node(mesh, prhs[1]);
+
+    plhs[0] = mxCreateString((node->name != NULL) ? node->name : "");
+\}
+
+static void mex_get_node_pos(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+\{
+    mesh_t       mesh;
+    mesh_node_t* node;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+    node = mx_to_node(mesh, prhs[1]);
+
+    plhs[0] = mxCreateDoubleMatrix(3,1,mxREAL);
+    memcpy(mxGetPr(plhs[0]), node->x, 3 * sizeof(double));
+\}
+
+\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+
+\subsection{{\tt{}mesh{\char95}node{\char95}lookup} command}
+
+The {\tt{}mesh{\char95}node{\char95}lookup(mesh{\char95}handle,\ node{\char95}name)} command
+finds the index of a node with a particular name.
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NWmesB-choM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choM-1}}}\moddef{cho-mesh-node-lookup.m~{\nwtagstyle{}\subpageref{NWmesB-choM-1}}}\endmoddef
+function [node] = cho_mesh_node_lookup(handle, nodename)
+node = sugarmex('mesh_node_lookup', handle, nodename);
+\nwnotused{cho-mesh-node-lookup.m}\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NWmesB-regM-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-8}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_node_lookup", mex_mesh_node_lookup);
+\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NWmesB-mexD-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-8}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_mesh_node_lookup(int nlhs, mxArray* plhs[],
+                                 int nrhs, const mxArray* prhs[])
+\{
+    mesh_t       mesh;
+    mesh_node_t* node;
+    const char*  name;
+    int          nnodes;
+    int          i;
+
+    mex_check_num_args(nrhs, 2);
+    mesh = mx_to_mesh(prhs[0]);
+    name = mx_to_string(prhs[1]);
+    nnodes = mesh_num_nodes(mesh);
+
+    for (i = 1; i <= nnodes; ++i) \{
+        if (strcmp(name, mesh_node(mesh, i)->name) == 0) \{
+            plhs[0] = mx_from_double(i);
+            return;
+        \}
+    \}
+
+    plhs[0] = mx_from_nil();
+\}
+
+\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+
+
+\subsection{{\tt{}mesh{\char95}material{\char95}param} command}
+
+The {\tt{}mesh{\char95}material{\char95}param(mesh,\ material{\char95}id,\ name)} command gets a
+parameter from a specified material.
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NWmesB-choP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choP-1}}}\moddef{cho-mesh-material-param.m~{\nwtagstyle{}\subpageref{NWmesB-choP-1}}}\endmoddef
+function [param] = cho_mesh_material_param(handle, material, name)
+param = sugarmex('mesh_material_param', handle, material, name);
+\nwnotused{cho-mesh-material-param.m}\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NWmesB-regM-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-9}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_material_param", mex_material_param);
+\nwendcode{}\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}\nwbegincode{87}\sublabel{NWmesB-mexD-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-9}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_material_param(int nlhs, mxArray* plhs[],
+                               int nrhs, const mxArray* prhs[])
+\{
+    mesh_t        mesh;
+    material_t*   material;
+    char*         name;
+    mesh_param_t* param;
+
+    mex_check_num_args(nrhs, 3);
+    mesh     = mx_to_mesh(prhs[0]);
+    material = mx_to_material(mesh, prhs[1]);
+    name     = mx_to_string(prhs[2]);
+
+    if (material->model->param)
+        param = (material->model->param)(material->data, name);
+
+    mxFree(name);
+    plhs[0] = mx_from_param(param);
+\}
+
+\nwendcode{}\nwbegindocs{88}\nwdocspar
+
+
+\subsection{{\tt{}mesh{\char95}param}}
+
+The {\tt{}mesh{\char95}param(mesh,\ id)} function gets a parameter by name or
+numeric identifier.  The {\tt{}mesh{\char95}params(mesh)} function gets all
+the parameters in a structure.  The Matlab interface function
+can be called as {\tt{}cho{\char95}mesh{\char95}param(mesh)} to get all parameters
+in a structure, {\tt{}cho{\char95}mesh{\char95}param(mesh,\ name)} to get a named
+parameter, or {\tt{}cho{\char95}mesh{\char95}param(mesh,\ material,\ name)} to get a named
+parameter from material or mesh.
+
+\nwenddocs{}\nwbegincode{89}\sublabel{NWmesB-choG.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choG.2-1}}}\moddef{cho-mesh-param.m~{\nwtagstyle{}\subpageref{NWmesB-choG.2-1}}}\endmoddef
+function [param] = cho_mesh_param(mesh, arg1, arg2)
+
+if nargin == 1
+    param = sugarmex('mesh_params', mesh);
+elseif nargin == 2
+    param = sugarmex('mesh_param', mesh, arg1);
+elseif nargin == 3
+    param = sugarmex('mesh_param', mesh, arg2);
+    if (isempty(param))
+        param = sugarmex('mesh_material_param', mesh, arg1, arg2)
+    end
+end
+\nwnotused{cho-mesh-param.m}\nwendcode{}\nwbegindocs{90}\nwdocspar
+
+\nwenddocs{}\nwbegincode{91}\sublabel{NWmesB-regM-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-A}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_param",  mex_mesh_param );
+mexmgr_add("mesh_params", mex_mesh_params);
+\nwendcode{}\nwbegindocs{92}\nwdocspar
+
+\nwenddocs{}\nwbegincode{93}\sublabel{NWmesB-mexD-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-A}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_mesh_params(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    mesh_t mesh;
+    int i, n;
+    const char** names;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+
+    plhs[0] = mx_from_params(mesh);
+\}
+
+\nwendcode{}\nwbegindocs{94}\nwdocspar
+
+\nwenddocs{}\nwbegincode{95}\sublabel{NWmesB-mexD-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-B}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_mesh_param(int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[])
+\{
+    mesh_t mesh;
+
+    mex_check_num_args(nrhs, 2);
+    mesh = mx_to_mesh(prhs[0]);
+
+    if (mxIsChar(prhs[1])) \{
+        char* name = mx_to_string(prhs[1]);
+        plhs[0] = mx_from_param(mesh_param_byname(mesh, name));
+    \} else \{
+        int i = (int) mx_to_double(prhs[1]);
+        plhs[0] = mx_from_param(mesh_param(mesh, i));
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{96}\nwdocspar
+
+
+\subsection{{\tt{}mesh{\char95}nodes}}
+
+The {\tt{}mesh{\char95}nodes(mesh)} function returns the current vector of node
+identifiers.
+
+\nwenddocs{}\nwbegincode{97}\sublabel{NWmesB-choM.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-choM.2-1}}}\moddef{cho-mesh-param-nodes.m~{\nwtagstyle{}\subpageref{NWmesB-choM.2-1}}}\endmoddef
+function [nodes] = cho_mesh_param_nodes(mesh)
+nodes = sugarmex('mesh_param_nodes', mesh);
+\nwnotused{cho-mesh-param-nodes.m}\nwendcode{}\nwbegindocs{98}\nwdocspar
+
+\nwenddocs{}\nwbegincode{99}\sublabel{NWmesB-regM-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-regM-B}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWmesB-regM-1}}}\plusendmoddef
+mexmgr_add("mesh_param_nodes", mex_mesh_param_nodes);
+\nwendcode{}\nwbegindocs{100}\nwdocspar
+
+\nwenddocs{}\nwbegincode{101}\sublabel{NWmesB-mexD-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWmesB-mexD-C}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWmesB-mexD-1}}}\plusendmoddef
+static void mex_mesh_param_nodes(int nhls, mxArray* plhs[],
+                                 int nrhs, const mxArray* prhs[])
+\{
+    mesh_t mesh;
+    int i, n;
+    double* data;
+
+    mex_check_num_args(nrhs, 1);    
+    mesh = mx_to_mesh(prhs[0]);
+
+    n = mesh_num_param_nodes(mesh);
+    plhs[0] = mxCreateDoubleMatrix(n,1,mxREAL);
+
+    data = mxGetPr(plhs[0]);
+    for (i = 0; i < n; ++i)
+        data[i] = mesh_param_node(mesh, i);
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{cho-addpath.m}{NWmesB-choD-1}{\nwixd{NWmesB-choD-1}}}%
+\nwixlogsorted{c}{{cho-load.m}{NWmesB-choA-1}{\nwixd{NWmesB-choA-1}}}%
+\nwixlogsorted{c}{{cho-mesh-free.m}{NWmesB-choF-1}{\nwixd{NWmesB-choF-1}}}%
+\nwixlogsorted{c}{{cho-mesh-material-param.m}{NWmesB-choP-1}{\nwixd{NWmesB-choP-1}}}%
+\nwixlogsorted{c}{{cho-mesh-nelements.m}{NWmesB-choK.2-1}{\nwixd{NWmesB-choK.2-1}}}%
+\nwixlogsorted{c}{{cho-mesh-nmaterials.m}{NWmesB-choL-1}{\nwixd{NWmesB-choL-1}}}%
+\nwixlogsorted{c}{{cho-mesh-nnodes.m}{NWmesB-choH-1}{\nwixd{NWmesB-choH-1}}}%
+\nwixlogsorted{c}{{cho-mesh-node-lookup.m}{NWmesB-choM-1}{\nwixd{NWmesB-choM-1}}}%
+\nwixlogsorted{c}{{cho-mesh-node.m}{NWmesB-choF.2-1}{\nwixd{NWmesB-choF.2-1}}}%
+\nwixlogsorted{c}{{cho-mesh-param.m}{NWmesB-choG.2-1}{\nwixd{NWmesB-choG.2-1}}}%
+\nwixlogsorted{c}{{cho-mesh-param-nodes.m}{NWmesB-choM.2-1}{\nwixd{NWmesB-choM.2-1}}}%
+\nwixlogsorted{c}{{cho-mesh-print.m}{NWmesB-choG-1}{\nwixd{NWmesB-choG-1}}}%
+\nwixlogsorted{c}{{cho-mesh-to-matlab.m}{NWmesB-choK-1}{\nwixd{NWmesB-choK-1}}}%
+\nwixlogsorted{c}{{functions}{NWmesB-fun9-1}{\nwixu{NWmesB-mesA.2-1}\nwixd{NWmesB-fun9-1}\nwixd{NWmesB-fun9-2}\nwixd{NWmesB-fun9-3}\nwixd{NWmesB-fun9-4}\nwixd{NWmesB-fun9-5}\nwixd{NWmesB-fun9-6}\nwixd{NWmesB-fun9-7}\nwixd{NWmesB-fun9-8}}}%
+\nwixlogsorted{c}{{mesh-mex.c}{NWmesB-mesA.2-1}{\nwixd{NWmesB-mesA.2-1}}}%
+\nwixlogsorted{c}{{mesh-mex.h}{NWmesB-mesA-1}{\nwixd{NWmesB-mesA-1}}}%
+\nwixlogsorted{c}{{mex functions}{NWmesB-mexD-1}{\nwixu{NWmesB-mesA.2-1}\nwixd{NWmesB-mexD-1}\nwixd{NWmesB-mexD-2}\nwixd{NWmesB-mexD-3}\nwixd{NWmesB-mexD-4}\nwixd{NWmesB-mexD-5}\nwixd{NWmesB-mexD-6}\nwixd{NWmesB-mexD-7}\nwixd{NWmesB-mexD-8}\nwixd{NWmesB-mexD-9}\nwixd{NWmesB-mexD-A}\nwixd{NWmesB-mexD-B}\nwixd{NWmesB-mexD-C}}}%
+\nwixlogsorted{c}{{register mex functions}{NWmesB-regM-1}{\nwixu{NWmesB-fun9-1}\nwixd{NWmesB-regM-1}\nwixd{NWmesB-regM-2}\nwixd{NWmesB-regM-3}\nwixd{NWmesB-regM-4}\nwixd{NWmesB-regM-5}\nwixd{NWmesB-regM-6}\nwixd{NWmesB-regM-7}\nwixd{NWmesB-regM-8}\nwixd{NWmesB-regM-9}\nwixd{NWmesB-regM-A}\nwixd{NWmesB-regM-B}}}%
+\nwixlogsorted{c}{{static data}{NWmesB-staB-1}{\nwixu{NWmesB-mesA.2-1}\nwixd{NWmesB-staB-1}}}%
+\nwixlogsorted{c}{{static functions}{NWmesB-staG-1}{\nwixu{NWmesB-mesA.2-1}\nwixd{NWmesB-staG-1}\nwixd{NWmesB-staG-2}\nwixd{NWmesB-staG-3}}}%
+\nwixlogsorted{c}{{transfer parameters to Lua environment}{NWmesB-trac-1}{\nwixu{NWmesB-mexD-2}\nwixd{NWmesB-trac-1}}}%
+\nwbegindocs{102}\nwdocspar
+
+\nwenddocs{}

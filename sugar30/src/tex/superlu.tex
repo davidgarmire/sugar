@@ -1,0 +1,244 @@
+
+\section{Introduction}
+
+This package provides a wrapper around the SuperLU solver package.
+The module can only be used if the {\tt{}HAS{\char95}SUPERLU} macro is defined.
+
+
+\section{Interface}
+
+\nwfilename{superlu.nw}\nwbegincode{1}\sublabel{NWsupA-sup9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-sup9-1}}}\moddef{superlu.h~{\nwtagstyle{}\subpageref{NWsupA-sup9-1}}}\endmoddef
+#ifndef SUPERLU_H
+#define SUPERLU_H
+
+#include "assemblem-sparse.h"
+
+typedef struct superlu_struct* superlu_t;
+
+superlu_t superlu_create  (assemble_matrix_t* assembler, int n);
+void      superlu_destroy (superlu_t self);
+void      superlu_print   (superlu_t self);
+void      superlu_factor  (superlu_t self);
+void      superlu_solve   (superlu_t self, double* b);
+int       superlu_n       (superlu_t self);
+
+#endif /* SUPERLU_H   */
+\nwnotused{superlu.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\tt{}superlu{\char95}create} constructor takes a sparse matrix assembler and
+builds from it a SuperLU solver object.  The memory used by the sparse
+matrix assembler is currently copied, in order to avoid confusion
+about who owns what space.  This may be changed later.  The {\tt{}destroy}
+method destroys the internal copies along with everything else.
+
+The {\tt{}print} method prints a text representation of the matrix to the
+screen.  The output is a raw dump of the matrix data and indexing vectors,
+and is not particularly pretty.  This is mostly for debugging purposes.
+
+The {\tt{}factor} method calls the SuperLU factorization routine, and
+the {\tt{}solve} method uses the factors to solve the system $Ax = b$.
+The {\tt{}solve} routine overwrites the storage for $b$ with $x$.
+
+This interface should eventually be extended so that elements of the
+data structures (the indexing structure, row permutation, etc) can
+be re-used.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWsupA-sup9.2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-sup9.2-1}}}\moddef{superlu.c~{\nwtagstyle{}\subpageref{NWsupA-sup9.2-1}}}\endmoddef
+#ifdef HAS_SUPERLU
+
+#include <stdlib.h>
+#include <assert.h>
+
+#include <dsp_defs.h>
+#include <util.h>
+
+#include "superlu.h"
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWsupA-typ5-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWsupA-fun9-1}}\RA{}
+
+#endif /* HAS_SUPERLU */
+\nwnotused{superlu.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The structure of this module is mostly copied from the first example
+in the SuperLU user's guide. %'
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWsupA-typ5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-typ5-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWsupA-typ5-1}}}\endmoddef
+struct superlu_struct \{
+    SuperMatrix A;
+    SuperMatrix L;
+    SuperMatrix U;
+    int  is_factored;
+
+    int* perm_r;
+    int* perm_c;
+    int* etree;
+
+    double* row_scales;
+    double* col_scales;
+    double rowcnd, colcnd, Amax;
+    char equed;
+
+    int  n;
+\};
+
+\nwused{\\{NWsupA-sup9.2-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The matrix {\tt{}A} is the original column-compressed matrix, which
+we initialize from the sparse matrix assembler data.  The {\tt{}A} matrix
+has dimensions {\tt{}n} by {\tt{}n}.  Once the {\tt{}factor} method has been
+called, {\tt{}is{\char95}factored} is set to true, the {\tt{}L} and {\tt{}U} matrices
+are filled with the factorization data, and {\tt{}perm{\char95}r} and {\tt{}perm{\char95}c}
+are filled with the row and column permutations.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWsupA-fun9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-fun9-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsupA-fun9-1}}}\endmoddef
+superlu_t superlu_create(assemble_matrix_t* assembler, int n)
+\{
+    superlu_t self = calloc(1, sizeof(*self));
+
+    int     nnz    = assembler_sparse_nnz(assembler);
+    double* nzval  = doubleCalloc( nnz );
+    int*    rowind = intCalloc   ( nnz );
+    int*    colptr = intCalloc   ( n+1 );
+
+    memcpy( nzval,  assembler_sparse_nzval(assembler),  nnz  * sizeof(double));
+    memcpy( rowind, assembler_sparse_rowind(assembler), nnz  * sizeof(int) );
+    memcpy( colptr, assembler_sparse_colptr(assembler), (n+1) * sizeof(int) );
+
+    self->n = n;
+    dCreate_CompCol_Matrix(&(self->A), n, n, nnz, nzval, rowind, colptr,
+                           NC, _D, GE);
+
+    self->perm_c = intMalloc( n );
+    self->perm_r = intMalloc( n );
+    self->etree  = intMalloc( n );
+
+    self->col_scales = doubleMalloc( n );
+    self->row_scales = doubleMalloc( n );
+
+    return self;
+\}
+
+\nwalsodefined{\\{NWsupA-fun9-2}\\{NWsupA-fun9-3}\\{NWsupA-fun9-4}\\{NWsupA-fun9-5}\\{NWsupA-fun9-6}}\nwused{\\{NWsupA-sup9.2-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWsupA-fun9-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-fun9-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsupA-fun9-1}}}\plusendmoddef
+void superlu_destroy(superlu_t self)
+\{
+    if (self->is_factored) \{
+        Destroy_SuperNode_Matrix (&(self->L));
+        Destroy_CompCol_Matrix   (&(self->U));
+    \}
+    SUPERLU_FREE(self->row_scales);
+    SUPERLU_FREE(self->col_scales);
+    SUPERLU_FREE(self->perm_r);
+    SUPERLU_FREE(self->perm_c);
+    SUPERLU_FREE(self->etree);
+    Destroy_CompCol_Matrix(&(self->A));
+    free(self);
+\}
+
+\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWsupA-fun9-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-fun9-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsupA-fun9-1}}}\plusendmoddef
+void superlu_print(superlu_t self)
+\{
+    dPrint_CompCol_Matrix("A", &(self->A));
+    if (self->is_factored) \{
+        dPrint_CompCol_Matrix   ("U", &(self->U));
+        dPrint_SuperNode_Matrix ("L", &(self->L));
+    \}
+\}
+
+\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+The {\tt{}factor} and {\tt{}solve} methods were buily by cutting and copying
+from the SuperLU {\tt{}dgssv} routine.  Once the error handling, timing,
+and transposition code were removed, the resulting routines proved
+not to be that long.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWsupA-fun9-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-fun9-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsupA-fun9-1}}}\plusendmoddef
+void superlu_factor(superlu_t self)
+\{
+    char* refact = "N";
+    SuperMatrix AC;     /* Matrix postmultiplied by Pc */
+    int lwork = 0;
+    int info;
+    int permc_spec = 2; /* Minimum degree on A + A^T */
+    
+    double diag_pivot_thresh = 1.0;
+    double drop_tol          = 0;
+    int    panel_size = sp_ienv(1); /* panel size */
+    int    relax      = sp_ienv(2); /* no of columns in a relaxed snodes */
+
+    if (self->is_factored)
+        return;
+
+    get_perm_c(permc_spec, &(self->A), self->perm_c);
+
+    StatInit(panel_size, relax);
+ 
+    sp_preorder(refact, &(self->A), self->perm_c, self->etree, &AC);
+
+    /* Compute the LU factorization of A. */
+    dgstrf(refact, &AC, diag_pivot_thresh, drop_tol, relax, panel_size,
+           (self->etree), NULL, lwork, 
+           (self->perm_r), (self->perm_c), &(self->L), &(self->U), 
+           &info);
+
+    Destroy_CompCol_Permuted(&AC);
+
+    StatFree();
+    assert(info == 0);
+
+    self->is_factored = 1;
+\}
+
+\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWsupA-fun9-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-fun9-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsupA-fun9-1}}}\plusendmoddef
+void superlu_solve(superlu_t self, double* b)
+\{
+    char* trans = "N";
+    int info;
+    
+    int panel_size = sp_ienv(1); /* panel size */
+    int relax      = sp_ienv(2); /* no of columns in a relaxed snodes */
+
+    SuperMatrix B;
+    dCreate_Dense_Matrix(&B, self->n, 1, b, self->n, DN, _D, GE);
+
+    if (!self->is_factored)
+        superlu_factor(self);
+
+    StatInit(panel_size, relax);
+    dgstrs(trans, &(self->L), &(self->U), self->perm_r, self->perm_c, 
+           &B, &info);
+    StatFree();
+
+    Destroy_SuperMatrix_Store(&B);
+    assert(info == 0);
+\}
+
+\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The {\tt{}superlu{\char95}n} routine is a getter function to query the
+dimension of the matrix.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWsupA-fun9-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWsupA-fun9-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWsupA-fun9-1}}}\plusendmoddef
+int superlu_n(superlu_t self)
+\{
+    return self->n;
+\}
+
+\nwendcode{}
+
+\nwixlogsorted{c}{{functions}{NWsupA-fun9-1}{\nwixu{NWsupA-sup9.2-1}\nwixd{NWsupA-fun9-1}\nwixd{NWsupA-fun9-2}\nwixd{NWsupA-fun9-3}\nwixd{NWsupA-fun9-4}\nwixd{NWsupA-fun9-5}\nwixd{NWsupA-fun9-6}}}%
+\nwixlogsorted{c}{{superlu.c}{NWsupA-sup9.2-1}{\nwixd{NWsupA-sup9.2-1}}}%
+\nwixlogsorted{c}{{superlu.h}{NWsupA-sup9-1}{\nwixd{NWsupA-sup9-1}}}%
+\nwixlogsorted{c}{{types}{NWsupA-typ5-1}{\nwixu{NWsupA-sup9.2-1}\nwixd{NWsupA-typ5-1}}}%
+\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}

@@ -1,0 +1,503 @@
+
+\section{Introduction}
+
+The [[gap]] model computes the force and moment between two
+rigid plates using an ``infinitesimal parallel plate''
+approximation with an ad-hoc correction for fringing fields.
+
+
+\subsection{Infinitesimal parallel plates}
+
+The attraction between two parallel plates at different voltage
+levels is well approximated by
+\[
+  F = \frac{1}{2} \epsilon_0 tL \frac{V^2}{g^2}
+\]
+where $\epsilon_0$ is the permittivity of free space, $t$ and $L$
+are the thickness and length of the electrodes (so $tL$ is the area
+on the side facing the other electrode), $V$ is the voltage level,
+and $g$ is the gap between two elements.  This approximation
+somewhat underestimates the total force, since it neglects the effect of
+fringing fields.
+
+When two plates are only slightly tilted with respect to
+each other, we can approximate the electrostatic forces between
+them by pretending they are made up of infinitesimal parallel
+plates:
+\[
+  F(x) dx = \frac{1}{2} \epsilon_0 t \frac{V^2}{g(x)^2}
+\]
+For the purposes of exposition, define 
+$K_e = \frac{1}{2} \epsilon_0 V^2$, so that
+\[
+  F(x) dx = K_e g(x)^{-2}
+\]
+where the gap $g(x)$ is a linear function of the position:
+\[
+  g(x) = \alpha + \theta x
+\]
+This approach is used, for instance, in an exercise in Halliday
+and Resnick's physics text~\cite{HallResn62b}.
+
+\subsection{Corrections to the parallel plate approximation}
+
+The SUGAR 2.0 model multiplies all forces by $1 + 1.12 g_0 / t$,
+where $g_0$ is the initial gap.  Li and Aluru~\cite{LiAlur01} 
+multiply their pressures by $1 + 0.65 g / t$.  
+These fudge factors are intended to correct for the presence 
+of fringing fields.  Frustratingly, there are no references in 
+either place.
+
+Pelesko recently recommended an approach for better approximating
+electrostatic forces using boundary layer theory~\cite{Peles01}.
+Pelesko's paper focuses on approximating the electrostatic pressure 
+on a circular membrane, but his general approach should extend to 
+other geometries.
+
+
+\section{Interface}
+
+<<model-gap.h>>=
+#ifndef MODEL_GAP_H
+#define MODEL_GAP_H
+
+#include "modelmgr.h"
+
+void model_gap_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_GAP_H */
+@ 
+
+
+
+\section{Implementation}
+
+<<model-gap.c>>=
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+
+#include "model-gap.h"
+#include "affine.h"
+#include "mesh.h"
+#include "vars.h"
+#include "assemble.h"
+#include "netdraw.h"
+#include "netout.h"
+
+<<types>>
+
+<<static functions>>
+<<model functions>>
+<<functions>>
+@ 
+
+
+\subsection{Integrating the pressure load}
+
+All the variants of the electrostatic pressure load from above have
+the form
+\[
+  p(x) = K_{e1} g(x)^{-2} + K_{e2} g(x)^{-1}
+\]
+
+Let $g(x) = \alpha + \theta x$ for $x \in (-L/2, L/2)$.
+We can cook up a potential corresponding to the pressure load:
+\[
+  G(\alpha, \theta, x) = -K_{e1} g(x)^{-1} + K_{e2} \log g(x)
+\]
+If we differentiate $G$ with respect to $\alpha$ and $\theta$,
+respectively, we get $p(x)$ and $x p(x)$.
+
+The total force magnitude and moment acting on one rigid plate
+are given by
+\begin{eqnarray*}
+  F & = & \frac{\partial \psi}{\partial \alpha} 
+          = \int_{-L/2}^{L/2} p(x) \, dx \\
+  M & = & \frac{\partial \psi}{\partial \theta}
+          = \int_{-L/2}^{L/2} x p(x) \, dx \\
+  \psi & = & \int_{-L/2}^{L/2} G(x) \, dx
+\end{eqnarray*}
+
+With some algebra, we can compute
+\[
+  \psi = -K_{e1} \psi_1 + K_{e2} \psi_2
+\]
+where for $z = (\theta L)/(2 \alpha)$
+\begin{eqnarray*}
+  \psi_1 & = & \frac{1}{\theta} \log \frac{1+z}{1-z} \\
+         & = & \frac{L}{2\alpha} \frac{1}{z} \log \frac{1+z}{1-z} \\
+  \psi_2 & = & \frac{L}{2} \left(
+                 \frac{1}{z} \log \frac{1+z}{1-z} +
+                 \log (1-z^2) 
+               \right) + L (log \alpha - 1)
+\end{eqnarray*}
+
+Two terms will occur with sufficient frequency in the following
+that we give them names.  Let $r(z) = \log \frac{1+z}{1-z}$ and 
+$s(z) = (1-z^2)^{-1}$.  Note that $dr/dz = 2s$ and $ds/dz = 2z s^2$.
+
+Now we differentiate for a while to get
+\begin{eqnarray*}
+  \psi_{1,\alpha} 
+    & = & -\frac{L}{\alpha^2} s 
+\\
+  \psi_{1,\alpha \alpha} 
+    & = & \frac{2L}{\alpha^3} s^2
+\\
+  \psi_{1,\alpha \theta}
+    & = & -\frac{L^2 z}{\alpha^3} s^2
+\\
+  \psi_{1,\theta}
+    & = & -\frac{L^2}{4 \alpha^2 z^2} (2zs - r)
+\\
+  \psi_{1,\theta \theta}
+    & = & -\frac{L^3}{4 \alpha^3 z^3} (r + (4z^2-2)z s^2)
+\\
+  \psi_{2,\alpha}
+    & = & \frac{L}{2 \alpha z} r \\
+    & = & \psi_1
+\\
+  \psi_{2,\theta}
+    & = & \frac{L^2}{4 \alpha z^2} (2z - r)
+\\
+  \psi_{2,\theta \theta}
+    & = & \frac{L^3}{4 \alpha^2 z^3} (r - (2-z^2)z s)
+\end{eqnarray*}
+
+We would be done and ready to start coding, but several of the formulas
+above have removable singularities at $z = 0$ ($\theta = 0$).  In
+particular, we need to compute $\psi_1$, $\psi_{1, \theta}$,
+$\psi_{1, \theta \theta}$, $\psi_{2, \theta}$ and $\psi_{2, \theta \theta}$
+using some different formulas near $z = 0$.  Our alternative formulas
+come from Taylor expansion
+\begin{eqnarray*}
+  \psi_1 & = & \frac{L}{\alpha} \left\{
+    1 + \frac{1}{3}z^2 + \frac{1}{5} z^4 + \frac{1}{7} z^6 + \ldots
+  \right\}
+\\
+  \psi_{1,\theta} & = & \frac{L^2}{2 \alpha^2} \left\{
+    \frac{2}{3} z + \frac{4}{5} z^3 + \frac{6}{7} z^5 + \ldots
+  \right\}
+\\
+  \psi_{1,\theta \theta} & = & \frac{L^3}{4 \alpha^3} \left\{
+    \frac{2}{3} + \frac{3 \cdot 4}{5} z^2 + \frac{5 \cdot 6}{7} z^4 + \ldots
+  \right\}
+\\
+  \psi_{2,\theta} & = & -\frac{L^2}{2 \alpha} \left\{
+    \frac{1}{3} z + \frac{1}{5} z^3 + \frac{1}{7} z^5 + \ldots
+  \right\}
+\\
+  \psi_{2,\theta \theta} & = & -\frac{L^3}{4 \alpha^2} \left\{
+    \frac{1}{3} + \frac{3}{5} z^2 + \frac{5}{7} z^4 + \ldots
+  \right\}
+\end{eqnarray*}
+
+It turns out that if we use these expansions for $|z| < 0.1$ and the
+original formulas for $|z| > 0.1$, we will get at least 12 digits of
+accuracy up to the point where overflow sets in.  The details of the
+analysis are tedious, but the idea is simple.  In evaluating $r$,
+the dominant term in the linearized error analysis (for small $z$)
+is a small absolute error on the order of the unit roundoff.
+Except for $\psi_1$, all the formulas with removable singularities
+involve a term that looks (to first order) like $r - 2z = O(z^3)$.
+In each case, we can show that in fact that term will be 
+$\gamma z^3 + O(z^5)$, where $\gamma = O(1)$.  Thus, the relative error
+is $O(\epsilon) / (\gamma z^3 + O(z^5)) \approx O(\epsilon z^{-3})$.
+The argument for $\psi_1$ is similar, but the relative error is only
+$O(\epsilon z^{-1})$.
+
+We use the first six terms in each of the expansions, which is plenty.
+I will not copy the analysis here, but the idea is pretty simple --
+just bound the tails of the expansions by a constant times
+$z^k (1-z^2)^{-1} = z^k + z^{k+2} + z^{k+4} + \ldots$.
+
+<<compute terms via Taylor expansions>>=
+double z2 = z*z;
+
+p1t = L2*z / (2*a2) *
+(2/3 + z2*(4/5 + z2*(5/7 + z2*(7/9 + z2*(9/11 + z2*(11/13))))));
+
+p1tt = L3 / (4*a3) *
+(2/3 + z2*(12/5 + z2*(20/7 + z2*(42/9 + z2*(72/11 + z2*(110/13))))));
+
+p2a = L/a *
+(1 + z2*(1/3 + z2*(1/5 + z2*(1/7 + z2*(1/9 + z2*(1/11))))));
+
+p2t = -L2*z/(2*a) * 
+(1/3 + z2*(1/5 + z2*(1/7 + z2*(1/9 + z2*(1/11 + z2*(1/13))))));
+
+p2tt = -L3/(4*a2) *
+(1/3 + z2*(3/5 + z2*(5/7 + z2*(7/9 + z2*(9/11 + z2*(11/13))))));
+
+@ 
+
+<<static functions>>=
+static void compute_forces(double* F, double* dF,
+			   double Ke1, double Ke2, 
+			   double a, double t, double L)
+{
+    double z = (t*L)/(2*a);
+    double s = 1/((1+z)*(1-z));
+
+    double p1a, p1aa, p1at, p1t, p1tt;
+    double p2a, p2aa, p2at, p2t, p2tt;
+
+    double a2 = a*a, a3 = a2*a;
+    double s2 = s*s;
+    double z2 = z*z, z3 = z2*z;
+    double L2 = L*L, L3 = L2*L;
+
+    p1a  =   -L  / a2 * s;
+    p1aa =  2*L  / a3 * s2;
+    p1at =   -L2 / a3 * s2*z;
+
+    if (abs(z) > 0.1) {
+
+	double r = log((1+z)/(1-z));
+
+	p1t  =  L2 / (4*a2*z2) * (2*z*s - r);
+	p1tt =  L3 / (4*a3*z3) * (r + (4*z2 - 2)*z*s2);
+        p2a  =   L / (2*a*z) * r;
+        p2t  =  L2 / (4*a*z2) * (2*z - r);
+        p2tt =  L3 / (4*a2*z3) * (r - (2-z2)*z*s);
+
+    } else {
+	<<compute terms via Taylor expansions>>
+    }
+
+    p2aa = p1a;
+    p2at = p1t;
+
+    F[0]  = -Ke1*p1a  + Ke2*p2a;
+    F[1]  = -Ke1*p1t  + Ke2*p2t;
+
+    dF[0] = -Ke1*p1aa + Ke2*p2aa;
+    dF[3] = -Ke1*p1tt + Ke2*p2tt;
+    dF[1] = -Ke1*p1at + Ke2*p2at;
+    dF[2] = dF[1];
+}
+
+@ 
+
+
+\subsection{Model functions}
+
+<<types>>=
+typedef struct gap_t {
+    element_t element;
+    int node[2];
+    int vars[6];
+    double relpos[3];
+    double g0;
+    double l, w, h;
+    double V;
+} gap_t;
+
+@ 
+
+<<model functions>>=
+static element_t* gap_init(mesh_t mesh, const char* model,
+			   model_element_t* modelfunc)
+{
+    gap_t* self = (gap_t*) mempool_cget(mesh_pool(mesh), sizeof(*self));
+    material_t* material;
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    if (mesh_num_param_nodes(mesh) != 2)
+        mesh_error(mesh, "Incorrect number of nodes for gap");
+    self->node[0] = mesh_param_node(mesh, 0);
+    self->node[1] = mesh_param_node(mesh, 1);
+
+    material = mesh_param_material(mesh, mesh_param_byname(mesh, "material"));
+    
+    self->l = get_number(mesh, material, "l");
+    self->w = get_number(mesh, material, "w");
+    self->h = get_number(mesh, material, "h");
+    self->V = get_number(mesh, material, "V");
+
+    return &(self->element);
+}
+
+@ 
+
+<<static functions>>=
+static double get_number(mesh_t mesh, material_t* material,
+                         const char* name)
+{
+    mesh_param_t* param = mesh_param_byname(mesh, name);
+    if (param == NULL && material != NULL && material->model != NULL &&
+            material->model->param != NULL)
+        param = (material->model->param)(material->data, name);
+    return mesh_param_number(mesh, param);    
+}
+
+@ 
+
+<<model functions>>=
+static void gap_set_position(void* pself, mesh_t mesh)
+{
+    gap_t* self = (gap_t*) pself;
+    double* x1 = mesh_node(mesh, self->node[0])->x;
+    double* x2 = mesh_node(mesh, self->node[1])->x;
+
+    double dx0 = x2[0] - x1[0];
+    double dx1 = x2[1] - x1[1];
+    double dx2 = x2[2] - x2[2];
+
+    self->relpos[0] = dx0;
+    self->relpos[1] = dx1;
+    self->relpos[2] = dx2;
+
+    self->g0 = sqrt(dx0*dx0 + dx1*dx1 + dx2*dx2);
+}
+
+@ 
+
+<<model functions>>=
+static void gap_vars(void* pself, vars_mgr_t vars)
+{
+    gap_t* self = (gap_t*) pself;
+
+    self->vars[0] = vars_node(vars, self->node[0], "x");
+    self->vars[1] = vars_node(vars, self->node[0], "y");
+    self->vars[2] = vars_node(vars, self->node[0], "rz");
+
+    self->vars[3] = vars_node(vars, self->node[0], "x");
+    self->vars[4] = vars_node(vars, self->node[0], "y");
+    self->vars[5] = vars_node(vars, self->node[0], "rz");
+}
+
+@ 
+
+<<model functions>>=
+static void gap_R(void* pself, assemble_matrix_t* R,
+		  assemble_matrix_t* x,
+		  assemble_matrix_t* v,
+		  assemble_matrix_t* a)
+{
+/*
+    gap_t* self = (gap_t*) pself;
+    double u[6];
+    double Rlocal[6];
+
+    memset(u, 0, 6*sizeof(double));
+    assemble_matrix_add(x, self->vars, 6, u);
+
+    double Ke1 = self->e0 * self->h * self->V * self->V;
+    double Ke2 = 0.65 * Ke1 / self->w;
+
+    double rpx = self->relpos[0] + u[0] - u[3];
+    double rpy = self->relpos[0] + u[1] - u[4];
+
+    double a = sqrt(rpx*rpx + rpy*rpy);
+    double t = u[2] - u[5];
+
+    compute_forces(F, dF, Ke1, Ke2, a, t, self->l);
+
+    Rlocal[0] =  F[0] * rpx / a;
+    Rlocal[1] =  F[0] * rpy / a;
+    Rlocal[2] =  F[1];
+
+    Rlocal[3] = -Rlocal[0];
+    Rlocal[4] = -Rlocal[1];
+    Rlocal[5] = -F[1];
+
+    assemble_matrix_add(R, self->vars, 6, Rlocal);
+*/
+}
+
+@ 
+
+<<model functions>>=
+static void gap_dR(void* pself, assemble_matrix_t* dR,
+		   double cx, assemble_matrix_t* x,
+		   double cv, assemble_matrix_t* v,
+		   double ca, assemble_matrix_t* a)
+{
+/*
+    gap_t* self = (gap_t*) pself;
+    double u[6];
+    double dRlocal[36];
+
+    memset(u, 0, 6*sizeof(double));
+    assemble_matrix_add(x, self->vars, 6, u);
+
+    double Ke1 = self->e0 * self->h * self->V * self->V;
+    double Ke2 = 0.65 * Ke1 / self->w;
+
+    double rpx = self->relpos[0] + u[0] - u[3];
+    double rpy = self->relpos[0] + u[1] - u[4];
+
+    double a = sqrt(rpx*rpx + rpy*rpy);
+    double t = u[2] - u[5];
+
+    compute_forces(F, dF, Ke1, Ke2, a, t, self->l);
+
+    dRlocal[0]  =               dR[0] * rpx * rpx / a / a;
+    dRlocal[7]  =               dR[0] * rpy * rpy / a / a;
+    dRlocal[1]  = dRlocal[6]  = dR[0] * rpx * rpy / a / a;
+
+    dRlocal[21] =               dR[3] * rpx * rpx / a / a;
+    dRlocal[28] =               dR[3] * rpy * rpy / a / a;
+    dRlocal[22] = dRlocal[27] = dR[3] * rpx * rpy / a / a;
+
+
+
+
+
+    Rlocal[0] =  F[0] * rpx / a;
+    Rlocal[1] =  F[0] * rpy / a;
+    Rlocal[2] =  F[1];
+
+    Rlocal[3] = -Rlocal[0];
+    Rlocal[4] = -Rlocal[1];
+    Rlocal[5] = -F[1];
+
+
+    assemble_matrix_add(dR, self->vars, 6, dRlocal);
+*/
+}
+
+@ 
+
+<<model functions>>=
+static void gap_output(void* pself, netout_t* netout)
+{
+    gap_t* self = (gap_t*) pself;
+
+    netout_string        (netout, "model",  "gap");
+    netout_int_matrix    (netout, "node",   self->node,   1, 2);
+    netout_double        (netout, "l",      self->l);
+    netout_double        (netout, "w",      self->w);
+    netout_double        (netout, "h",      self->h);
+    netout_double        (netout, "V",      self->V);
+    netout_double_matrix (netout, "relpos", self->relpos, 1, 3);
+    netout_int_matrix    (netout, "vars",   self->vars,   1, 6);
+}
+
+@ 
+
+\subsection{Registration function}
+
+<<functions>>=
+void model_gap_register(model_mgr_t model_mgr)
+{
+    model_element_t model;
+    memset(&model, 0, sizeof(model));
+
+    model.init         = gap_init;
+    model.set_position = gap_set_position;
+    model.vars         = gap_vars;
+    model.R            = gap_R;
+    model.dR           = gap_dR;
+    model.output       = gap_output;
+
+    model_mgr_add_element(model_mgr, "gap2d", &model);
+}
+
+@

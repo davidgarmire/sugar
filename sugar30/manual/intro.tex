@@ -1,0 +1,156 @@
+
+\section{What is SUGAR?}
+
+In less than a decade, the MEMS community has leveraged nearly all the
+integrated-circuit community's fabrication techniques, but little of the wealth
+of simulation capabilities.  A wide range of student and professional circuit
+designers regularly use circuit simulation tools like SPICE, while MEMS
+designers often resort to back-of-the-envelope calculations.  
+For three decades, development of IC CAD tools has gone hand-in-hand
+with the development of IC processes.  Tools for simulation will
+play a similar role in future advances in the design of complicated
+micro-electromechanical systems.
+
+SUGAR inherits its name and philosophy from SPICE.  A MEMS designer can
+describe a device in a compact netlist format, and very quickly simulate
+the device's behavior.  Using simple simulations in SUGAR, a designer can
+quickly find problems in a design or try out new ideas.
+Later in the design process, a designer might run more detailed simulations
+to check for subtle second-order effects; early in the design, a quick
+approximate solution is key.  SUGAR provides that quick solution.
+
+The main components of SUGAR are a netlist interpreter (based on a derivative 
+of the Lua language), models written in MATLAB or C (possibly 
+more languages in future revisions) describing the characteristics of the 
+different components, a command-line and gui which allows interaction and 
+visualization of the specified devices, and a SUGAR core that handles 
+generated nodes and elements, mesh assembly, and analysis of devices.
+
+\section{A first example}
+
+Let's first look at a simple example of how SUGAR is used.
+Perhaps we have just designed a simple test structure in the MUMPS process,
+a long cantilever anchored at one end.  We want to know how much
+it will deflect if we apply a small force to the free end.
+
+First, we need an input file, called a \emph{netlist}, that describes
+the device.  We save this netlist in the file \texttt{cantilever.net}:
+\begin{verbatim}
+  use("mumps.net")
+  use("stdlib.net")
+
+  A = node{0, 0, 0; name = "A"}
+  B = node{name = "B"}
+  
+  anchor { A    ; material=p1, l=10u, w=10u }
+  beam3d { A, B ; material=p1, l=100u, w=2u }
+  f3d    { B    ; F=50u, oz=90 }
+\end{verbatim}
+%  element{ A    ; model="anchor", material=p1, l=10u, w=10u }
+%  element{ A, B ; model="beam3d", material=p1, l=100u, w=2u }
+%  element{ B    ; model="f3d", F=50u, oz=90 }
+The first line tells SUGAR that our device is made using the standard
+MUMPS process.  The second and third line define two nodes to be used 
+later in describing the \emph{netlist}'s elements. The fourth and fifth 
+lines tell SUGAR that the device
+is made of an anchor at node \texttt{A}, which is ten microns on a side;
+and a beam, two microns wide and one hundred long, which goes from the 
+anchored end point \texttt{A} to the free end \texttt{B}.  Both the
+anchor and the beam are made of the poly1 layer, or \texttt{p1}.
+The sixth line describes a force of 50 micro-Newtons applied at a
+right angle to the free end of the beam.
+
+Using SUGAR, we only need to write three commands to see the effect 
+of the force on the beam:
+\begin{verbatim}
+  > net = cho_load('cantilever.net');
+  > q = cho_dc(net);
+  > cho_display(net, q);
+\end{verbatim}
+The first command tells SUGAR to process the netlist description in
+\texttt{cantilever.net}.  The result is a data structure stored in the
+\texttt{net} variable that describes the device to other SUGAR routines.
+The \texttt{cho\_dc} function does a static (DC) analysis of the device,
+and returns a vector representing the equilibrium position.  Finally,
+the third line causes SUGAR to display the displaced device.
+
+
+\section{Installing SUGAR}
+
+All the SUGAR software is available from the SUGAR home page at
+\begin{verbatim}
+  http://bsac.berkeley.edu/cadtools/sugar
+\end{verbatim}
+We update the software frequently; if you encounter problems, you may want to
+download the latest version before devoting hours of your time (or ours!) to
+debugging.
+
+% TODO: Change the following when it isn't true any more!
+There is also a web interface to SUGAR at:
+\begin{verbatim}
+  http://sugar.millennium.berkeley.edu/
+\end{verbatim}
+
+If you are building SUGAR for your particular system, note that you need to
+first make the {\tt noweb} and Lua tools in the {\tt sugar30/tools} directory
+of the source tree. {\tt noweb} (refer to {\tt http://www.eecs.harvard.edu/\~{}nr/noweb/USA.html}) enables literate programming. The modified form of Lua
+(refer to {\tt http://www.lua.org/}) is for the netlist and 
+command-line interpreter.
+
+
+\subsection{System requirements}
+
+To require SUGAR, you will need MATLAB release 5.2 or later. Version 6.0 is
+recommended. Because the student edition of MATLAB 5 only handles matrices
+of a limited size, users of the student edition will only be able
+to simulate small devices.
+
+SUGAR is regularly tested using MATLAB 5.3 on Windows, Sun, HP,
+and Alpha systems, and is tested using MATLAB 6.0 on Linux systems.
+We have not tested the software on other systems.
+If you would like to use SUGAR on a different system,
+you will need to compile the external routines for that system,
+as described later in this section.
+
+\subsection{Setting SUGAR paths}
+
+To use SUGAR, make sure that your MATLAB path is set correctly.
+In particular, make sure the analysis and model subdirectories are
+included in your MATLAB path.  This can be done from within MATLAB, e.g.
+\begin{verbatim}
+ addpath /home/eecs/dbindel/sugar30/src/matlab
+ addpath /home/eecs/dbindel/sugar20/src/model
+\end{verbatim}
+or from the shell, by setting the MATLABPATH environment variable.
+In \texttt{csh}, for instance, this might be 
+\begin{verbatim}
+ setenv MATLABPATH /home/eecs/dbindel/sugar30/src/matlab:\
+ /home/eecs/dbindel/sugar20/model
+\end{verbatim}
+% addpath /home/eecs/dbindel/sugar/analysis
+% addpath /home/eecs/dbindel/sugar/model
+
+\subsection{Compiling external routines}
+
+You will need to compile the external routines \emph{only} if
+pre-compiled versions are not already available on your system.
+To compile the routines, follow the directions in the included
+README file.
+%change to the \texttt{src/c} subdirectory
+%and from MATLAB type \texttt{makemex}.  Alternatively, on UNIX-based
+%systems, change to the \texttt{src} subdirectory, modify the file
+%\texttt{make.inc}, and type \texttt{make sugar-mex}.  Then copy all the files
+%beginning with \texttt{sugarmex} to the \texttt{src/matlab} subdirectory.
+
+
+\section{Getting (and giving) help}
+
+If you have concerns or difficulties using SUGAR which are not addressed
+in the manual sections, feel free to post to
+\begin{verbatim}
+  http://sourceforge.net/projects/mems
+\end{verbatim}
+We will try to respond promptly.
+
+SUGAR \emph{is} research software; let us know if you would like to contribute
+models, analysis routines, or examples to the SUGAR project.

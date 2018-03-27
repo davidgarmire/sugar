@@ -1,0 +1,150 @@
+
+
+function rigid_link_relpos(L, ox, oy, oz)
+
+  if not L then
+    return {0, 0, 0}
+  end
+
+  local x = {L, 0, 0};
+  if ox then xform_apply(xform_ox(ox), x) end
+  if oz then xform_apply(xform_oz(oz), x) end
+  if oy then xform_apply(xform_oy(oy), x) end
+  return x
+    
+end
+
+
+subnet mfsemicircularbeam(A, B, material, 
+	h, w, radius, alpha,
+	fluid, viscosity, density, Youngsmodulus, Poisson,
+	stress, straingradient, thermalexpansion,
+	ox1, oy1, oz1, L1,
+	ox2, oy2, oz2, L2)
+
+  element {A, B; model="mf2wrap", wrapmf="MF_semicircularbeam",
+           radius=radius, alpha=alpha, w=w, h=h,
+           density       = density,     
+           fluid         = fluid,
+           viscosity     = viscosity, 
+           Youngsmodulus = Youngsmodulus,
+           Poisson       = Poisson,     
+           stress        = stress,
+           straingradient     = straingradient,
+           thermalexpansion   = thermalexpansion,
+           ambienttemperature = ambienttemperature,
+	   ox1=ox1, oy1=oy1, oz1=oz1, L1=L1,
+	   ox2=ox2, oy2=oy2, oz2=oz2, L2=L2,
+           rot = xform_stack[xform_stack.n] }
+
+  local RL1 = rigid_link_relpos( L1, ox1, oy1, oz1)
+  local RL2 = rigid_link_relpos( L2, ox2, oy2, oz2)
+  local rel = { RL2[1]+RL1[1] + radius * sin(alpha), 
+                RL2[2]+RL1[2] + radius * (1-cos(alpha)), 
+                RL2[3]+RL1[3] }
+
+  relpos_add(A, B, top_xform(rel))
+
+end
+
+
+subnet mfpredisplacedbeam4(A, B, material, 
+	l, h, w,
+	fluid, viscosity, density, Youngsmodulus, Poisson,
+	stress, straingradient, thermalexpansion,
+	qx1, qy1, qz1, qox1, qoy1, qoz1,
+	qx2, qy2, qz2, qox2, qoy2, qoz2,
+	ox1, oy1, oz1, L1,
+	ox2, oy2, oz2, L2)
+
+  element {A, B; model="mf2wrap", wrapmf="MF_predisplacedbeam4",
+           l=l, w=w, h=h,
+           density       = density,     
+           fluid         = fluid,
+           viscosity     = viscosity, 
+           Youngsmodulus = Youngsmodulus,
+           Poisson       = Poisson,     
+           stress        = stress,
+           straingradient     = straingradient,
+           thermalexpansion   = thermalexpansion,
+           ambienttemperature = ambienttemperature,
+	   qx1=qx1, qy1=qy1, qz1=qz1, qox1=qox1, qoy1=qoy1, qoz1=qoz1,
+	   qx2=qx2, qy2=qy2, qz2=qz2, qox2=qox2, qoy2=qoy2, qoz2=qoz2,
+	   ox1=ox1, oy1=oy1, oz1=oz1, L1=L1,
+	   ox2=ox2, oy2=oy2, oz2=oz2, L2=L2,
+           rot = xform_stack[xform_stack.n] }
+
+  local RL1 = rigid_link_relpos( L1, ox1, oy1, oz1)
+  local RL2 = rigid_link_relpos( L2, ox2, oy2, oz2)
+  local rel = { RL2[1]+RL1[1] + qx2 + l, 
+                RL2[2]+RL1[2] + qy2, 
+                RL2[3]+RL1[3] - qz2 }
+
+  relpos_add(A, B, top_xform(rel))
+
+end
+
+
+subnet mfbeam3dlink(A, B, material, l, w, h, 
+        density, fluid, viscosity, Poisson, Youngsmodulus,
+        stress, straingradient, thermalexpansion, ambienttemperature,
+	ox1, oy1, oz1, L1,
+	ox2, oy2, oz2, L2)
+
+  element {A, B; model="mf2wrap", wrapmf="MF_beam3dlink",
+           l=l, w=w, h=h,
+           density       = density,     
+           fluid         = fluid,
+           viscosity     = viscosity, 
+           Youngsmodulus = Youngsmodulus,
+           Poisson       = Poisson,     
+           stress        = stress,
+           straingradient     = straingradient,
+           thermalexpansion   = thermalexpansion,
+           ambienttemperature = ambienttemperature,
+	   ox1=ox1, oy1=oy1, oz1=oz1, L1=L1,
+	   ox2=ox2, oy2=oy2, oz2=oz2, L2=L2,
+           rot = xform_stack[xform_stack.n] }
+
+  local RL1 = rigid_link_relpos( L1, ox1, oy1, oz1)
+  local RL2 = rigid_link_relpos( L2, ox2, oy2, oz2)
+  local rel = { RL2[1]+RL1[1] + l, 
+                RL2[2]+RL1[2], 
+                RL2[3]+RL1[3] }
+
+  relpos_add(A, B, top_xform(rel))
+
+end
+
+
+subnet mfbeam3dlinkcorner(A, B, material, l, w, h, 
+        density, fluid, viscosity, Poisson, Youngsmodulus,
+        stress, straingradient, thermalexpansion, ambienttemperature,
+	ox1, oy1, oz1, L1,
+	ox2, oy2, oz2, L2)
+
+  element {A, B; model="mf2wrap", wrapmf="MF_beam3dlinkcorner",
+           l=l, w=w, h=h,
+           density       = density,     
+           fluid         = fluid,
+           viscosity     = viscosity, 
+           Youngsmodulus = Youngsmodulus,
+           Poisson       = Poisson,     
+           stress        = stress,
+           straingradient     = straingradient,
+           thermalexpansion   = thermalexpansion,
+           ambienttemperature = ambienttemperature,
+	   ox1=ox1, oy1=oy1, oz1=oz1, L1=L1,
+	   ox2=ox2, oy2=oy2, oz2=oz2, L2=L2,
+           rot = xform_stack[xform_stack.n] }
+
+  local RL1 = rigid_link_relpos( L1, ox1, oy1, oz1)
+  local RL2 = rigid_link_relpos( L2, ox2, oy2, oz2)
+  local rel = { RL2[1]+RL1[1] + l, 
+                RL2[2]+RL1[2], 
+                RL2[3]+RL1[3] }
+
+  relpos_add(A, B, top_xform(rel))
+
+end
+

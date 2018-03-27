@@ -1,0 +1,323 @@
+\section{Introduction}
+
+A uses manager object manages a set of included (used) files.
+In particular, the uses manager handles path lookups and
+tracks what files have been opened.
+
+
+\section{Interface}
+
+<<uses-manager.h>>=
+#ifndef USES_MANAGER_H
+#define USES_MANAGER_H
+
+#include <stdio.h>
+#include <mempool.h>
+
+typedef struct uses_manager_struct* uses_manager_t;
+typedef char* (*uses_manager_search_t)(void* data, char* namebuf, 
+                                               unsigned buflen);
+
+<<exported functions>>
+
+#endif /* USES_MANAGER_H */
+@ 
+
+A uses manager is allocated on a pool, which is where it will
+keep its internal data structures.  There is no destructor
+function -- to free the memory for a uses manager, you must
+free the pool on which it was allocated.
+
+<<exported functions>>=
+uses_manager_t uses_manager_create(mempool_t pool);
+
+@ 
+
+The uses manager keeps an internal list of paths for the purposes
+of looking things up.  The [[uses_manager_addpath]] function can
+be used to \emph{prepend} to that list of paths.  There currently is no
+function to \emph{append} to the list, and there probably
+should be one, since order matters.  The current directory is
+always implicitly the first thing on the path.  The [[uses_manager_envpath]]
+function includes a set of paths specified in the external environment.
+The [[uses_manager_search]] function searches its path for files
+matching the name passed in [[namebuf]].
+If it finds a match, [[namebuf]] will be prepended with the appropriate
+path and return a pointer to [[namebuf]].  If there is no match,
+namebuf will be unmodified, and the function will return NULL.
+
+<<exported functions>>=
+void  uses_manager_addpath(uses_manager_t self, const char* path);
+void  uses_manager_envpath(uses_manager_t self, const char* envname);
+void  uses_manager_addfunc(uses_manager_t self, 
+                                   uses_manager_search_t search,
+                                   void* data);
+char* uses_manager_search (uses_manager_t self, char* namebuf, 
+                                   int buflen);
+
+@ 
+
+We want to be able to register the files we use so that
+we can get a list for later debugging, and so that we can
+check whether a file has already been used.  The [[uses_manager_use]]
+function registers a file as used; the [[uses_manager_already_used]]
+function returns true iff a filename has already been entered via
+[[uses_manager_use]].  The matching algorithm is not all that sophisticated,
+so the same file accessed via different paths will be saved as two different
+files.
+
+<<exported functions>>=
+void uses_manager_use         (uses_manager_t self, const char* name);
+int  uses_manager_already_used(uses_manager_t self, const char* name);
+@ 
+
+
+\section{Implementation}
+
+<<uses-manager.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <string.h>
+
+#include <uses_manager.h>
+
+<<types>>
+<<functions>>
+@ 
+
+A [[name_list_t]] is just a linked list entry containing a pointer
+to a path name (or file name).
+
+<<types>>=
+typedef struct name_list_t {
+    const char* name;
+    struct name_list_t* next;
+} name_list_t;
+
+@ 
+
+A [[searcher_list_t]] is a list of functions and associated data
+for doing searches via externally handled means (searching the Matlab
+path, opening a file box, etc.)
+<<types>>=
+typedef struct searcher_list_t {
+    uses_manager_search_t fun;
+    void* data;
+    struct searcher_list_t* next;
+} searcher_list_t;
+
+@ 
+
+<<types>>=
+struct uses_manager_struct {
+    mempool_t pool;
+    name_list_t* paths;
+    name_list_t* files;
+    searcher_list_t* searchers;
+};
+
+@ 
+
+Creating a uses manager is simple.  We just need to remember to store
+a link to the pool for later allocations.
+
+<<functions>>=
+uses_manager_t uses_manager_create(mempool_t pool)
+{
+    uses_manager_t self = (uses_manager_t) 
+        mempool_get(pool, sizeof(struct uses_manager_struct));
+
+    self->pool = pool;
+    self->paths = NULL;
+    self->files = NULL;
+    self->searchers = NULL;
+    return self;
+}
+
+@ 
+
+When we add to the path, we \emph{prepend} by default.  The current
+directory is always implicitly at the start of the path.
+
+<<functions>>=
+void uses_manager_addpath(uses_manager_t self, const char* name)
+{
+    name_list_t* link = (name_list_t*)
+        mempool_get(self->pool, sizeof(struct name_list_t));
+
+    link->name = mempool_strdup(self->pool, name);
+    link->next = self->paths;
+    self->paths = link;
+}
+
+@ 
+
+<<functions>>=
+void uses_manager_envpath(uses_manager_t self, const char* envname)
+{
+    char* names;
+    char* name;
+
+    if ((names = getenv(envname)) == NULL)
+        return;
+
+    names = mempool_strdup(self->pool, names);
+
+    while ((name = strtok(names, ":")) != NULL) {
+        name_list_t* link = (name_list_t*)
+            mempool_get(self->pool, sizeof(struct name_list_t));
+        link->name = name;
+        link->next = self->paths;
+        self->paths = link;
+        names = NULL;
+    }
+}
+
+@ 
+
+<<functions>>=
+void uses_manager_addfunc(uses_manager_t self, 
+                                  uses_manager_search_t search,
+                                  void* data)
+{
+    searcher_list_t* link = (searcher_list_t*)
+        mempool_get(self->pool, sizeof(struct searcher_list_t));
+
+    link->fun = search;
+    link->data = data;
+    link->next = self->searchers;
+    self->searchers = link;
+}
+
+@ 
+
+
+If the world was POSIX compliant, I could use the [[access]] function.
+Alas, the world is not POSIX compliant.
+
+<<functions>>=
+int uses_manager_access(const char* name)
+{
+    FILE* fp = fopen(name, "r");
+    if (fp) {
+        fclose(fp);
+        return 0;
+    }
+    return -1;
+}
+
+@
+
+<<functions>>=
+char* uses_manager_search(uses_manager_t self, char* namebuf,
+                                  int buflen)
+{
+    name_list_t* current_path = self->paths;
+    searcher_list_t* current_searcher = self->searchers;
+
+    <<Check the current working directory>>
+    <<Check all the paths in the list>>
+    <<Check all the searchers in the list>>
+
+    return NULL;
+}
+
+@ 
+
+<<Check the current working directory>>=
+if (uses_manager_access(namebuf) == 0)
+    return namebuf;
+@ 
+
+Note that [[tmpbuf]] has two characters extra space for the end-of-string
+and for a path separator character.
+
+<<Check all the paths in the list>>=
+while (current_path != NULL) {
+
+    int tmpbuflen = strlen(current_path->name) +
+                    strlen(namebuf) + 2;
+    char* tmpbuf = (char*) mempool_geth(self->pool, tmpbuflen);
+
+    <<Build path name>>
+    if (uses_manager_access(tmpbuf) == 0) {
+        <<Copy result to namebuf and return>>
+    }
+    
+    mempool_freeh(tmpbuf);
+    current_path = current_path->next;
+}
+
+@ 
+
+<<Check all the searchers in the list>>=
+while (current_searcher != NULL) {
+    char* p = (current_searcher->fun)(current_searcher->data, namebuf, buflen);
+    if (p) 
+        return p;
+    current_searcher = current_searcher->next;
+}
+
+@ 
+
+There should probably be something to handle platform-specific
+path component separator characters, too.
+
+<<Build path name>>=
+strcpy(tmpbuf, current_path->name);
+strcat(tmpbuf, "/");
+strcat(tmpbuf, namebuf);
+@ 
+
+Note that if the buffer isn't large enough, we return NULL.
+This perhaps isn't ideal, but returning the truncated file name
+seems evil.
+
+<<Copy result to namebuf and return>>=
+if (strlen(tmpbuf) + 1 > buflen) {
+    mempool_freeh(tmpbuf);
+    return NULL;
+} else {
+    strcpy(namebuf, tmpbuf);
+    mempool_freeh(tmpbuf);
+    return namebuf;
+}
+@ 
+
+Saving a name in the ``used'' list and checking whether a name
+is in the use list are just basic linked list operations.
+This is \emph{not} a particularly time-efficient implementation.
+Something more sophisticated might use a hash table.
+
+<<functions>>=
+void uses_manager_use(uses_manager_t self, const char* name)
+{
+    if (!uses_manager_already_used(self, name)) {
+        name_list_t* new_link = (name_list_t*)
+            mempool_get(self->pool, sizeof(name_list_t));
+
+        new_link->name = mempool_strdup(self->pool, name);
+        new_link->next = self->files;
+        self->files = new_link;
+    }
+}
+
+@ 
+
+<<functions>>=
+int uses_manager_already_used(uses_manager_t self, const char* name)
+{
+    name_list_t* link = self->files;
+    while (link != NULL) {
+        if (strcmp(link->name, name) == 0)
+            return 1;
+        link = link->next;
+    }
+    return 0;
+}
+
+@ 
+

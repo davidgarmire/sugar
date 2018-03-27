@@ -1,0 +1,663 @@
+
+\section{Introduction}
+
+The [[assemble_mex]] module provides the Matlab interface to
+the assembly routines.
+
+
+\section{Interface}
+
+<<assemble-mex.h>>=
+#ifndef ASSEMBLE_MEX_H
+#define ASSEMBLE_MEX_H
+
+#include <mex.h>
+#include <assemble.h>
+
+void assemble_mex_register();
+int  assemble_mex_tag();
+
+assemble_matrix_t* mx_to_assemble(const mxArray* array);
+
+#endif /* ASSEMBLE_MEX_H */
+@ 
+
+The [[assemble_mex_register]] function registers the commands
+[[assemble_R]], [[assemble_bc]], [[add_displace]], [[add_R]],
+[[add_dR]], and [[x_local]].
+
+
+\section{Implementation}
+
+<<assemble-mex.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <mex_handle.h>
+#include <sugarmex.h>
+#include <mesh_mex.h>
+#include <assemble_mex.h>
+
+<<static data>>
+<<mex functions>>
+<<functions>>
+@ 
+
+
+\subsection{Assembler data structures}
+
+<<static data>>=
+static int assemble_handle_tag;
+
+@ 
+
+<<functions>>=
+void assemble_mex_register()
+{
+    assemble_handle_tag = mex_handle_new_tag();
+    <<register mex functions>>
+}
+
+void assemble_mex_shutdown()
+{
+}
+
+int assemble_mex_handle_tag()
+{
+    return assemble_handle_tag;
+}
+
+@ 
+
+
+\subsection{Conversion functions}
+
+<<functions>>=
+assemble_matrix_t* mx_to_assemble(const mxArray* array)
+{
+    return mx_to_handle(array, assemble_handle_tag, 
+                        "Invalid assembler handle");
+}
+
+@ 
+
+
+\subsection{[[mesh_nactive]] command}
+
+The [[mesh_nactive(mesh)]] function returns the number of active
+degrees of freedom in the system.
+
+<<cho-mesh-nactive.m>>=
+function [n] = cho_mesh_nactive(mesh)
+n = sugarmex('mesh_nactive', mesh);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_nactive", mesh_nactive);
+@ 
+
+<<mex functions>>=
+static void mesh_nactive(int nlhs, mxArray* plhs[],
+                         int nrhs, const mxArray* prhs[])
+{
+    mesh_t mesh;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+
+    plhs[0] = mx_from_double(assemble_get_active(mesh_assembler(mesh)));
+}
+
+@ 
+
+
+\subsection{[[assemble_R]] and [[assemble_R_full]] commands}
+
+The [[[R] = assemble_R(mesh, x)]] function computes the
+residual vector at $x$.  If $x$ is omitted, then a zero 
+vector is used.  The [[[R] = assemble_R_full(mesh, x)]] function
+computes the unreduced residual vector (including components
+corresponding to reaction forces at nodes subject to
+displacement boundary conditions).
+
+<<cho-assemble-R.m>>=
+function [R] = cho_assemble_R(mesh, x, v, a)
+
+if nargin == 1
+    [R] = sugarmex('assemble_R', mesh, 0);
+elseif nargin == 2
+    [R] = sugarmex('assemble_R', mesh, 0, x);
+elseif nargin == 3
+    [R] = sugarmex('assemble_R', mesh, 0, x, v);
+elseif nargin == 4
+    [R] = sugarmex('assemble_R', mesh, 0, x, v, a);
+else
+    error('Incorrect number of arguments to cho_assemble_R');
+end
+@ 
+
+<<cho-assemble-R-full.m>>=
+function [R] = cho_assemble_R_full(mesh, x, v, a)
+
+if nargin == 1
+    [R] = sugarmex('assemble_R', mesh, 1);
+elseif nargin == 2
+    [R] = sugarmex('assemble_R', mesh, 1, x);
+elseif nargin == 3
+    [R] = sugarmex('assemble_R', mesh, 1, x, v);
+elseif nargin == 4
+    [R] = sugarmex('assemble_R', mesh, 1, x, v, a);
+else
+    error('Incorrect number of arguments to cho_assemble_R');
+end
+@ 
+
+<<register mex functions>>=
+mexmgr_add("assemble_R", mex_assemble_R);
+@ 
+
+<<mex functions>>=
+static void mex_assemble_R(int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[])
+{
+    mesh_t      mesh;
+    int         full_size;
+    assembler_t assembler;
+    double*     x = NULL;
+    double*     v = NULL;
+    double*     a = NULL;
+    double*     R;
+    int         Rsize;
+
+    int nvars;
+    int nactive;
+
+    mex_check_num_args(nrhs, 2);
+    mesh      = mx_to_mesh(prhs[0]);
+    full_size = mx_to_double(prhs[1]);
+    assembler = mesh_assembler(mesh);
+
+    nvars   = vars_count(mesh_vars_mgr(mesh));
+    nactive = assemble_get_active(assembler);
+
+    Rsize   = (full_size ? nvars : nactive);
+
+    x = mxMalloc(nvars * sizeof(double));
+    memcpy(x, assemble_get_displacements(assembler), nvars * sizeof(double));
+    if (nrhs > 2) {
+        if (!mxIsNumeric(prhs[2]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[2]) != nactive || mxGetN(prhs[2]) != 1)
+            mexErrMsgTxt("x vector is wrong size");
+        memcpy(x, mxGetPr(prhs[2]), nactive * sizeof(double));
+    }
+
+    if (nrhs > 3) {
+        v = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[3]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[3]) != nactive || mxGetN(prhs[3]) != 1)
+            mexErrMsgTxt("v vector is wrong size");
+        memcpy(v, mxGetPr(prhs[3]), nactive * sizeof(double));
+    }
+
+    if (nrhs > 4) {
+        a = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[4]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[4]) != nactive || mxGetN(prhs[4]) != 1)
+            mexErrMsgTxt("a vector is wrong size");
+        memcpy(a, mxGetPr(prhs[4]), nactive * sizeof(double));
+    }
+
+    plhs[0] = mxCreateDoubleMatrix(Rsize, 1, mxREAL);
+    R       = mxGetPr(plhs[0]);
+
+    assemble_R(assembler, x, v, a, R, Rsize); 
+
+    if (a) mxFree(a);
+    if (v) mxFree(v);
+    if (x) mxFree(x);
+}
+
+@ 
+
+
+\subsection{[[assemble_dR]] command}
+
+The [[[dR] = assemble_dR(mesh, x)]] function computes the
+residual tangent matrix at $x$.  If $x$ is omitted,
+then a zero vector is used.
+
+<<cho-assemble-dR.m>>=
+function [dR] = cho_assemble_dR(mesh, c, x, v, a)
+
+if nargin == 1
+    [dR] = sugarmex('assemble_dR', mesh, [1 0 0]);
+elseif nargin == 2
+    [dR] = sugarmex('assemble_dR', mesh, c);
+elseif nargin == 3
+    [dR] = sugarmex('assemble_dR', mesh, c, x);
+elseif nargin == 4
+    [dR] = sugarmex('assemble_dR', mesh, c, x, v);
+elseif nargin == 5
+    [dR] = sugarmex('assemble_dR', mesh, c, x, v, a);
+end
+@ 
+
+<<register mex functions>>=
+mexmgr_add("assemble_dR", mex_assemble_dR);
+@ 
+
+<<mex functions>>=
+static void mex_assemble_dR(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+{
+    mesh_t      mesh;
+    assembler_t assembler;
+    double      c[3] = {1, 0, 0};
+    double*     x = NULL;
+    double*     v = NULL;
+    double*     a = NULL;
+    double*     dR;
+
+    int nvars;
+    int nactive;
+
+    mex_check_num_args(nrhs, 2);
+    mesh      = mx_to_mesh(prhs[0]);
+    assembler = mesh_assembler(mesh);
+
+    nvars   = vars_count(mesh_vars_mgr(mesh));
+    nactive = assemble_get_active(assembler);
+
+    if (!mxIsNumeric(prhs[1])) {
+        mexErrMsgTxt("c argument must be a numeric vector");
+    } else if (mxGetM(prhs[1]) * mxGetN(prhs[1]) > 3) {
+        mexErrMsgTxt("c vector is wrong size");
+    } else {
+        memcpy(c, mxGetPr(prhs[1]), 
+               mxGetM(prhs[1]) * mxGetN(prhs[1]) * sizeof(double));
+    }
+
+    x = mxMalloc(nvars * sizeof(double));
+    memcpy(x, assemble_get_displacements(assembler), nvars * sizeof(double));
+    if (nrhs > 2) {
+        if (!mxIsNumeric(prhs[2]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[2]) != nactive || mxGetN(prhs[2]) != 1)
+            mexErrMsgTxt("x vector is wrong size");
+        memcpy(x, mxGetPr(prhs[2]), nactive * sizeof(double));
+    }
+
+    if (nrhs > 3) {
+        v = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[3]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[3]) != nactive || mxGetN(prhs[3]) != 1)
+            mexErrMsgTxt("v vector is wrong size");
+        memcpy(v, mxGetPr(prhs[3]), nactive * sizeof(double));
+    }
+
+    if (nrhs > 4) {
+        a = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[4]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[4]) != nactive || mxGetN(prhs[4]) != 1)
+            mexErrMsgTxt("a vector is wrong size");
+        memcpy(a, mxGetPr(prhs[4]), nactive * sizeof(double));
+    }
+
+    plhs[0] = mxCreateDoubleMatrix(nactive, nactive, mxREAL);
+    dR      = mxGetPr(plhs[0]);
+
+    assemble_dR(assembler, c[0], x, c[1], v, c[2], a, dR, nactive);
+
+    if (a) mxFree(a);
+    if (v) mxFree(v);
+    if (x) mxFree(x);
+}
+
+@ 
+
+
+\subsection{[[assemble_dR_sparse]] command}
+
+The [[[dR] = assemble_dR_sparse(mesh, x)]] function computes the
+residual vector and tangent matrix at $x$.  If $x$ is omitted,
+then a zero vector is used.  The tangent matrix is assembled 
+in sparse form.
+
+<<cho-assemble-dR-sparse.m>>=
+function [dR] = cho_assemble_dR_sparse(mesh, c, x, v, a)
+
+if nargin == 1
+    [dR] = sugarmex('assemble_dR_sparse', mesh, [1 0 0]);
+elseif nargin == 2
+    [dR] = sugarmex('assemble_dR_sparse', mesh, c);
+elseif nargin == 3
+    [dR] = sugarmex('assemble_dR_sparse', mesh, c, x);
+elseif nargin == 4
+    [dR] = sugarmex('assemble_dR_sparse', mesh, c, x, v);
+elseif nargin == 5
+    [dR] = sugarmex('assemble_dR_sparse', mesh, c, x, v, a);
+end
+@ 
+
+<<register mex functions>>=
+mexmgr_add("assemble_dR_sparse", mex_assemble_dR_sparse);
+@ 
+
+<<mex functions>>=
+static void mex_assemble_dR_sparse(int nlhs, mxArray* plhs[],
+                                   int nrhs, const mxArray* prhs[])
+{
+    mesh_t      mesh;
+    assembler_t assembler;
+    double      c[3] = {1, 0, 0};
+    double*     x = NULL;
+    double*     v = NULL;
+    double*     a = NULL;
+    int*        pi;
+
+    assemble_matrix_t* assembler_x = NULL;
+    assemble_matrix_t* assembler_v = NULL;
+    assemble_matrix_t* assembler_a = NULL;
+    assemble_matrix_t* assembler_dR;
+
+    int i, n;
+    int nvars;
+    int nactive;
+
+    mex_check_num_args(nrhs, 1);
+    mesh      = mx_to_mesh(prhs[0]);
+    assembler = mesh_assembler(mesh);
+
+    nvars   = vars_count(mesh_vars_mgr(mesh));
+    nactive = assemble_get_active(assembler);
+
+    if (!mxIsNumeric(prhs[1])) {
+        mexErrMsgTxt("c argument must be a numeric vector");
+    } else if (mxGetM(prhs[1]) * mxGetN(prhs[1]) > 3) {
+        mexErrMsgTxt("c vector is wrong size");
+    } else {
+        memcpy(c, mxGetPr(prhs[1]), 
+               mxGetM(prhs[1]) * mxGetN(prhs[1]) * sizeof(double));
+    }
+
+    x = mxMalloc(nvars * sizeof(double));
+    memcpy(x, assemble_get_displacements(assembler), nvars * sizeof(double));
+    if (nrhs > 2) {
+        if (!mxIsNumeric(prhs[2]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[2]) != nactive || mxGetN(prhs[2]) != 1)
+            mexErrMsgTxt("x vector is wrong size");
+        memcpy(x, mxGetPr(prhs[2]), nactive * sizeof(double));
+    }
+
+    if (nrhs > 3) {
+        v = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[3]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[3]) != nactive || mxGetN(prhs[3]) != 1)
+            mexErrMsgTxt("v vector is wrong size");
+        memcpy(v, mxGetPr(prhs[3]), nactive * sizeof(double));
+    }
+
+    if (nrhs > 4) {
+        a = mxCalloc(nvars, sizeof(double));
+        if (!mxIsNumeric(prhs[4]))
+            mexErrMsgTxt("Argument must be a numeric vector");
+        if (mxGetM(prhs[4]) != nactive || mxGetN(prhs[4]) != 1)
+            mexErrMsgTxt("a vector is wrong size");
+        memcpy(a, mxGetPr(prhs[4]), nactive * sizeof(double));
+    }
+
+    if (x) assembler_x = assembler_dense_getvector(x, nvars, nvars);
+    if (v) assembler_v = assembler_dense_getvector(v, nvars, nvars);
+    if (a) assembler_a = assembler_dense_getvector(a, nvars, nvars);
+    assembler_dR = assembler_sparse_matrix(nactive, nactive);
+
+    n = mesh_num_elements(mesh);
+    for (i = 1; i <= n; ++i) {
+        element_dR( mesh_element(mesh, i), assembler_dR, 
+                    c[0], assembler_x,
+                    c[1], assembler_v,
+                    c[2], assembler_a);
+    }
+
+    assembler_sparse_csc(assembler_dR);
+
+    n = assembler_sparse_nnz(assembler_dR);
+    plhs[0] = mxCreateSparse(nactive, nactive, n, mxREAL);
+    memcpy(mxGetPr(plhs[0]), assembler_sparse_nzval(assembler_dR), 
+           n * sizeof(double));
+    memcpy(mxGetIr(plhs[0]), assembler_sparse_rowind(assembler_dR), 
+           n * sizeof(int));
+    memcpy(mxGetJc(plhs[0]), assembler_sparse_colptr(assembler_dR), 
+           (nactive+1) * sizeof(int));
+
+    assembler_matrix_free(assembler_dR);
+    if (assembler_a) assembler_matrix_free(assembler_a);
+    if (assembler_v) assembler_matrix_free(assembler_v);
+    if (assembler_x) assembler_matrix_free(assembler_x);
+
+    if (a) mxFree(a);
+    if (v) mxFree(v);
+    if (x) mxFree(x);
+}
+
+@ 
+
+
+\subsection{[[assemble_bc]] command}
+
+The [[assemble_bc(mesh)]] function applies displacement boundary
+conditions from the mesh.
+
+<<cho-assemble-bc.m>>=
+function cho_assemble_bc(mesh)
+sugarmex('assemble_bc', mesh);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("assemble_bc", mex_assemble_bc);
+@ 
+
+<<mex functions>>=
+static void mex_assemble_bc(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+{
+    mesh_t      mesh;
+    assembler_t assembler;
+
+    mex_check_num_args(nrhs, 1);
+    mesh      = mx_to_mesh(prhs[0]);
+    assembler = mesh_assembler(mesh);
+
+    assemble_displace(assembler);
+}
+
+@
+
+
+\subsection{[[add_displace]] command}
+
+The [[add_displace(assembler, var_id, value)]] function applies displacement
+boundary conditions to an indicated degree of freedom in the mesh.
+
+<<cho-add-displace.m>>=
+function cho_add_displace(assembler, var_id, value)
+
+if nargin == 2
+    value = 0;
+end
+sugarmex('add_displace', assembler, var_id, value);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("add_displace", mex_add_displace);
+@ 
+
+<<mex functions>>=
+static void mex_add_displace(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+{
+    assemble_matrix_t* assembler;
+
+    int     var_id;
+    double  value;
+
+    mex_check_num_args(nrhs, 3);
+    assembler = mx_to_assemble(prhs[0]);
+    var_id    = (int) mx_to_double(prhs[1]);
+    value     = mx_to_double(prhs[2]);
+
+    assemble_matrix_add1(assembler, var_id, value);
+}
+
+@
+
+
+\subsection{[[add_R]] command}
+
+The [[add_R(assembler, var_ids, Rlocal)]] function assembles the local
+residual contribution into the global vector.
+
+<<cho-add-R.m>>=
+function cho_add_R(assembler, var_ids, Rlocal)
+sugarmex('add_R', assembler, var_ids, Rlocal);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("add_R", mex_add_R);
+@ 
+
+<<mex functions>>=
+static void mex_add_R(int nlhs, mxArray* plhs[],
+                      int nrhs, const mxArray* prhs[])
+{
+    assemble_matrix_t* assembler;
+
+    int*    var_ids;
+    double* value;
+    int     num_vars;
+    int     i;
+
+    mex_check_num_args(nrhs, 3);
+    assembler = mx_to_assemble(prhs[0]);
+
+    if (!mxIsNumeric(prhs[1]) || !mxIsNumeric(prhs[2]))
+        mexErrMsgTxt("Arguments must be numeric");
+
+    num_vars  = mxGetM(prhs[1]) * mxGetN(prhs[1]);
+    if (mxGetM(prhs[2]) != num_vars || mxGetN(prhs[2]) != 1)
+        mexErrMsgTxt("Mismatch between number of arguments and Rlocal");
+
+    value     = mxGetPr(prhs[2]);
+    var_ids   = mxCalloc(num_vars, sizeof(int));
+    for (i = 0; i < num_vars; ++i)
+        var_ids[i] = (int) (mxGetPr(prhs[1])[i]);
+
+    assemble_matrix_add(assembler, var_ids, num_vars, value);
+    mxFree(var_ids);
+}
+
+@
+
+
+\subsection{[[add_dR]] command}
+
+The [[add_dR(assembler, var_ids, dRlocal)]] function assembles the local
+residual tangent contribution into the global matrix.
+
+<<cho-add-dR.m>>=
+function cho_add_dR(assembler, var_ids, dRlocal)
+sugarmex('add_dR', assembler, var_ids, dRlocal);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("add_dR", mex_add_dR);
+@ 
+
+<<mex functions>>=
+static void mex_add_dR(int nlhs, mxArray* plhs[],
+                       int nrhs, const mxArray* prhs[])
+{
+    assemble_matrix_t* assembler;
+
+    int*    var_ids;
+    double* value;
+    int     num_vars;
+    int     i;
+
+    mex_check_num_args(nrhs, 3);
+    assembler = mx_to_assemble(prhs[0]);
+
+    if (!mxIsNumeric(prhs[1]) || !mxIsNumeric(prhs[2]))
+        mexErrMsgTxt("Arguments must be numeric");
+
+    num_vars  = mxGetM(prhs[1]) * mxGetN(prhs[1]);
+    if (mxGetM(prhs[2]) != num_vars || mxGetN(prhs[2]) != num_vars)
+        mexErrMsgTxt("Mismatch between number of arguments and dRlocal");
+
+    value     = mxGetPr(prhs[2]);
+    var_ids   = mxCalloc(num_vars, sizeof(int));
+    for (i = 0; i < num_vars; ++i)
+        var_ids[i] = (int) (mxGetPr(prhs[1])[i]);
+
+    assemble_matrix_add(assembler, var_ids, num_vars, value);
+    mxFree(var_ids);
+}
+
+@
+
+
+\subsection{[[x_local]] command}
+
+The [[x_local(assembler, var_ids)]] function assembles the local
+residual contribution into the global vector.
+
+<<cho-x-local.m>>=
+function [xlocal] = cho_x_local(assembler, var_ids)
+xlocal = sugarmex('x_local', assembler, var_ids);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("x_local", mex_x_local);
+@ 
+
+<<mex functions>>=
+static void mex_x_local(int nlhs, mxArray* plhs[],
+                              int nrhs, const mxArray* prhs[])
+{
+    assemble_matrix_t* assembler;
+
+    int*    var_ids;
+    double* value;
+    int     num_vars;
+    int     i;
+
+    mex_check_num_args(nrhs, 2);
+    assembler = mx_to_assemble(prhs[0]);
+
+    if (!mxIsNumeric(prhs[1]))
+        mexErrMsgTxt("Arguments must be numeric");
+
+    num_vars  = mxGetM(prhs[1]) * mxGetN(prhs[1]);
+    plhs[0]   = mxCreateDoubleMatrix(mxGetM(prhs[1]) * mxGetN(prhs[1]), 1, 
+                                     mxREAL);
+    value     = mxGetPr(plhs[0]);
+
+    var_ids   = mxCalloc(num_vars, sizeof(int));
+    for (i = 0; i < num_vars; ++i)
+        var_ids[i] = (int) (mxGetPr(prhs[1])[i]);
+
+    assemble_matrix_add(assembler, var_ids, num_vars, value);
+    mxFree(var_ids);
+}
+
+@

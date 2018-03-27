@@ -1,0 +1,262 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}netdraw-mex\nwendquote} module is the MEX interface to the SUGAR graphics
+context type.  It is \emph{not} the wrapper for implementing graphics
+interfaces in Matlab.
+
+
+\section{Interface}
+
+\nwfilename{netdraw-mex.nw}\nwbegincode{1}\sublabel{NW3tcInU-1Y1PI2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-1Y1PI2-1}}}\moddef{netdraw-mex.h~{\nwtagstyle{}\subpageref{NW3tcInU-1Y1PI2-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef NETDRAW_MEX_H
+#define NETDRAW_MEX_H
+
+#include <mex.h>
+#include <netdraw.h>
+
+void gc_mex_register();
+void gc_mex_shutdown();
+int  gc_mex_handle_tag();
+
+netdraw_gc_t* mx_to_gc(const mxArray* array);
+
+#endif /* NETDRAW_MEX_H */
+\nwnotused{netdraw-mex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3tcInU-3cSteE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-3cSteE-1}}}\moddef{netdraw-mex.c~{\nwtagstyle{}\subpageref{NW3tcInU-3cSteE-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <mesh.h>
+#include <netdraw_xt.h>
+#include <netdraw_mlab.h>
+#include <assemble.h>
+
+#include <mex_handle.h>
+#include <sugarmex.h>
+#include <netdraw_mex.h>
+#include <mesh_mex.h>
+
+static int gc_handle_tag;
+
+\LA{}mex functions~{\nwtagstyle{}\subpageref{NW3tcInU-3MtIgE-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW3tcInU-nRuDO-1}}\RA{}
+\nwnotused{netdraw-mex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{{\Tt{}display\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3tcInU-3Dac3n-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-3Dac3n-1}}}\moddef{cho-display.m~{\nwtagstyle{}\subpageref{NW3tcInU-3Dac3n-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function cho_display(mesh, x, gctype)
+
+if nargin < 3
+  gctype = 'matlab';
+end
+
+if strcmp(gctype, 'xt')
+  if (nargin > 1) & ~isempty(x)
+    sugarmex('xt_draw', mesh, x)    
+  else
+    sugarmex('xt_draw', mesh)
+  end
+elseif strcmp(gctype, 'matlab')
+  if (nargin > 1) & ~isempty(x)
+    cho_mdraw(mesh, x)
+  else
+    cho_mdraw(mesh)
+  end
+end
+\nwnotused{cho-display.m}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{{\Tt{}xt{\_}draw\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3tcInU-fmMNl-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-fmMNl-1}}}\moddef{cho-xt-draw.m~{\nwtagstyle{}\subpageref{NW3tcInU-fmMNl-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function cho_xt_draw(mesh)
+sugarmex('xt_draw', mesh);
+\nwnotused{cho-xt-draw.m}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3tcInU-BzF6M-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-BzF6M-1}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW3tcInU-BzF6M-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3tcInU-nRuDO-2}}\nwprevnextdefs{\relax}{NW3tcInU-BzF6M-2}\nwenddeflinemarkup
+#ifdef HAVE_X11
+mexmgr_add("xt_draw", xt_draw);
+#endif
+\nwalsodefined{\\{NW3tcInU-BzF6M-2}\\{NW3tcInU-BzF6M-3}}\nwused{\\{NW3tcInU-nRuDO-2}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3tcInU-3MtIgE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-3MtIgE-1}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3tcInU-3MtIgE-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3tcInU-3cSteE-1}}\nwprevnextdefs{\relax}{NW3tcInU-3MtIgE-2}\nwenddeflinemarkup
+#ifdef HAVE_X11
+static void xt_draw(int nlhs, mxArray* plhs[],
+                    int nrhs, const mxArray* prhs[])
+\{
+    static int   argc = 1;
+    static char* argv = "dummy";
+    mesh_t mesh;
+    double* x = NULL;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+
+    if (nrhs > 1) \{
+        int nactive = assemble_get_active(mesh_assembler(mesh));
+        if (!mxIsNumeric(prhs[1]) || 
+                mxGetM(prhs[1]) != nactive || mxGetN(prhs[1]) != 1)
+            mexErrMsgTxt("Incorrect displacement vector");
+        x = mxGetPr(prhs[1]);
+    \}
+
+    xtnetdraw_init(argc, &argv);
+    xtnetdraw(mesh, x);
+\}
+#endif
+
+\nwalsodefined{\\{NW3tcInU-3MtIgE-2}\\{NW3tcInU-3MtIgE-3}}\nwused{\\{NW3tcInU-3cSteE-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{{\Tt{}mdraw\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW3tcInU-3wbt2m-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-3wbt2m-1}}}\moddef{cho-mdraw.m~{\nwtagstyle{}\subpageref{NW3tcInU-3wbt2m-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function cho_mdraw(mesh, x)
+
+clf;
+grid on;
+hold on;
+view(0,90);
+xlabel('X - horizontal  [m]');
+ylabel('Y - vertical  [m]');
+zlabel('Z - out of plane  [m]');
+
+if nargin == 1
+    sugarmex('mdraw', mesh);
+else
+    sugarmex('mdraw', mesh, x);
+end    
+
+rotate3d on;
+color=pink;
+color(:,2)=color(:,2)*(0.5 + 0.5*rand);
+color(:,1)=color(:,1)*(0.5 + 0.5*rand);
+color(:,3)=color(:,3)*(0.5 + 0.5*rand);
+colormap(color);
+shading interp;
+axis equal;
+axis vis3d;
+hold off;
+
+\nwnotused{cho-mdraw.m}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW3tcInU-BzF6M-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-BzF6M-2}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW3tcInU-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3tcInU-nRuDO-2}}\nwprevnextdefs{NW3tcInU-BzF6M-1}{NW3tcInU-BzF6M-3}\nwenddeflinemarkup
+mexmgr_add("mdraw", mdraw);
+\nwused{\\{NW3tcInU-nRuDO-2}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW3tcInU-3MtIgE-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-3MtIgE-2}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3tcInU-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3tcInU-3cSteE-1}}\nwprevnextdefs{NW3tcInU-3MtIgE-1}{NW3tcInU-3MtIgE-3}\nwenddeflinemarkup
+static void mdraw(int nlhs, mxArray* plhs[],
+                  int nrhs, const mxArray* prhs[])
+\{
+    mesh_t  mesh;
+    double* x = NULL;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+
+    if (nrhs > 1) \{
+        int nactive = assemble_get_active(mesh_assembler(mesh));
+        if (!mxIsNumeric(prhs[1]) || 
+                mxGetM(prhs[1]) != nactive || mxGetN(prhs[1]) != 1)
+            mexErrMsgTxt("Incorrect displacement vector");
+        x = mxGetPr(prhs[1]);
+    \}
+
+    netdraw_mlab(mesh, x);
+\}
+
+\nwused{\\{NW3tcInU-3cSteE-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{{\Tt{}draw{\_}beam\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW3tcInU-208Iil-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-208Iil-1}}}\moddef{cho-draw-beam.m~{\nwtagstyle{}\subpageref{NW3tcInU-208Iil-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function cho_draw_beam(gc, transform, l, w, h, vindex)
+sugarmex('draw_beam', gc, transform, l, w, h, vindex);
+\nwnotused{cho-draw-beam.m}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW3tcInU-BzF6M-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-BzF6M-3}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW3tcInU-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3tcInU-nRuDO-2}}\nwprevnextdefs{NW3tcInU-BzF6M-2}{\relax}\nwenddeflinemarkup
+mexmgr_add("draw_beam", draw_beam);
+\nwused{\\{NW3tcInU-nRuDO-2}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW3tcInU-3MtIgE-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-3MtIgE-3}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3tcInU-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3tcInU-3cSteE-1}}\nwprevnextdefs{NW3tcInU-3MtIgE-2}{\relax}\nwenddeflinemarkup
+static void draw_beam(int nlhs, mxArray* plhs[],
+                      int nrhs, const mxArray* prhs[])
+\{
+    netdraw_gc_t* gc;
+    double* transform;
+    double l, w, h;
+    int* vindex;
+    int i;
+
+    mex_check_num_args(nrhs, 6);
+    gc = mx_to_gc(prhs[0]);
+    l  = mx_to_double(prhs[2]);
+    w  = mx_to_double(prhs[3]);
+    h  = mx_to_double(prhs[4]);
+
+    if (!mxIsNumeric(prhs[1]) || mxGetM(prhs[1]) != 3 || mxGetN(prhs[1]) != 4)
+        mexErrMsgTxt("Invalid transform argument");
+
+    if (!mxIsNumeric(prhs[5]) || mxGetM(prhs[5]) * mxGetN(prhs[5]) != 12)
+        mexErrMsgTxt("Invalid variable index vector");
+
+    transform = mxGetPr(prhs[1]);
+    vindex = mxCalloc(12, sizeof(double));
+    for (i = 0; i < 12; ++i)
+        vindex[i] = (mxGetPr(prhs[5]))[i];
+
+    netdraw_beam(gc, transform, l, w, h, vindex);
+
+    mxFree(vindex);
+\}
+
+\nwused{\\{NW3tcInU-3cSteE-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+
+\subsection{Net drawing data structure}
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW3tcInU-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3tcInU-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3tcInU-3cSteE-1}}\nwprevnextdefs{\relax}{NW3tcInU-nRuDO-2}\nwenddeflinemarkup
+netdraw_gc_t* mx_to_gc(const mxArray* array)
+\{
+    return mx_to_handle(array, gc_handle_tag, "Invalid gc handle");
+\}
+
+\nwalsodefined{\\{NW3tcInU-nRuDO-2}}\nwused{\\{NW3tcInU-3cSteE-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW3tcInU-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3tcInU-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3tcInU-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3tcInU-3cSteE-1}}\nwprevnextdefs{NW3tcInU-nRuDO-1}{\relax}\nwenddeflinemarkup
+void gc_mex_register()
+\{
+    gc_handle_tag = mex_handle_new_tag();
+    \LA{}register functions~{\nwtagstyle{}\subpageref{NW3tcInU-BzF6M-1}}\RA{}
+\}
+
+void gc_mex_shutdown()
+\{
+\}
+
+int gc_mex_handle_tag()
+\{
+    return gc_handle_tag;
+\}
+
+\nwused{\\{NW3tcInU-3cSteE-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{cho-display.m}{NW3tcInU-3Dac3n-1}{\nwixd{NW3tcInU-3Dac3n-1}}}%
+\nwixlogsorted{c}{{cho-draw-beam.m}{NW3tcInU-208Iil-1}{\nwixd{NW3tcInU-208Iil-1}}}%
+\nwixlogsorted{c}{{cho-mdraw.m}{NW3tcInU-3wbt2m-1}{\nwixd{NW3tcInU-3wbt2m-1}}}%
+\nwixlogsorted{c}{{cho-xt-draw.m}{NW3tcInU-fmMNl-1}{\nwixd{NW3tcInU-fmMNl-1}}}%
+\nwixlogsorted{c}{{functions}{NW3tcInU-nRuDO-1}{\nwixu{NW3tcInU-3cSteE-1}\nwixd{NW3tcInU-nRuDO-1}\nwixd{NW3tcInU-nRuDO-2}}}%
+\nwixlogsorted{c}{{mex functions}{NW3tcInU-3MtIgE-1}{\nwixu{NW3tcInU-3cSteE-1}\nwixd{NW3tcInU-3MtIgE-1}\nwixd{NW3tcInU-3MtIgE-2}\nwixd{NW3tcInU-3MtIgE-3}}}%
+\nwixlogsorted{c}{{netdraw-mex.c}{NW3tcInU-3cSteE-1}{\nwixd{NW3tcInU-3cSteE-1}}}%
+\nwixlogsorted{c}{{netdraw-mex.h}{NW3tcInU-1Y1PI2-1}{\nwixd{NW3tcInU-1Y1PI2-1}}}%
+\nwixlogsorted{c}{{register functions}{NW3tcInU-BzF6M-1}{\nwixd{NW3tcInU-BzF6M-1}\nwixd{NW3tcInU-BzF6M-2}\nwixd{NW3tcInU-BzF6M-3}\nwixu{NW3tcInU-nRuDO-2}}}%
+\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}

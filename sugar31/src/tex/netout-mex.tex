@@ -1,0 +1,122 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}netout{\_}mex\nwendquote} module provides Matlab interfaces to
+the netlist output routines.
+
+
+\section{Interface}
+
+\nwfilename{netout-mex.nw}\nwbegincode{1}\sublabel{NW3vTA7A-3fxJec-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-3fxJec-1}}}\moddef{netout-mex.h~{\nwtagstyle{}\subpageref{NW3vTA7A-3fxJec-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef NETOUT_MEX_H
+#define NETOUT_MEX_H
+
+#include <mex.h>
+#include <netout.h>
+
+void netout_mex_register();
+int  netout_mex_tag();
+
+netout_t* mx_to_netout(const mxArray* array);
+
+#endif /* NETOUT_MEX_H */
+\nwnotused{netout-mex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3vTA7A-1e4DT0-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-1e4DT0-1}}}\moddef{netout-mex.c~{\nwtagstyle{}\subpageref{NW3vTA7A-1e4DT0-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <sugarmex.h>
+#include <mex_handle.h>
+#include <netout_mex.h>
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NW3vTA7A-IAwJm-1}}\RA{}
+\LA{}mex functions~{\nwtagstyle{}\subpageref{NW3vTA7A-3MtIgE-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW3vTA7A-nRuDO-1}}\RA{}
+\nwnotused{netout-mex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Netout data structures}
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3vTA7A-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NW3vTA7A-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3vTA7A-1e4DT0-1}}\nwenddeflinemarkup
+static int netout_handle_tag;
+
+\nwused{\\{NW3vTA7A-1e4DT0-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3vTA7A-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3vTA7A-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3vTA7A-1e4DT0-1}}\nwprevnextdefs{\relax}{NW3vTA7A-nRuDO-2}\nwenddeflinemarkup
+void netout_mex_register()
+\{
+    netout_handle_tag = mex_handle_new_tag();
+    \LA{}register mex functions~{\nwtagstyle{}\subpageref{NW3vTA7A-Ye2uh-1}}\RA{}
+\}
+
+\nwalsodefined{\\{NW3vTA7A-nRuDO-2}\\{NW3vTA7A-nRuDO-3}}\nwused{\\{NW3vTA7A-1e4DT0-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3vTA7A-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3vTA7A-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3vTA7A-1e4DT0-1}}\nwprevnextdefs{NW3vTA7A-nRuDO-1}{NW3vTA7A-nRuDO-3}\nwenddeflinemarkup
+int netout_mex_tag()
+\{
+    return netout_handle_tag;
+\}
+
+\nwused{\\{NW3vTA7A-1e4DT0-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\subsection{Conversion functions}
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3vTA7A-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3vTA7A-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3vTA7A-1e4DT0-1}}\nwprevnextdefs{NW3vTA7A-nRuDO-2}{\relax}\nwenddeflinemarkup
+netout_t* mx_to_netout(const mxArray* array)
+\{
+    return mx_to_handle(array, netout_handle_tag, "Invalid netout handle");
+\}
+
+\nwused{\\{NW3vTA7A-1e4DT0-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{{\Tt{}netout\nwendquote} command}
+
+The {\Tt{}netout(netout,\ name,\ data)\nwendquote} command adds parameters to the netlist.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW3vTA7A-2yJWyC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-2yJWyC-1}}}\moddef{cho-netout.m~{\nwtagstyle{}\subpageref{NW3vTA7A-2yJWyC-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function cho_netout(handle, name, data)
+sugarmex('netout', handle, name, data);
+\nwnotused{cho-netout.m}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW3vTA7A-Ye2uh-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-Ye2uh-1}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3vTA7A-Ye2uh-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3vTA7A-nRuDO-1}}\nwenddeflinemarkup
+mexmgr_add("netout", netout);
+\nwused{\\{NW3vTA7A-nRuDO-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW3vTA7A-3MtIgE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3vTA7A-3MtIgE-1}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3vTA7A-3MtIgE-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3vTA7A-1e4DT0-1}}\nwenddeflinemarkup
+static void netout(int nlhs, mxArray* plhs[],
+                   int nrhs, const mxArray* prhs[])
+\{
+    netout_t*   netout;
+    const char* name;
+
+    mex_check_num_args(nrhs, 3);
+    netout = mx_to_netout(prhs[0]);
+    name   = mx_to_string(prhs[1]);
+
+    if (mxIsChar(prhs[2]))
+        netout_string(netout, name, mx_to_string(prhs[2]));
+    else if (mxIsNumeric(prhs[2]))
+        netout_double_matrix(netout, name, mxGetPr(prhs[2]), 
+                             mxGetM(prhs[2]), mxGetN(prhs[2]));
+    else \{
+/*        mexErrMsgTxt("Cannot output a non-string and non-number type\\n");*/
+netout_string(netout, name, "***");
+    \}
+\}
+
+\nwused{\\{NW3vTA7A-1e4DT0-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{cho-netout.m}{NW3vTA7A-2yJWyC-1}{\nwixd{NW3vTA7A-2yJWyC-1}}}%
+\nwixlogsorted{c}{{functions}{NW3vTA7A-nRuDO-1}{\nwixu{NW3vTA7A-1e4DT0-1}\nwixd{NW3vTA7A-nRuDO-1}\nwixd{NW3vTA7A-nRuDO-2}\nwixd{NW3vTA7A-nRuDO-3}}}%
+\nwixlogsorted{c}{{mex functions}{NW3vTA7A-3MtIgE-1}{\nwixu{NW3vTA7A-1e4DT0-1}\nwixd{NW3vTA7A-3MtIgE-1}}}%
+\nwixlogsorted{c}{{netout-mex.c}{NW3vTA7A-1e4DT0-1}{\nwixd{NW3vTA7A-1e4DT0-1}}}%
+\nwixlogsorted{c}{{netout-mex.h}{NW3vTA7A-3fxJec-1}{\nwixd{NW3vTA7A-3fxJec-1}}}%
+\nwixlogsorted{c}{{register mex functions}{NW3vTA7A-Ye2uh-1}{\nwixu{NW3vTA7A-nRuDO-1}\nwixd{NW3vTA7A-Ye2uh-1}}}%
+\nwixlogsorted{c}{{static data}{NW3vTA7A-IAwJm-1}{\nwixu{NW3vTA7A-1e4DT0-1}\nwixd{NW3vTA7A-IAwJm-1}}}%
+\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}

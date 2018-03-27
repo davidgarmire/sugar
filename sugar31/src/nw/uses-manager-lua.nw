@@ -1,0 +1,189 @@
+\section{Introduction}
+
+This module provides an interactive command interface to SUGAR
+using the Lua language.  It defines little functionality on its
+own.
+
+This module provides a Lua interface to the [[uses]] manager
+functionality.
+
+Commands to the interface include
+\begin{itemize}
+  \item [[use]]:
+    Read and execute a Lua script file in the current environment
+  \item [[addpath]]: Add to the search path
+\end{itemize}
+
+Besides these commands, the basic Lua library and the math library
+are included.  All the standard Lua syntax is, of course, available.
+
+
+\section{Interface}
+
+The module provides three functions: one to register the library
+functions with the Lua interpreter, and a setter/getter pair to
+access the uses manager associated with the interpreter.
+
+<<uses-manager-lua.h>>=
+#ifndef USES_MANAGER_LUA_H
+#define USES_MANAGER_LUA_H
+
+#include <uses_manager.h>
+
+void lua_usesmgrlib(lua_State* L);
+void lua_set_usesmgr(lua_State* L, uses_manager_t uses_mgr);
+uses_manager_t lua_get_usesmgr(lua_State* L);
+
+#endif /* USES_MANAGER_LUA_H */
+@ 
+
+
+\section{Implementation}
+
+<<uses-manager-lua.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lua.h>
+#include <lualib.h>
+
+#include <uses_manager_lua.h>
+
+<<static functions>>
+<<functions>>
+
+@ 
+
+
+\subsection{Accessing the uses manager}
+
+The uses manager is stored in the Lua registry table in the entry
+keyed by ``SUGAR uses manager''.
+
+<<functions>>=
+void lua_set_usesmgr(lua_State* L, uses_manager_t uses_mgr)
+{
+    lua_getregistry(L);
+    lua_pushstring(L, "SUGAR uses manager");
+    lua_pushuserdata(L, uses_mgr);
+    lua_settable(L,-3);
+    lua_pop(L,1);
+}
+
+@ 
+
+<<functions>>=
+uses_manager_t lua_get_usesmgr(lua_State* L)
+{
+    uses_manager_t uses_mgr;
+
+    lua_getregistry(L);
+    lua_pushstring(L, "SUGAR uses manager");
+    lua_gettable(L,-2);
+    if (!lua_isuserdata(L,-1))
+        return NULL;
+    uses_mgr = (uses_manager_t) lua_touserdata(L,-1);
+    lua_pop(L,2);
+    return uses_mgr;
+}
+
+@ 
+
+
+\subsection{[[use]] command}
+
+The [[use]] command executes a Lua file in the current environment.
+
+<<static functions>>=
+static int use_lua_file(lua_State* L)
+{
+    uses_manager_t uses_manager = lua_get_usesmgr(L);
+    int n = lua_gettop(L);
+    int i;
+
+    <<Assert presence of uses manager>>
+
+    for (i = 1; i <= n; ++i) {
+        char buf[256];
+        if (!lua_isstring(L,i))
+            lua_error(L, "Invalid argument to 'use'");
+        <<Get complete name of file to use>>
+        <<Use lua file>>
+    }
+    return 0;
+}
+
+@ 
+
+To get the full file name, including path, we consult 
+the uses manager.  If we find a full name, we store it in [[buf]];
+otherwise, we'd better complain.
+
+<<Assert presence of uses manager>>=
+if (uses_manager == NULL)
+    lua_error(L, "Uses manager not installed!\n");
+@ 
+
+<<Get complete name of file to use>>=
+strncpy(buf, lua_tostring(L,i), sizeof(buf));
+if (uses_manager_search(uses_manager, buf, sizeof(buf)) == NULL)
+    lua_error(L, "Could not open file");
+@ 
+
+<<Use lua file>>=
+if (lua_dofile(L, buf) != 0)
+    lua_error(L, "Error opening file");
+@ 
+
+<<register functions>>=
+lua_register(L, "use", use_lua_file);
+@ 
+
+
+\subsection{[[addpath]] command}
+
+The [[addpath]] command adds to the list of paths to search in
+[[use]] commands.  Calls to the [[uses_manager_addpath]] command
+prepend to the list of available paths.  Note that you \emph{don't}
+want to try to add multiple paths in the same string (separated by
+a colon as in shell, say).  You can, however, add multiple paths
+in different string arguments in a single call to [[addpath]]
+
+<<static functions>>=
+static int addpath_lua(lua_State* L)
+{
+    uses_manager_t uses_manager = lua_get_usesmgr(L);
+    int n = lua_gettop(L);
+    int i;
+
+    <<Assert presence of uses manager>>
+
+    for (i = 1; i <= n; ++i) {
+        if (!lua_isstring(L,i))
+            lua_error(L, "Invalid argument to 'use'");
+        uses_manager_addpath(uses_manager, lua_tostring(L,i));
+    }
+    return 0;
+}
+
+@ 
+
+<<register functions>>=
+lua_register(L, "addpath", addpath_lua);
+@ 
+
+
+\subsection{Registration}
+
+<<functions>>=
+void lua_usesmgrlib(lua_State* L)
+{
+    <<register functions>>
+}
+
+@ 
+
+

@@ -1,0 +1,262 @@
+
+\section{Introduction}
+
+This pair of model functions (one for materials and one for elements)
+is purely for test purposes.  The initializer saves the parameter
+list, and the output function prints them back out.
+
+
+\section{Interface}
+
+The [[model_test_register]] function registers the test models with
+the model manager as the default models.
+
+<<model-test.h>>=
+#ifndef MODEL_TEST_H
+#define MODEL_TEST_H
+
+#include <modelmgr.h>
+
+void model_test_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_TEST_H */
+@ 
+
+
+\section{Implementation}
+
+<<model-test.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include <model_test.h>
+#include <modelmgr.h>
+#include <mesh.h>
+#include <netout.h>
+
+<<types>>
+<<static functions>>
+<<model functions>>
+<<registration function>>
+@ 
+
+
+\subsection{Element model}
+
+The element model type is essentially just storage for the list
+of nodes and parameters stored by the element.
+
+<<types>>=
+typedef struct model_test_element_t {
+    element_t element;
+    const char* model;
+    int* nodes;
+    int num_nodes;
+    mesh_param_t* params;
+    int num_params;
+} model_test_element_t;
+
+@ 
+
+The initializer function just copies the node and parameter
+lists from the mesh.  Again, both element and material models
+use the same initializer.  Copying over the node information for
+the material just wastes a little time and space.
+
+<<model functions>>=
+static element_t* test_element_init(mesh_t mesh, const char* name,
+                                            model_element_t* modelfunc)
+{
+    int i;
+    mempool_t pool = mesh_pool(mesh);
+    model_test_element_t* self = (model_test_element_t*)
+        mempool_cget(pool, sizeof(*self));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    self->model = name;
+    <<copy nodes>>
+    <<copy parameters>>
+
+    return &(self->element);
+}
+
+@ 
+
+<<copy nodes>>=
+self->num_nodes = mesh_num_param_nodes(mesh);
+self->nodes = (int*) 
+    mempool_cget(pool, self->num_nodes * sizeof(int));
+for (i = 0; i < self->num_nodes; ++i)
+    self->nodes[i] = mesh_param_node(mesh, i);
+@ 
+
+<<copy parameters>>=
+self->num_params = mesh_num_params(mesh);
+self->params = (mesh_param_t*)
+    mempool_cget(pool, self->num_params * sizeof(mesh_param_t));
+for (i = 0; i < self->num_params; ++i)
+    self->params[i] = *mesh_param(mesh, i);
+@ 
+
+The output routines print out a header, the node list (in the case
+of an element), and the parameters (in the case of either).  Not
+that much to it.
+
+<<model functions>>=
+static void output_element(void* pself, netout_t* netout)
+{
+    model_test_element_t* self = (model_test_element_t*) pself;
+    netout_string(netout, "model", self->model);
+    print_nodes(self, netout);
+    print_params(self->num_params, self->params, netout);
+}
+
+@ 
+
+<<static functions>>=
+static void print_nodes(model_test_element_t* self, netout_t* netout)
+{
+    netout_int_matrix(netout, "nodes", self->nodes, 1, self->num_nodes);
+}
+
+@ 
+
+<<static functions>>=
+static void print_params(int num_params, mesh_param_t* params, 
+                                 netout_t* netout)
+{
+    int i;
+
+    for (i = 0; i < num_params; ++i) {
+        if (params[i].tag == MESH_PARAM_STRING)
+            netout_string(netout, params[i].name, params[i].val.s);
+        else if (params[i].tag == MESH_PARAM_NUMBER)
+            netout_double(netout, params[i].name, params[i].val.d);
+        else if (params[i].tag == MESH_PARAM_MATRIX)
+            netout_double_matrix(netout, params[i].name,
+                                 params[i].val.m.data,
+                                 params[i].val.m.m,
+                                 params[i].val.m.n);
+        else
+            netout_string(netout, params[i].name, "???");
+    }
+}
+
+@ 
+
+
+\subsection{Material model}
+
+The material model type uses the same structure, but with the nodes unused.
+
+<<types>>=
+typedef struct model_test_material_t {
+    material_t material;
+    const char* model;
+    mesh_param_t* params;
+    int num_params;
+    material_t* parent;
+} model_test_material_t;
+
+@ 
+
+<<model functions>>=
+static material_t* test_material_init(mesh_t mesh, const char* name,
+                                              model_material_t* modelfunc)
+{
+    int i;
+    mempool_t pool = mesh_pool(mesh);
+
+    model_test_material_t* self = (model_test_material_t*)
+        mempool_cget(pool, sizeof(*self));
+    mesh_param_t* parent_param = NULL;
+    self->material.model = modelfunc;
+    self->material.data = self;
+
+    self->model = name;
+    <<copy parameters>>
+    <<set parent>>
+
+    return &(self->material);
+}
+
+@ 
+
+<<set parent>>=
+parent_param = mesh_param_byname(mesh, NULL, "parent");
+if (parent_param)
+    self->parent = mesh_param_material(mesh, parent_param);
+@ 
+
+The [[material_param]] method just tries to fetch a material parameter by name.
+
+<<model functions>>=
+static struct mesh_param_t* 
+test_material_param(void* pself, const char* name)
+{
+    model_test_material_t* self = (model_test_material_t*) pself;
+    int i;
+
+    <<check local parameters>>
+    <<check parent parameters>>
+    return NULL;
+}
+
+@ 
+
+<<check local parameters>>=
+for (i = 0; i < self->num_params; ++i) {
+    if (strcmp(name, self->params[i].name) == 0)
+        return &(self->params[i]);
+}
+@ 
+
+<<check parent parameters>>=
+if (self->parent != NULL && self->parent->model->param != NULL)
+    return (self->parent->model->param)(self->parent->data, name);
+@ 
+
+<<model functions>>=
+static void output_material(void* pself, netout_t* netout)
+{
+    model_test_material_t* self = (model_test_material_t*) pself;
+    netout_string(netout, "model", self->model);
+    print_params(self->num_params, self->params, netout);
+}
+
+@ 
+
+
+\subsection{Registration}
+
+Now we register the models as the defaults for the model manager,
+and we're ready to go. %'
+
+<<registration function>>=
+void model_test_register(model_mgr_t model_mgr)
+{
+    model_element_t  element;
+    model_material_t material;
+
+    memset(&element,  0, sizeof(element));
+    memset(&material, 0, sizeof(material));
+
+    element.init   = test_element_init;
+    element.output = output_element;
+
+    material.init   = test_material_init;
+    material.param  = test_material_param;
+    material.output = output_material;
+
+    model_mgr_add_element(model_mgr, "test", &element);
+    model_mgr_add_material(model_mgr, NULL, &material);
+}
+
+@ 
+

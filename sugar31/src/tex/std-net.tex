@@ -1,0 +1,99 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\subsection{Interface}
+
+The standard netlist include file {\Tt{}std.net\nwendquote} adds wrappers for
+the basic model functions.  This is also the right place to put
+commonly-used composite model functions.
+
+For models that require a material parameter, our convention
+is to add the material identifier as an additional ``positional''
+parameter to the wrapper function, after the node numbers.
+For example, to create a two-dimensional beam in the {\Tt{}p1\nwendquote} process,
+we would write
+\begin{verbatim}
+  beam2d {A, B, p1; w=2u}
+\end{verbatim}
+For contrast, the corresponding call to {\Tt{}element\nwendquote} would be
+\begin{verbatim}
+  element {A, B; model="beam2d", material=p1, w=2u}
+\end{verbatim}
+
+
+\subsection{Implementation}
+
+\nwfilename{std-net.nw}\nwbegincode{1}\sublabel{NW3zsgGg-3KMTZp-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3zsgGg-3KMTZp-1}}}\moddef{std.net~{\nwtagstyle{}\subpageref{NW3zsgGg-3KMTZp-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+use("xformstack.lua")
+use("relpos.lua")
+use("subnetize.lua")
+
+\LA{}model wrappers~{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-1}}\RA{}
+\nwnotused{std.net}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\Tt{}beam2d\nwendquote} wrapper adds relative position information
+if the length parameter {\Tt{}l\nwendquote} is defined.  The {\Tt{}beam2d\nwendquote}
+function is ``subnetized,'' so specifying {\Tt{}ox\nwendquote}, {\Tt{}oy\nwendquote},
+and {\Tt{}oz\nwendquote} results in a rotated beam (a la SUGAR 2.0).
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3zsgGg-3n3ZBD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-1}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3zsgGg-3KMTZp-1}}\nwprevnextdefs{\relax}{NW3zsgGg-3n3ZBD-2}\nwenddeflinemarkup
+subnet beam2d(A, B, material, l, w, h)
+  if l then
+    relpos_add(A, B, top_xform(\{l, 0, 0\}))
+  end
+  element \{A, B; model="beam2d", material=material, l=l, w=w, h=h\}
+end
+
+\nwalsodefined{\\{NW3zsgGg-3n3ZBD-2}\\{NW3zsgGg-3n3ZBD-3}\\{NW3zsgGg-3n3ZBD-4}\\{NW3zsgGg-3n3ZBD-5}\\{NW3zsgGg-3n3ZBD-6}}\nwused{\\{NW3zsgGg-3KMTZp-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The semantics of the {\Tt{}force\nwendquote} wrapper are not the same
+as those of the SUGAR 2.0 force.
+Perhaps the {\Tt{}force\nwendquote} wrapper should also be ``subnetized''?
+Alternatively, we might add a separate wrapper (specifically
+to ease porting SUGAR 2.0 netlists) that applies a force along 
+a specified axis.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3zsgGg-3n3ZBD-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-2}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3zsgGg-3KMTZp-1}}\nwprevnextdefs{NW3zsgGg-3n3ZBD-1}{NW3zsgGg-3n3ZBD-3}\nwenddeflinemarkup
+subnet force()
+  args.model    = "force";
+  element(args);
+end
+
+subnet displace()
+  args.model   = "displace";
+  element(args);
+end
+
+\nwused{\\{NW3zsgGg-3KMTZp-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3zsgGg-3n3ZBD-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-3}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3zsgGg-3KMTZp-1}}\nwprevnextdefs{NW3zsgGg-3n3ZBD-2}{NW3zsgGg-3n3ZBD-4}\nwenddeflinemarkup
+subnet anchor(A, material, l, w, h)
+  element \{A; model="anchor", material=material, l=l, w=w, h=h\}
+end
+
+\nwused{\\{NW3zsgGg-3KMTZp-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3zsgGg-3n3ZBD-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-4}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3zsgGg-3KMTZp-1}}\nwprevnextdefs{NW3zsgGg-3n3ZBD-3}{NW3zsgGg-3n3ZBD-5}\nwenddeflinemarkup
+subnet constraint(A, B)
+  element \{A, B; model="constraint"\}
+end
+
+\nwused{\\{NW3zsgGg-3KMTZp-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3zsgGg-3n3ZBD-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-5}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3zsgGg-3KMTZp-1}}\nwprevnextdefs{NW3zsgGg-3n3ZBD-4}{NW3zsgGg-3n3ZBD-6}\nwenddeflinemarkup
+subnet rigid(A)
+  element \{A; model="rigid"\}
+end
+
+\nwused{\\{NW3zsgGg-3KMTZp-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW3zsgGg-3n3ZBD-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-6}}}\moddef{model wrappers~{\nwtagstyle{}\subpageref{NW3zsgGg-3n3ZBD-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3zsgGg-3KMTZp-1}}\nwprevnextdefs{NW3zsgGg-3n3ZBD-5}{\relax}\nwenddeflinemarkup
+subnet gap2d(A, B, material, l, w, h, V)
+  element \{A, B; model="gap2d", material=material, l=l, w=w, h=h, V=V\}
+end
+
+\nwused{\\{NW3zsgGg-3KMTZp-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{model wrappers}{NW3zsgGg-3n3ZBD-1}{\nwixu{NW3zsgGg-3KMTZp-1}\nwixd{NW3zsgGg-3n3ZBD-1}\nwixd{NW3zsgGg-3n3ZBD-2}\nwixd{NW3zsgGg-3n3ZBD-3}\nwixd{NW3zsgGg-3n3ZBD-4}\nwixd{NW3zsgGg-3n3ZBD-5}\nwixd{NW3zsgGg-3n3ZBD-6}}}%
+\nwixlogsorted{c}{{std.net}{NW3zsgGg-3KMTZp-1}{\nwixd{NW3zsgGg-3KMTZp-1}}}%
+\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}

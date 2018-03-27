@@ -1,0 +1,409 @@
+
+\section{Introduction}
+
+The assembly module is responsible for building global entities
+from local contributions, and for extracting the local part of
+global structures.  In particular, this module builds the tangent
+stiffness matrix and load vector.
+
+
+\section{Interface}
+
+<<assemble.h>>=
+#ifndef ASSEMBLE_H
+#define ASSEMBLE_H
+
+#include <mempool.h>
+#include <mesh.h>
+#include <vars.h>
+
+#include <assemblem.h>
+#include <assemblem_sparse.h>
+#include <assemblem_dense.h>
+#include <superlu.h>
+
+<<exported types>>
+<<exported functions>>
+
+#endif /* ASSEMBLE_H */
+@ 
+
+An assembler object requires a mesh and a variable manager.
+
+<<exported types>>=
+typedef struct assembler_struct* assembler_t;
+
+@ 
+
+<<exported functions>>=
+assembler_t assemble_pcreate(mempool_t pool, mesh_t mesh);
+assembler_t assemble_create (mesh_t mesh);
+void        assemble_destroy(assembler_t self);
+
+@ 
+
+The [[add_displace]] method applies displacement boundary conditions
+to a specified degree of freedom.  The [[displace]] method builds
+a global list of displacement boundary conditions.  Inactive degrees
+of freedom are permuted to the end of the list.
+The displacement vector and the number of active degrees of 
+freedom after boundary conditions can be retrieved using 
+[[get_displacements]] and [[get_active]], respectively.
+
+<<exported functions>>=
+void    assemble_add_displace(assembler_t self, 
+                                      int var_id, double value);
+void    assemble_displace    (assembler_t self);
+
+double* assemble_get_displacements(assembler_t self);
+int     assemble_get_active       (assembler_t self);
+
+@ 
+
+[[assemble_R]] and [[assemble_dR]] put together the global version
+of the (reduced) residual and stiffness.   The [[assemble_dR_csc]] function
+builds a compressed sparse column representation of the matrix.
+
+<<exported functions>>=
+void assemble_R   (assembler_t self, double* x, double* v, double* a,
+                           double* R, int Rsize);
+void assemble_dR  (assembler_t self,
+                           double cx, double* x, 
+                           double cv, double* v, 
+                           double ca, double* a, 
+                           double* dR,
+                           int dRsize);
+superlu_t assemble_dR_csc(assembler_t self,
+                          double cx, double* x, 
+                          double cv, double* v, 
+                          double ca, double* a,
+                          int dRsize);
+
+@ 
+
+
+\section{Implementation}
+
+<<assemble.c>>=
+#include <sugar.h>
+
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include <modelmgr.h>
+#include <assemble.h>
+
+<<types>>
+<<functions>>
+@ 
+
+<<types>>=
+struct assembler_struct {
+    <<[[assembler_t]] entries>>
+};
+
+@ 
+
+Right now, the ``by pool'' allocation option is pretty useless,
+since we end up allocating all our temporary space using [[malloc]].
+The only piece that is actually allocated on the pool is the
+[[assembler_t]] structure itself.
+
+<<[[assembler_t]] entries>>=
+mesh_t     mesh;
+vars_mgr_t vars_mgr;
+int        via_pool;
+@ 
+
+<<functions>>=
+assembler_t assemble_create(mesh_t mesh)
+{
+    assembler_t self = calloc(1, sizeof(*self));
+    self->mesh       = mesh;
+    self->vars_mgr   = mesh_vars_mgr(mesh);
+    self->via_pool   = 0;
+    return self;
+}
+
+@ 
+
+<<functions>>=
+assembler_t assemble_pcreate(mempool_t pool, mesh_t mesh)
+{
+    assembler_t self = (assembler_t) mempool_cget(pool, sizeof(*self));
+    self->mesh       = mesh;
+    self->vars_mgr   = mesh_vars_mgr(mesh);
+    self->via_pool   = 1;
+    return self;
+}
+
+@ 
+
+<<functions>>=
+void assemble_destroy(assembler_t self)
+{
+    <<destroy assembler variables>>
+
+    if (!self->via_pool) {
+        free(self);
+    }
+}
+
+@ 
+
+We need some internal storage when we assemble displacement boundary
+conditions.  We store the number of variables, total and active,
+in [[num_vars]] and [[num_active]].  We keep track of which variables
+have been fixed by displacement boundary conditions using the
+logical [[is_displaced]] vector, and we keep track of the
+displacement values in the [[displacements]] vector.  The
+[[is_displaced]] vector becomes redundant after we generate
+a [[permutation]] vector that moves all the inactive degrees
+of freedom to the end of the list.
+
+<<[[assembler_t]] entries>>=
+int        num_vars;
+int        num_active;
+double*    displacements;
+@ 
+
+<<destroy displacement assembly variables>>=
+if (self->displacements) free(self->displacements);
+@ 
+
+<<destroy assembler variables>>=
+<<destroy displacement assembly variables>>
+@ 
+
+<<functions>>=
+void assemble_displace(assembler_t self)
+{
+    int i, n, active_id, inactive_id;
+    assemble_matrix_t* bc_assembler;
+    int*  permutation;
+    char* has_bc;
+
+    <<destroy displacement assembly variables>>
+
+    self->num_vars      = vars_count(self->vars_mgr);
+    self->displacements = calloc(self->num_vars, sizeof(double));
+    permutation         = calloc(self->num_vars, sizeof(int));
+    has_bc              = calloc(self->num_vars, 1);
+    bc_assembler = assembler_bc(self->displacements, has_bc, self->num_vars);
+
+    <<call element [[displace]] cases>>
+    <<count active degrees of freedom>>
+    <<bucket sort inactive variables to the end>>
+    <<rearrange entries of [[displacements]]>>
+
+    vars_permute(self->vars_mgr, permutation);
+    assembler_matrix_free(bc_assembler);
+    free(permutation);
+    free(has_bc);
+}
+
+@ 
+
+The main assembly loop calls the [[displace]] method for each
+element that has one.  Those routines in turn call [[add_displace]],
+which records the boundary condition in the [[is_displaced]] and
+[[displacements]] vectors.
+
+<<call element [[displace]] cases>>=
+n = mesh_num_elements(self->mesh);
+for (i = 1; i <= n; ++i)
+    element_displace( mesh_element(self->mesh, i), bc_assembler );
+
+@ 
+
+We build the permutation vector using a simple bucket sort.  Among
+other things, that means the permutation retains the relative ordering
+of the active variables among themselves and of the inactive variables
+among themselves.
+
+<<count active degrees of freedom>>=
+self->num_active = 0;
+for (i = 0; i < self->num_vars; ++i)
+    if (!has_bc[i])
+        self->num_active++;
+@ 
+
+<<bucket sort inactive variables to the end>>=
+active_id   = 0;
+inactive_id = self->num_active;
+for (i = 0; i < self->num_vars; ++i) {
+    if (has_bc[i])
+        permutation[i] = inactive_id++;
+    else
+        permutation[i] = active_id++;
+}
+@ 
+
+Why can we do this?  Because we know that the inactive degrees of freedom
+are shifted to the end, and that their relative order does not change.
+That means that for all the inactive variables, $\pi(i) >= i$.
+
+<<rearrange entries of [[displacements]]>>=
+for (i = self->num_vars - 1; i >= 0; --i) {
+    if (permutation[i] >= self->num_active) {
+        self->displacements[permutation[i]] = self->displacements[i];
+    }
+}
+memset(self->displacements, 0, self->num_active * sizeof(double));
+@ 
+
+<<functions>>=
+double* assemble_get_displacements(assembler_t self)
+{
+    return self->displacements;
+}
+
+int assemble_get_active(assembler_t self)
+{
+    return self->num_active;
+}
+
+@ 
+
+The [[R]] and [[dR]] routines loop through the element model
+functions and call their [[R]] and [[dR]] model cases.  Those functions
+in turn call [[add_R]] and [[add_dR]] to add their
+local contributions to the global matrix.  In the process, they
+may need to get information from the global $x$ vector using [[xlocal]].
+While we are doing the assembly, we keep pointers to the global $x$
+vector and to the output matrix in fields in the assembler object,
+so that we can get at them readily from [[add_R]] and [[add_dR]].
+
+<<functions>>=
+void assemble_R(assembler_t self, double* x, double* v, double* a, 
+                        double* R, int Rsize)
+{
+    int i, n;
+
+    assemble_matrix_t* assembler_x;
+    assemble_matrix_t* assembler_v;
+    assemble_matrix_t* assembler_a;
+    assemble_matrix_t* assembler_R;
+
+    assembler_x = (x == NULL) ? NULL : 
+        assembler_dense_getvector(x, self->num_vars, self->num_vars);
+
+    assembler_v = (v == NULL) ? NULL : 
+        assembler_dense_getvector(v, self->num_vars, self->num_vars);
+
+    assembler_a = (a == NULL) ? NULL : 
+        assembler_dense_getvector(a, self->num_vars, self->num_vars);
+
+    assembler_R = 
+        assembler_dense_vector(R, Rsize, Rsize);
+
+    memset(R, 0, self->num_active * sizeof(double));
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_R( mesh_element(self->mesh, i), assembler_R, 
+                   assembler_x, assembler_v, assembler_a );
+
+    assembler_matrix_free(assembler_R);
+    if (assembler_a) assembler_matrix_free(assembler_a);
+    if (assembler_v) assembler_matrix_free(assembler_v);
+    if (assembler_x) assembler_matrix_free(assembler_x);
+}
+
+@ 
+
+<<functions>>=
+void assemble_dR(assembler_t self, 
+                 double cx, double* x, 
+                 double cv, double* v, 
+                 double ca, double* a, 
+                 double* dR,
+                 int dRsize)
+{
+    int i, n;
+
+    assemble_matrix_t* assembler_x;
+    assemble_matrix_t* assembler_v;
+    assemble_matrix_t* assembler_a;
+    assemble_matrix_t* assembler_dR;
+
+    assembler_x = (x == NULL) ? NULL : 
+        assembler_dense_getvector(x, self->num_vars, self->num_vars);
+
+    assembler_v = (v == NULL) ? NULL : 
+        assembler_dense_getvector(v, self->num_vars, self->num_vars);
+
+    assembler_a = (a == NULL) ? NULL : 
+        assembler_dense_getvector(a, self->num_vars, self->num_vars);
+
+    assembler_dR = 
+        assembler_dense_matrix(dR, dRsize, dRsize);
+
+    memset(dR, 0, self->num_active * self->num_active * sizeof(double));
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_dR( mesh_element(self->mesh, i), assembler_dR, 
+                    cx, assembler_x,
+                    cv, assembler_v,
+                    ca, assembler_a );
+
+    assembler_matrix_free(assembler_dR);
+    if (assembler_a) assembler_matrix_free(assembler_a);
+    if (assembler_v) assembler_matrix_free(assembler_v);
+    if (assembler_x) assembler_matrix_free(assembler_x);
+}
+
+@ 
+
+<<functions>>=
+superlu_t assemble_dR_csc(assembler_t self,
+                          double cx, double* x, 
+                          double cv, double* v, 
+                          double ca, double* a,
+                          int dRsize)
+{
+#ifdef HAVE_SUPERLU
+    int i, n;
+    superlu_t dRsuper;
+
+    assemble_matrix_t* assembler_x;
+    assemble_matrix_t* assembler_v;
+    assemble_matrix_t* assembler_a;
+    assemble_matrix_t* assembler_dR;
+
+    assembler_x = (x == NULL) ? NULL : 
+        assembler_dense_getvector(x, self->num_vars, self->num_vars);
+
+    assembler_v = (v == NULL) ? NULL : 
+        assembler_dense_getvector(v, self->num_vars, self->num_vars);
+
+    assembler_a = (a == NULL) ? NULL : 
+        assembler_dense_getvector(a, self->num_vars, self->num_vars);
+
+    assembler_dR = 
+        assembler_sparse_matrix(dRsize, dRsize);
+
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_dR( mesh_element(self->mesh, i), assembler_dR, 
+                    cx, assembler_x,
+                    cv, assembler_v,
+                    ca, assembler_a);
+
+    assembler_sparse_csc(assembler_dR);
+    dRsuper = superlu_create(assembler_dR, dRsize);
+
+    assembler_matrix_free(assembler_dR);
+    if (assembler_a) assembler_matrix_free(assembler_a);
+    if (assembler_v) assembler_matrix_free(assembler_v);
+    if (assembler_x) assembler_matrix_free(assembler_x);
+
+    return dRsuper;
+#else
+    printf("Library not compiled with SuperLU support\n");
+    assert(0);
+    return NULL;
+#endif
+}
+
+@ 

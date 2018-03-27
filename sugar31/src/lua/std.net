@@ -1,0 +1,37 @@
+use("xformstack.lua")
+use("relpos.lua")
+use("subnetize.lua")
+
+subnet beam2d(A, B, material, l, w, h)
+  if l then
+    relpos_add(A, B, top_xform({l, 0, 0}))
+  end
+  element {A, B; model="beam2d", material=material, l=l, w=w, h=h}
+end
+
+subnet force()
+  args.model    = "force";
+  element(args);
+end
+
+subnet displace()
+  args.model   = "displace";
+  element(args);
+end
+
+subnet anchor(A, material, l, w, h)
+  element {A; model="anchor", material=material, l=l, w=w, h=h}
+end
+
+subnet constraint(A, B)
+  element {A, B; model="constraint"}
+end
+
+subnet rigid(A)
+  element {A; model="rigid"}
+end
+
+subnet gap2d(A, B, material, l, w, h, V)
+  element {A, B; model="gap2d", material=material, l=l, w=w, h=h, V=V}
+end
+

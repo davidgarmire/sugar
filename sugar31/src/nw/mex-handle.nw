@@ -1,0 +1,255 @@
+
+\section{Introduction}
+
+The [[mex_handle]] module keeps track of C data structures by numeric
+handles, so that Matlab users can refer to C objects by providing a
+handle.
+
+
+\section{Interface}
+
+<<mex-handle.h>>=
+#ifndef MEX_HANDLE_H
+#define MEX_HANDLE_H
+
+<<exported functions>>
+
+#endif /* MEX_HANDLE_H */
+@ 
+
+The handle manager object is a statically-allocated singleton.
+It is initialized by [[create]] and destroyed by [[destroy]].
+
+<<exported functions>>=
+void mex_handle_create ();
+void mex_handle_destroy();
+
+@ 
+
+Each object stored by the handle manager has a data field
+and a numeric type tag.  New tags can be allocated using
+the [[new_tag]] routine.  The zero tag is reserved for empty
+handle slots.
+
+<<exported functions>>=
+int   mex_handle_new_tag();
+
+@ 
+
+The [[add]] function allocates a new handle.  The [[find]]
+function locates a handle that has already been allocated.
+Once a handle has been allocated, the associated data and tag fields can
+be retrieved with the [[data]] and [[tag]] methods.  If
+the handle is not valid, [[data]] will return NULL and [[tag]]
+will return zero.  The [[remove]] function deallocates a handle;
+future references to that handle will be invalid.
+
+<<exported functions>>=
+int   mex_handle_add   (void* data, int tag);
+int   mex_handle_find  (void* data, int tag);
+int   mex_handle_tag   (int handle_id);
+void* mex_handle_data  (int handle_id);
+void* mex_handle_remove(int handle_id);
+
+@ 
+
+\section{Implementation}
+
+<<mex-handle.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+
+#include <mex_handle.h>
+#include <dynarray.h>
+
+typedef struct mex_handle_t {
+    void* data;
+    int   tag;
+    int   id;
+} mex_handle_t;
+
+static dynarray_t handles;
+static int next_tag;
+static int next_id;
+static int free_list;
+
+<<functions>>
+@ 
+
+The handles are stored in the dynamic array [[handles]].  Each handle
+has a data pointer, a tag, and a field for the handle identifier.
+The [[next_tag]] and [[next_id]] variables keep track of the number
+of tags and handle identifiers that have been allocated over the lifetime
+of the handle manager.
+
+<<functions>>=
+void mex_handle_create()
+{
+    handles   = dynarray_create(sizeof(mex_handle_t), 16);
+    next_tag  = 1;
+    next_id   = 1;
+    free_list = -1;
+}
+
+void mex_handle_destroy()
+{
+    dynarray_destroy(handles);
+}
+
+@ 
+
+Allocating a new tag is just a matter of incrementing the [[next_tag]] flag.
+
+<<functions>>=
+int mex_handle_new_tag()
+{
+    return next_tag++;
+}
+
+@ 
+
+At a high level, the [[add]] and [[remove]] operations are simple, too.
+To add a handle, we need only to find a space for it, set the fields,
+and assign an identifier.  To remove a handle, we grab the handle data,
+deallocate the handle, and return the data pointer.
+
+<<functions>>=
+int mex_handle_add(void* data, int tag)
+{
+    int index;
+    mex_handle_t* handle;
+
+    <<allocate handle>>
+    handle->data = data;
+    handle->tag  = tag;
+    handle->id   = <<allocate handle identifier>>
+
+    return handle->id;
+}
+
+@ 
+
+<<functions>>=
+void* mex_handle_remove(int handle_id)
+{
+    int index;
+    mex_handle_t* handle;
+    void*         data;
+
+    <<find handle identifier>>
+
+    if (handle == NULL)
+        return NULL;
+    else {
+        data = handle->data;
+        <<deallocate handle>>
+        return data;
+    }
+}
+
+@ 
+
+The [[find]] function returns the identifier for a handle that has
+already been allocated.
+
+<<functions>>=
+int mex_handle_find(void* data, int tag)
+{
+    int i, n;
+    mex_handle_t* handle_data = dynarray_data(handles);
+
+    n = dynarray_count(handles);
+    for (i = 0; i < n; ++i) {
+        if (handle_data[i].tag == tag && handle_data[i].data == data)
+            return handle_data[i].id;
+    }
+    return 0;
+}
+
+@ 
+
+The [[tag]] and [[data]] functions find a handle and return its data
+field (or zero if the handle is invalid).
+
+<<functions>>=
+int mex_handle_tag(int handle_id)
+{
+    int index;
+    mex_handle_t* handle;
+
+    <<find handle identifier>>
+
+    return (handle != NULL) ? handle->tag : 0;
+}
+
+@ 
+
+<<functions>>=
+void* mex_handle_data(int handle_id)
+{
+    int index;
+    mex_handle_t* handle;
+
+    <<find handle identifier>>
+
+    return (handle != NULL) ? handle->data : NULL;
+}
+
+@ 
+
+We keep a free list of deallocated handle slots for re-use, since
+it seems likely that they will be deallocated pretty often.
+The handle [[id]] field is used to point to the next slot on
+the free list, and $-1$ serves the role of a NULL.  If we want
+a new slot and there are none available from the free list, we
+just expand the array to accomodate a new handle.
+
+<<allocate handle>>=
+if (free_list >= 0) {
+    index      = free_list;
+    handle     = dynarray_get(handles, index);
+    free_list  = handle->id;
+} else {
+    index      = dynarray_count(handles);
+    handle     = dynarray_append(handles, NULL);
+}
+
+@ 
+
+<<deallocate handle>>=
+handle->tag  = 0;
+handle->data = NULL;
+handle->id   = free_list;
+free_list    = index;
+
+@ 
+
+A natural way to pick handle identifiers would be to use the
+array index of the identifier.  There is a problem
+with this approach, though.  We would like small,
+common numbers like $0$ and $1$ \emph{not} to be valid handles.
+It makes it more difficult for the user to accidentally retrieve 
+a valid handle that was not returned to him.  Similarly, we would
+like the handles not to be too close together, so that taking a
+valid handle and adding one to it doesn't yield another valid handle.
+
+We can get a more scattered space of handles by putting some unique
+identifying information in the high order bits and using the low
+order bits for index information.  For the moment, we'll use the
+lower ten bits for indexing.  I doubt we'll ever have more than 256
+simultaneously active handles, so the for loop used to retrieve
+the handle identifiers will probably never go past the first iteration
+unless there is an error.
+
+<<allocate handle identifier>>=
+(next_tag++ << 8) + (index & 255);
+@ 
+
+<<find handle identifier>>=
+for (index = (handle_id & 255);
+     (handle = dynarray_get(handles, index)) != NULL &&
+         handle->id != handle_id;
+     index += 256);
+@ 
+

@@ -1,0 +1,303 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+As a convenience to users, we provide a mechanism for declaring
+nested coordinate systems.  This is particularly useful
+for creating \emph{substructures} or \emph{subnets}.  Different
+instances of a subnet may have the same relative placements
+of nodes, but at different translations and orientations.
+
+
+\section{Interface}
+
+We support nested coordinate systems via a \emph{transformation stack}.
+The entries in this stack data structures are all affine transformations that
+take the current coordinate system to the global system.  New transformations
+are \emph{composed} with the previous top-of-stack, so that if
+$T_0$ is the current transformation to global coordinates and a
+transformation $S$ is pushed onto the stack, then $T_0 S$ will
+be the new transformation from current to global coordinates.
+
+The transformation $T = Ax + b$ is given by a table of twelve entries 
+which represents the components of the matrix $[A; b]$ in column major 
+order.  A vector $x$ is given by a table with coordinate entries at
+indices 1 to 3.  Note that the table can contain additional information
+(e.g. a node name).  Part of the reason the transformation functions
+overwrite the input vector table is so that entries besides those
+at indices 1 to 3 can be retained unchanged.
+
+The functions provided by this module are
+\begin{itemize}
+  \item {\Tt{}xform{\_}push(T)\nwendquote}: compose a transformation onto the stack
+  \item {\Tt{}xform{\_}pop\nwendquote}: pop a level off the transformation stack
+  \item {\Tt{}top{\_}xform(x)\nwendquote}: overwrite $x$ with $T_\mathit{top} x$,
+        where $T_\mathit{top}$ is the top transform on the stack
+  \item {\Tt{}xform{\_}apply(T,\ x)\nwendquote}: overwrite $x$ with $Tx$.
+  \item {\Tt{}xform{\_}applyA(t,\ x)\nwendquote}: overwrite $x$ with $A_T x$,
+        where $A_T$ is the linear part of the affine transform $T$.
+  \item {\Tt{}xform{\_}compose(T,\ S)\nwendquote}: return $TS$
+  \item {\Tt{}xform{\_}identity\nwendquote}: return the identity transform
+  \item {\Tt{}xform{\_}ox(r),\ xform{\_}oy(r),\ xform{\_}oz(r)\nwendquote}:
+        return right-handed rotations about the coordinate axes
+  \item {\Tt{}xform{\_}translate(z)\nwendquote}: return a translation by the
+        vector $z$
+  \item {\Tt{}subnet(f)\nwendquote}: return a function which creates a nested
+        coordinate system according to any {\Tt{}ox\nwendquote}, {\Tt{}oy\nwendquote},
+        and {\Tt{}oz\nwendquote} parameters, calls {\Tt{}f\nwendquote}, and then pops the
+        nested coordinate system.
+\end{itemize}
+
+
+\section{Implementation}
+
+\nwfilename{xformstack.nw}\nwbegincode{1}\sublabel{NW4ZsHyK-4TVv9z-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-4TVv9z-1}}}\moddef{xformstack.lua~{\nwtagstyle{}\subpageref{NW4ZsHyK-4TVv9z-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+\LA{}data~{\nwtagstyle{}\subpageref{NW4ZsHyK-3zsvuH-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}\RA{}
+\nwnotused{xformstack.lua}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+\subsection{The transform stack}
+
+The size of the stack is maintained in the field $n$.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW4ZsHyK-3zsvuH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-3zsvuH-1}}}\moddef{data~{\nwtagstyle{}\subpageref{NW4ZsHyK-3zsvuH-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwenddeflinemarkup
+xform_stack = \{n = 0\};
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+Note that we compose new transformations onto the stack, interpreting
+the transformation argument as a transformation into the current coordinates
+instead of a transformation into the global coordinates.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW4ZsHyK-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{\relax}{NW4ZsHyK-nRuDO-2}\nwenddeflinemarkup
+function xform_push(T)
+  local n = xform_stack.n + 1
+  if n == 1 then
+    xform_stack[n] = T
+  else
+    xform_stack[n] = xform_compose(xform_stack[n-1], T);
+  end
+  xform_stack.n = n;
+end
+
+\nwalsodefined{\\{NW4ZsHyK-nRuDO-2}\\{NW4ZsHyK-nRuDO-3}\\{NW4ZsHyK-nRuDO-4}\\{NW4ZsHyK-nRuDO-5}\\{NW4ZsHyK-nRuDO-6}\\{NW4ZsHyK-nRuDO-7}\\{NW4ZsHyK-nRuDO-8}\\{NW4ZsHyK-nRuDO-9}\\{NW4ZsHyK-nRuDO-A}\\{NW4ZsHyK-nRuDO-B}\\{NW4ZsHyK-nRuDO-C}}\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW4ZsHyK-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-1}{NW4ZsHyK-nRuDO-3}\nwenddeflinemarkup
+function xform_pop()
+  xform_stack.n = xform_stack.n - 1
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW4ZsHyK-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-2}{NW4ZsHyK-nRuDO-4}\nwenddeflinemarkup
+function top_xform(x)
+  local n = xform_stack.n
+  if n > 0 then
+    return xform_apply(xform_stack[n], x)
+  else
+    return x
+  end
+end 
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\subsection{Transformation functions}
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW4ZsHyK-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-3}{NW4ZsHyK-nRuDO-5}\nwenddeflinemarkup
+-- Overwrite x with Tx
+function xform_apply(T, x)
+  local y1 = T[1]*x[1] + T[4]*x[2] + T[7]*x[3] + T[10];
+  local y2 = T[2]*x[1] + T[5]*x[2] + T[8]*x[3] + T[11];
+  local y3 = T[3]*x[1] + T[6]*x[2] + T[9]*x[3] + T[12];
+  x[1] = y1;
+  x[2] = y2;
+  x[3] = y3;
+  return x;
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW4ZsHyK-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-4}{NW4ZsHyK-nRuDO-6}\nwenddeflinemarkup
+-- Overwrite x with A_T * x
+function xform_applyA(T, x)
+  local y1 = T[1]*x[1] + T[4]*x[2] + T[7]*x[3]; 
+  local y2 = T[2]*x[1] + T[5]*x[2] + T[8]*x[3]; 
+  local y3 = T[3]*x[1] + T[6]*x[2] + T[9]*x[3];
+  x[1] = y1;
+  x[2] = y2;
+  x[3] = y3;
+  return x;
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+Recall that 
+\[
+  T(S(x)) = A_T (A_S x + b_S) + b_T = (A_T A_S) x + T(b_T)
+\]
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW4ZsHyK-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-5}{NW4ZsHyK-nRuDO-7}\nwenddeflinemarkup
+-- Return TS
+function xform_compose(T, S)
+  local TS = \{\};
+  for k = 1,4 do
+    local base = 3*k-3;
+    TS[base+1] = T[1]*S[base+1] + T[4]*S[base+2] + T[7]*S[base+3];
+    TS[base+2] = T[2]*S[base+1] + T[5]*S[base+2] + T[8]*S[base+3];
+    TS[base+3] = T[3]*S[base+1] + T[6]*S[base+2] + T[9]*S[base+3];
+  end
+  TS[10] = TS[10] + T[10];
+  TS[11] = TS[11] + T[11];
+  TS[12] = TS[12] + T[12];
+  return TS;
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW4ZsHyK-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-6}{NW4ZsHyK-nRuDO-8}\nwenddeflinemarkup
+-- Return the identity
+function xform_identity()
+  return \{ 1, 0, 0,
+           0, 1, 0,
+           0, 0, 1,
+           0, 0, 0 \};
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+Getting right hand rotations correct is always a trick.
+Important note -- remember that the transformation matrix is
+interpreted as column-major, but is ``typographically'' row
+major.  So put on your transposing hat before reading the
+following three functions.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW4ZsHyK-nRuDO-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-7}{NW4ZsHyK-nRuDO-9}\nwenddeflinemarkup
+-- Return a rotation about the x axis
+function xform_ox(r)
+  local c = cos(r)
+  local s = sin(r)
+  return \{ 1,   0,  0,
+           0,   c,  s,
+           0,  -s,  c,
+           0,   0,  0 \}
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW4ZsHyK-nRuDO-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-8}{NW4ZsHyK-nRuDO-A}\nwenddeflinemarkup
+-- Return a rotation about the y axis
+function xform_oy(r)
+  local c = cos(r)
+  local s = sin(r)
+  return \{ c,   0, -s,
+           0,   1,  0,
+           s,   0,  c,
+           0,   0,  0 \}
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW4ZsHyK-nRuDO-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-9}{NW4ZsHyK-nRuDO-B}\nwenddeflinemarkup
+-- Return a rotation about the z axis
+function xform_oz(r)
+  local c = cos(r)
+  local s = sin(r)
+  return \{ c,   s,  0,
+          -s,   c,  0,
+           0,   0,  1,
+           0,   0,  0 \}
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW4ZsHyK-nRuDO-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-A}{NW4ZsHyK-nRuDO-C}\nwenddeflinemarkup
+-- Return a translation 
+function xform_translate(z)
+  return \{ 1,    0,    0,
+           0,    1,    0,
+           0,    0,    1,
+           z[1], z[2], z[3] \}
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+
+\subsection{{\Tt{}node\nwendquote} and {\Tt{}subnetize\nwendquote} functions}
+
+We assume that node positions are expressed in the current coordinate
+system (at least, that's what we assume for most purposes).
+So the {\Tt{}nodex\nwendquote} (``node transformed'') function transforms
+the input coordinates from local to global, and them makes a node.
+
+We still want to leave the option of expressing node coordinates
+directly in the global coordinate system, though.  For instance,
+we may want to put a node halfway between two other nodes which
+have already been transformed into global coordinates.  For this
+reason, we leave the {\Tt{}node\nwendquote} function alone.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW4ZsHyK-nRuDO-C}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4ZsHyK-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-4TVv9z-1}}\nwprevnextdefs{NW4ZsHyK-nRuDO-B}{\relax}\nwenddeflinemarkup
+function nodex(p)
+  if p[1] then
+    top_xform(p)
+  end
+  return node(p)
+end
+
+\nwused{\\{NW4ZsHyK-4TVv9z-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+
+
+\subsection{Test code}
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW4ZsHyK-pcrvx-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-pcrvx-1}}}\moddef{xformtst.lua~{\nwtagstyle{}\subpageref{NW4ZsHyK-pcrvx-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+use("xformstack.lua")
+
+\LA{}test transform constructors~{\nwtagstyle{}\subpageref{NW4ZsHyK-1zasbh-1}}\RA{}
+\LA{}test composition~{\nwtagstyle{}\subpageref{NW4ZsHyK-2X3VkV-1}}\RA{}
+\nwnotused{xformtst.lua}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW4ZsHyK-1zasbh-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-1zasbh-1}}}\moddef{test transform constructors~{\nwtagstyle{}\subpageref{NW4ZsHyK-1zasbh-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-pcrvx-1}}\nwenddeflinemarkup
+-- First check out the basics
+
+rx45 = xform_ox(45)
+ry45 = xform_oy(45)
+rz45 = xform_oz(45)
+trans = xform_translate \{1, 2, 3\}
+
+x1 = xform_apply(rx45,  \{1, 0, 0\})
+x2 = xform_apply(ry45,  \{1, 0, 0\})
+x3 = xform_apply(rz45,  \{1, 0, 0\})
+x4 = xform_apply(trans, \{1, 0, 0\})
+x5 = xform_applyA(trans, \{1, 0, 0\})
+
+print("Rotate e1 by rx45: ",     x1[1], x1[2], x1[3])
+print("Rotate e1 by ry45: ",     x2[1], x2[2], x2[3])
+print("Rotate e1 by rz45: ",     x3[1], x3[2], x3[3])
+print("Translate e1 by 1,2,3: ", x4[1], x4[2], x4[3])
+print("Apply A e1 by 1,2,3: ",   x5[1], x5[2], x5[3])
+
+\nwused{\\{NW4ZsHyK-pcrvx-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW4ZsHyK-2X3VkV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4ZsHyK-2X3VkV-1}}}\moddef{test composition~{\nwtagstyle{}\subpageref{NW4ZsHyK-2X3VkV-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4ZsHyK-pcrvx-1}}\nwenddeflinemarkup
+-- Now check out composition
+
+T = xform_compose(trans, rz45)
+x = xform_apply(T, \{1, 0, 0\})
+
+print("Rotate then translate: ", x[1], x[2], x[3])
+
+undoT = xform_compose(xform_oz(-45), xform_translate\{-1,-2,-3\})
+xform_apply(undoT, x)
+
+print("After undo operation: ", x[1], x[2], x[3])
+
+\nwused{\\{NW4ZsHyK-pcrvx-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{data}{NW4ZsHyK-3zsvuH-1}{\nwixu{NW4ZsHyK-4TVv9z-1}\nwixd{NW4ZsHyK-3zsvuH-1}}}%
+\nwixlogsorted{c}{{functions}{NW4ZsHyK-nRuDO-1}{\nwixu{NW4ZsHyK-4TVv9z-1}\nwixd{NW4ZsHyK-nRuDO-1}\nwixd{NW4ZsHyK-nRuDO-2}\nwixd{NW4ZsHyK-nRuDO-3}\nwixd{NW4ZsHyK-nRuDO-4}\nwixd{NW4ZsHyK-nRuDO-5}\nwixd{NW4ZsHyK-nRuDO-6}\nwixd{NW4ZsHyK-nRuDO-7}\nwixd{NW4ZsHyK-nRuDO-8}\nwixd{NW4ZsHyK-nRuDO-9}\nwixd{NW4ZsHyK-nRuDO-A}\nwixd{NW4ZsHyK-nRuDO-B}\nwixd{NW4ZsHyK-nRuDO-C}}}%
+\nwixlogsorted{c}{{test composition}{NW4ZsHyK-2X3VkV-1}{\nwixu{NW4ZsHyK-pcrvx-1}\nwixd{NW4ZsHyK-2X3VkV-1}}}%
+\nwixlogsorted{c}{{test transform constructors}{NW4ZsHyK-1zasbh-1}{\nwixu{NW4ZsHyK-pcrvx-1}\nwixd{NW4ZsHyK-1zasbh-1}}}%
+\nwixlogsorted{c}{{xformstack.lua}{NW4ZsHyK-4TVv9z-1}{\nwixd{NW4ZsHyK-4TVv9z-1}}}%
+\nwixlogsorted{c}{{xformtst.lua}{NW4ZsHyK-pcrvx-1}{\nwixd{NW4ZsHyK-pcrvx-1}}}%
+\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}

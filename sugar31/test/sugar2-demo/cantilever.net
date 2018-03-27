@@ -1,0 +1,22 @@
+% This netlist describes a cantilever beam with a force applied
+% at the end.  The netlist lines describe
+%
+%  - An anchor fabricated in the first polySi layer (p1).
+%    Note that this netlist assumes the default process
+%    (which is MUMPS).  Parameters describing the different
+%    layers in this process (e.g. Young's modulus and film
+%    thickness) are specified in the file processmaster.m.
+%    The node 'substrate' is where the anchor is attached.
+%  - A beam, also made from the first polySi layer, which
+%    runs from the node 'substrate' to node 'tip'.  The
+%    beam is 100 microns long, and has a 2 micron-by-2 micron
+%    cross section.
+%  - A 2 micro-Newton force applied at a right angle to the 
+%    tip of the beam
+
+uses mumps.net
+
+anchor  p1 [substrate]     [l=10u w=10u]
+beam3d  p1 [substrate tip] [l=100u w=2u h=2u]
+f3d     *   [tip]          [F=2u oz=pi/2]
+

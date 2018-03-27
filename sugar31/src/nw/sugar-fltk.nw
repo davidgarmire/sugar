@@ -1,0 +1,532 @@
+
+\section{Introduction}
+
+The Fast Light Tool Kit (FLTK) is a C++ windowing toolkit which works
+under either X or Windows.  The programming interface is similar in
+some ways to the XForms library (or, more generally, any OO event-driven
+interface widget set).  This module implements a graphical shell for
+the SUGAR Lua interfaces.
+
+\emph{Todo: Need to say a little more about what it looks like, 
+      how you might use it, etc.  Probably inscrutable right now.}
+
+
+\section{Implementation}
+
+This implementation is a hacked-up version of the ``editor'' demo application
+that came with the FLTK distribution.  Unlike the rest of SUGAR, it is
+written in C++.  I wrote it for fun on a Friday night (and Saturday morning), 
+so caveat user.
+
+<<sugar-fltk.cc>>=
+<<includes>>
+<<static data>>
+<<[[EditorWindow]] class>>
+<<Lua functions>>
+<<event handlers>>
+<<menu data>>
+<<[[EditorWindow]] methods>>
+<<main routine>>
+@ 
+
+We need to wrap several of the header files in an [[extern "C"]]
+block to tell the C++ compiler not to do name mangling on the
+symbols they export.  We also use standard headers.
+
+<<includes>>=
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+
+extern "C" {
+#include <lua.h>
+#include <lualib.h>
+
+#include <modelmgr.h>
+#include <model_test.h>
+#include <vars.h>
+#include <assemble.h>
+#include <uses_manager.h>
+
+#include <uses_manager_lua.h>
+#include <meshgen_lua.h>
+#include <mesh_lua.h>
+#include <matrix_lua.h>
+#include <superlu_lua.h>
+}
+
+@ 
+
+For every FLTK widget we use, we need a header file.  It is sort
+of annoying.
+
+<<includes>>=
+#include <FL/Fl.H>
+#include <FL/Fl_Group.H>
+#include <FL/Fl_Double_Window.H>
+#include <FL/fl_ask.H>
+#include <FL/Fl_File_Chooser.H>
+#include <FL/Fl_Menu_Bar.H>
+#include <FL/Fl_Input.H>
+#include <FL/Fl_Button.H>
+#include <FL/Fl_Return_Button.H>
+#include <FL/Fl_Text_Buffer.H>
+#include <FL/Fl_Text_Editor.H>
+#include <Fl/Fl_Box.H>
+#include <Fl/fl_draw.H>
+
+@ 
+
+The [[netdraw-fltk]] module implements the [[netdraw]] interface
+so that SUGAR can sketch designs to a box in the bottom half of
+the user interface screen.
+
+<<includes>>=
+#include <netdraw_fltk.hh>
+
+@ 
+
+
+\subsection{Provided Lua functions}
+
+Perhaps the trickiest part of incorporating Lua with FLTK is the
+output and error handling routines.  They are not difficult,
+but there are a couple things to remember:
+\begin{itemize}
+ \item Output cannot go to the standard output.  I send error
+       messages to special alert boxes, and printed output
+       to the user ``command line'' text box.
+ \item Any calls to the Lua interfaces from within widget callbacks
+       should be handled through the [[lua_dostring]] function
+       or something like it.  Calls should \emph{not} be made
+       directly or using the [[lua_rawcall]] function.
+       The [[lua_dostring]] interface handles error cases
+       internally; the [[lua_rawcall]] interface can result in
+       [[longjmp]] calls that have no appropriate match.  Somehow,
+       that interacts with the FLTK event handler in a bad way.
+       (If nothing else, it can freeze the X server on my laptop).
+\end{itemize}
+
+The [[_ALERT]] function is used by the Lua error handling routines
+to deliver error and warning messages.
+
+<<register Lua functions>>=
+lua_register(L, "_ALERT", lua_alert);
+
+@
+
+<<Lua functions>>=
+static int lua_alert(lua_State* L)
+{
+    int n = lua_gettop(L);  /* number of arguments */
+
+    lua_getglobal(L, "tostring");
+    lua_pushvalue(L, 1);
+    lua_rawcall(L, 1, 1);
+
+    const char* s = lua_tostring(L, -1);
+    if (s != NULL)
+        fl_alert("%s", s);
+
+    lua_settop(L, 0);
+    return 0;
+}
+
+@ 
+
+Errors reported during mesh generation should also be handled
+using the Lua error handling interface.
+
+<<Lua functions>>=
+static void error_handler(void* arg, const char* msg)
+{
+    lua_State* L = (lua_State*) arg;
+    lua_error(L, msg);
+}
+
+@ 
+
+We want a new [[print]] implementation that outputs to the 
+text box instead of [[stdout]].  This code is a hacked-up
+version of the default Lua print implementation.
+
+<<register Lua functions>>=
+lua_pushuserdata(L, window->editor);
+lua_pushcclosure(L, lua_print, 1);
+lua_setglobal(L, "print");
+
+@ 
+
+<<Lua functions>>=
+static int lua_print(lua_State *L)
+{
+    int n = lua_gettop(L);  /* number of arguments */
+
+    <<get editor object [[e]]>>
+
+    lua_getglobal(L, "tostring");
+    for (int i=1; i<=n; i++) {
+        <<convert argument $i$ to string>>
+        <<insert string in text window>>
+        lua_pop(L, 1);
+    }
+    <<finish line and update window>>
+
+    lua_settop(L, 0);
+    return 0;
+}
+
+@ 
+
+<<convert argument $i$ to string>>=
+lua_pushvalue(L, -1);  /* function to be called */
+lua_pushvalue(L,  i);  /* value to print */
+lua_rawcall(L, 1, 1);
+const char* s = lua_tostring(L, -1);
+@ 
+
+<<get editor object [[e]]>>=
+Fl_Text_Editor* e = (Fl_Text_Editor*) lua_touserdata(L, -1);
+lua_pop(L,1);
+--n;
+@
+
+<<insert string in text window>>=
+if (s == NULL)
+    lua_error(L, "`tostring' must return a string to `print'");
+if (i>1) e->insert("\t");
+e->insert(s);
+@ 
+
+<<finish line and update window>>=
+e->insert("\n");
+e->show_insert_position();
+@ 
+
+The [[cho_load]] function was copied from the [[sugar-lua]] module.
+
+<<register Lua functions>>=
+lua_register(L, "cho_load", lua_netload);
+
+@ 
+
+<<Lua functions>>=
+static int lua_netload(lua_State* L)
+{
+    int n = lua_gettop(L);
+    mesh_t mesh;
+
+    if (n != 1 || !lua_isstring(L,-1))
+        lua_error(L, "Invalid argument to 'cho_load'");
+
+    mesh = mesh_lua_load(L, uses_manager, lua_tostring(L,-1),
+                         model_mgr, error_handler);
+
+    if (mesh == NULL)
+        lua_error(L, "Error opening file");
+
+    lua_settop(L,0);
+    lua_mesh_create(L, mesh);
+    return 1;
+}
+
+@ 
+
+The [[cho_display]] function updates the mesh displayed in the draw box
+with a call to the [[set_mesh]] for the [[DrawBox]] class.
+The [[set_mesh]] method tells the drawing area to use a particular
+mesh for display; if the argument is NULL, the drawing area will
+be empty.
+
+<<register Lua functions>>=
+lua_pushuserdata(L, window->drawbox);
+lua_pushcclosure(L, lua_draw, 1);
+lua_setglobal(L, "cho_display");
+
+@ 
+
+<<Lua functions>>=
+static int lua_draw(lua_State* L)
+{
+    int n = lua_gettop(L);  /* number of arguments */
+
+    DrawBox* box = (DrawBox*) lua_touserdata(L, -1);
+    lua_pop(L, 1);
+    --n;
+
+    mesh_t  mesh = NULL;
+    double* x    = NULL;
+
+    if (n >= 1) {
+        mesh = lua_mesh_get(L,1);
+    }
+    if (n >= 2) {
+        <<get draw displacement parameter>>
+    }
+    if (n > 2)
+        lua_error(L, "Too many arguments to cho_display");
+
+    box->set_mesh(mesh);
+    box->set_disp(x);
+
+    lua_settop(L, 0);
+    return 0;
+}
+
+@ 
+
+<<get draw displacement parameter>>=
+lua_matrix_t xarg      = lua_matrix_get(L,2);
+vars_mgr_t   vars_mgr  = mesh_vars_mgr(mesh);
+assembler_t  assembler = mesh_assembler(mesh);
+int          nvars     = vars_count(vars_mgr);
+int          nactive   = assemble_get_active(assembler);
+int          i;
+
+double*      displacements = assemble_get_displacements(assembler);
+
+if (xarg->m != nactive || xarg->n != 1)
+    lua_error(L, "State vector is wrong size");
+
+x = (double*) calloc(nvars, sizeof(double));
+memcpy(x, displacements, nvars * sizeof(double));
+memcpy(x, xarg->data, nactive * sizeof(double));
+
+@ 
+
+\subsection{Editor window}
+
+The editor window has two major components: a text editor box, where
+user interaction occurs; and a drawing box, where the current device
+is displayed.  We also have a command menu.  Note that the [[editor]] 
+and [[drawbox]] fields should almost certainly not be public (as they
+currently are).
+
+<<[[EditorWindow]] class>>=
+class EditorWindow : public Fl_Double_Window {
+public:
+    EditorWindow(int w, int h, const char* t);
+    ~EditorWindow();
+
+    Fl_Text_Editor     *editor;
+    DrawBox            *drawbox;
+};
+
+@ 
+
+<<static data>>=
+static lua_State*         L;
+static uses_manager_t     uses_manager;
+static model_mgr_t        model_mgr;
+static Fl_Text_Buffer    *textbuf;
+
+@ 
+
+<<[[EditorWindow]] methods>>=
+EditorWindow::EditorWindow(int w, int h, const char* t) : 
+    Fl_Double_Window(w, h, t) 
+{
+    begin();
+
+      Fl_Menu_Bar* m = new Fl_Menu_Bar(0, 0, 512, 30);
+      m->copy(menuitems, this);
+
+      editor = new Fl_Text_Editor(0, 30, 512, 354);
+      editor->buffer(textbuf);
+      editor->textfont(FL_COURIER);
+
+      drawbox = new DrawBox(0, 384, 512, 300);
+
+    end();
+
+    editor->add_key_binding(FL_Enter, FL_TEXT_EDITOR_ANY_STATE,
+                               enter_key_cb);
+
+    resizable(editor);
+    callback((Fl_Callback *)quit_cb, this);
+
+    textbuf->add_modify_callback(changed_cb, this);
+    textbuf->call_modify_callbacks();
+}
+
+EditorWindow::~EditorWindow() 
+{
+}
+
+@ 
+
+<<event handlers>>=
+static int enter_key_cb(int, Fl_Text_Editor* e)
+{
+    int old_position = e->insert_position();
+    e->insert("\n");
+    lua_dostring(L, textbuf->line_text(old_position));
+    e->show_insert_position();
+    return 1;
+}
+
+static void changed_cb(int, int nInserted, int nDeleted,int, 
+                       const char*, void* v) 
+{
+    EditorWindow *w = (EditorWindow *)v;
+    w->editor->show_insert_position();
+}
+
+@ 
+
+The command menu includes options to load and save files,
+create netlists, and quit.
+
+<<menu data>>=
+static Fl_Menu_Item menuitems[] = {
+  { "&File",              0, 0, 0, FL_SUBMENU },
+
+    <<file menu options>>
+    <<netlist menu options>>
+
+    { "E&xit", FL_CTRL + 'q', (Fl_Callback *) quit_cb, 0 },
+    { 0 },
+
+  { 0 }
+};
+
+@ 
+
+<<event handlers>>=
+static void quit_cb(Fl_Widget*, void*) 
+{
+    lua_close(L);
+    exit(0);
+}
+
+@ 
+
+<<file menu options>>=
+{ "&Open",            FL_CTRL + 'o', (Fl_Callback *) open_cb, 0 },
+{ "&Load net",        FL_CTRL + 'l', (Fl_Callback *) load_cb, 0 },
+{ "&Save File",       FL_CTRL + 's', (Fl_Callback *) save_cb, 0 },
+{ "Save File &As...", FL_CTRL + FL_SHIFT + 's', 
+   (Fl_Callback *)saveas_cb, 0, FL_MENU_DIVIDER }, 
+
+@ 
+
+<<event handlers>>=
+static void open_cb(Fl_Widget*, void*) 
+{
+    char *newfile = fl_file_chooser("Open File?", "*.lua", NULL);
+    if (newfile != NULL) 
+        lua_dofile(L, newfile);
+}
+
+static void load_cb(Fl_Widget*, void*) 
+{
+    char *newfile = fl_file_chooser("Open File?", "*.net", NULL);
+    if (newfile != NULL) {
+        char buf[256];
+        sprintf(buf, "net = cho_load(\"%s\"); draw(net);", newfile);
+        lua_dostring(L, buf);
+    }
+}
+
+static void save_file(int save_as) 
+{
+    static char filename[128] = "";
+
+    char* newfile = filename;
+    if (save_as || *filename == '\0')
+            newfile = fl_file_chooser("Save File As?", "*", filename);
+
+    if (newfile != NULL && textbuf->savefile(newfile))
+        fl_alert("Error writing to file \'%s\':\n%s.", 
+                 newfile, strerror(errno));
+}
+
+static void saveas_cb(void) 
+{
+    save_file(1);
+}
+
+static void save_cb(void) 
+{
+    save_file(0);
+}
+
+@ 
+
+<<netlist menu options>>=
+{ "&Create netlist...", 0, (Fl_Callback *) new_net_cb, 0, 0 }, 
+{ "&End netlist...",    0, (Fl_Callback *) end_net_cb, 0, 
+                        FL_MENU_DIVIDER }, 
+
+@ 
+
+<<event handlers>>=
+static void new_net_cb(Fl_Widget*, void*)
+{
+    mesh_t mesh = mesh_create(model_mgr);
+    mesh_set_handlers(mesh, error_handler, NULL, L);
+    lua_meshgen_register(L, mesh);
+
+    lua_mesh_create(L, mesh);
+    lua_setglobal(L, "net");
+
+    lua_dostring(L, "draw(net)");
+    lua_dostring(L, "element = function(p) %element(p); draw(net); end");
+}
+
+static void end_net_cb(Fl_Widget*, void*)
+{
+    lua_meshgen_unregister(L);
+
+    lua_getglobal(L, "net");
+    mesh_t mesh = (mesh_t) lua_touserdata(L,-1);
+    lua_pop(L,1);
+
+    vars_get_vartypes(mesh_vars_mgr(mesh));
+    vars_assign      (mesh_vars_mgr(mesh));
+    assemble_displace(mesh_assembler(mesh));
+}
+
+@ 
+
+\section{Main routine}
+
+<<main routine>>=
+int main(int argc, char **argv) 
+{
+    textbuf = new Fl_Text_Buffer;
+    EditorWindow* window = 
+        new EditorWindow(512, 684, "SUGAR interface window");
+
+    window->show(1, argv);
+
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr      = model_mgr_init();
+    uses_manager   = uses_manager_create(pool);
+
+    xtnetdraw_init(argc, argv);
+    model_test_register(model_mgr);
+    model_mgr_standard_register(model_mgr);
+
+    L = lua_open(0);
+
+    lua_matrix_register(L);
+    lua_superlu_register(L);
+    lua_mesh_register(L);
+    lua_usesmgrlib(L);
+    lua_set_usesmgr(L, uses_manager);
+
+    lua_baselibopen(L);
+    lua_mathlibopen(L);
+    lua_iolibopen(L);
+
+    uses_manager_envpath(uses_manager, "SUGAR_LUA_PATH");
+    
+    <<register Lua functions>>
+
+    window->editor->insert("");
+    return Fl::run();
+}
+
+@ 

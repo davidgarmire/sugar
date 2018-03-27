@@ -1,0 +1,266 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}mex{\_}handle\nwendquote} module keeps track of C data structures by numeric
+handles, so that Matlab users can refer to C objects by providing a
+handle.
+
+
+\section{Interface}
+
+\nwfilename{mex-handle.nw}\nwbegincode{1}\sublabel{NWNhLk6-4fAjjr-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-4fAjjr-1}}}\moddef{mex-handle.h~{\nwtagstyle{}\subpageref{NWNhLk6-4fAjjr-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MEX_HANDLE_H
+#define MEX_HANDLE_H
+
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWNhLk6-2gXoUc-1}}\RA{}
+
+#endif /* MEX_HANDLE_H */
+\nwnotused{mex-handle.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The handle manager object is a statically-allocated singleton.
+It is initialized by {\Tt{}create\nwendquote} and destroyed by {\Tt{}destroy\nwendquote}.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWNhLk6-2gXoUc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-2gXoUc-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWNhLk6-2gXoUc-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-4fAjjr-1}}\nwprevnextdefs{\relax}{NWNhLk6-2gXoUc-2}\nwenddeflinemarkup
+void mex_handle_create ();
+void mex_handle_destroy();
+
+\nwalsodefined{\\{NWNhLk6-2gXoUc-2}\\{NWNhLk6-2gXoUc-3}}\nwused{\\{NWNhLk6-4fAjjr-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+Each object stored by the handle manager has a data field
+and a numeric type tag.  New tags can be allocated using
+the {\Tt{}new{\_}tag\nwendquote} routine.  The zero tag is reserved for empty
+handle slots.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWNhLk6-2gXoUc-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-2gXoUc-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWNhLk6-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-4fAjjr-1}}\nwprevnextdefs{NWNhLk6-2gXoUc-1}{NWNhLk6-2gXoUc-3}\nwenddeflinemarkup
+int   mex_handle_new_tag();
+
+\nwused{\\{NWNhLk6-4fAjjr-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\Tt{}add\nwendquote} function allocates a new handle.  The {\Tt{}find\nwendquote}
+function locates a handle that has already been allocated.
+Once a handle has been allocated, the associated data and tag fields can
+be retrieved with the {\Tt{}data\nwendquote} and {\Tt{}tag\nwendquote} methods.  If
+the handle is not valid, {\Tt{}data\nwendquote} will return NULL and {\Tt{}tag\nwendquote}
+will return zero.  The {\Tt{}remove\nwendquote} function deallocates a handle;
+future references to that handle will be invalid.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWNhLk6-2gXoUc-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-2gXoUc-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWNhLk6-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-4fAjjr-1}}\nwprevnextdefs{NWNhLk6-2gXoUc-2}{\relax}\nwenddeflinemarkup
+int   mex_handle_add   (void* data, int tag);
+int   mex_handle_find  (void* data, int tag);
+int   mex_handle_tag   (int handle_id);
+void* mex_handle_data  (int handle_id);
+void* mex_handle_remove(int handle_id);
+
+\nwused{\\{NWNhLk6-4fAjjr-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWNhLk6-22fNlv-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-22fNlv-1}}}\moddef{mex-handle.c~{\nwtagstyle{}\subpageref{NWNhLk6-22fNlv-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+
+#include <mex_handle.h>
+#include <dynarray.h>
+
+typedef struct mex_handle_t \{
+    void* data;
+    int   tag;
+    int   id;
+\} mex_handle_t;
+
+static dynarray_t handles;
+static int next_tag;
+static int next_id;
+static int free_list;
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}\RA{}
+\nwnotused{mex-handle.c}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+The handles are stored in the dynamic array {\Tt{}handles\nwendquote}.  Each handle
+has a data pointer, a tag, and a field for the handle identifier.
+The {\Tt{}next{\_}tag\nwendquote} and {\Tt{}next{\_}id\nwendquote} variables keep track of the number
+of tags and handle identifiers that have been allocated over the lifetime
+of the handle manager.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWNhLk6-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-22fNlv-1}}\nwprevnextdefs{\relax}{NWNhLk6-nRuDO-2}\nwenddeflinemarkup
+void mex_handle_create()
+\{
+    handles   = dynarray_create(sizeof(mex_handle_t), 16);
+    next_tag  = 1;
+    next_id   = 1;
+    free_list = -1;
+\}
+
+void mex_handle_destroy()
+\{
+    dynarray_destroy(handles);
+\}
+
+\nwalsodefined{\\{NWNhLk6-nRuDO-2}\\{NWNhLk6-nRuDO-3}\\{NWNhLk6-nRuDO-4}\\{NWNhLk6-nRuDO-5}\\{NWNhLk6-nRuDO-6}\\{NWNhLk6-nRuDO-7}}\nwused{\\{NWNhLk6-22fNlv-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+Allocating a new tag is just a matter of incrementing the {\Tt{}next{\_}tag\nwendquote} flag.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWNhLk6-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-22fNlv-1}}\nwprevnextdefs{NWNhLk6-nRuDO-1}{NWNhLk6-nRuDO-3}\nwenddeflinemarkup
+int mex_handle_new_tag()
+\{
+    return next_tag++;
+\}
+
+\nwused{\\{NWNhLk6-22fNlv-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+At a high level, the {\Tt{}add\nwendquote} and {\Tt{}remove\nwendquote} operations are simple, too.
+To add a handle, we need only to find a space for it, set the fields,
+and assign an identifier.  To remove a handle, we grab the handle data,
+deallocate the handle, and return the data pointer.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWNhLk6-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-22fNlv-1}}\nwprevnextdefs{NWNhLk6-nRuDO-2}{NWNhLk6-nRuDO-4}\nwenddeflinemarkup
+int mex_handle_add(void* data, int tag)
+\{
+    int index;
+    mex_handle_t* handle;
+
+    \LA{}allocate handle~{\nwtagstyle{}\subpageref{NWNhLk6-109qp6-1}}\RA{}
+    handle->data = data;
+    handle->tag  = tag;
+    handle->id   = \LA{}allocate handle identifier~{\nwtagstyle{}\subpageref{NWNhLk6-48sA3f-1}}\RA{}
+
+    return handle->id;
+\}
+
+\nwused{\\{NWNhLk6-22fNlv-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWNhLk6-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-22fNlv-1}}\nwprevnextdefs{NWNhLk6-nRuDO-3}{NWNhLk6-nRuDO-5}\nwenddeflinemarkup
+void* mex_handle_remove(int handle_id)
+\{
+    int index;
+    mex_handle_t* handle;
+    void*         data;
+
+    \LA{}find handle identifier~{\nwtagstyle{}\subpageref{NWNhLk6-kHjXn-1}}\RA{}
+
+    if (handle == NULL)
+        return NULL;
+    else \{
+        data = handle->data;
+        \LA{}deallocate handle~{\nwtagstyle{}\subpageref{NWNhLk6-1mZPrH-1}}\RA{}
+        return data;
+    \}
+\}
+
+\nwused{\\{NWNhLk6-22fNlv-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+The {\Tt{}find\nwendquote} function returns the identifier for a handle that has
+already been allocated.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWNhLk6-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-22fNlv-1}}\nwprevnextdefs{NWNhLk6-nRuDO-4}{NWNhLk6-nRuDO-6}\nwenddeflinemarkup
+int mex_handle_find(void* data, int tag)
+\{
+    int i, n;
+    mex_handle_t* handle_data = dynarray_data(handles);
+
+    n = dynarray_count(handles);
+    for (i = 0; i < n; ++i) \{
+        if (handle_data[i].tag == tag && handle_data[i].data == data)
+            return handle_data[i].id;
+    \}
+    return 0;
+\}
+
+\nwused{\\{NWNhLk6-22fNlv-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+The {\Tt{}tag\nwendquote} and {\Tt{}data\nwendquote} functions find a handle and return its data
+field (or zero if the handle is invalid).
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWNhLk6-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-22fNlv-1}}\nwprevnextdefs{NWNhLk6-nRuDO-5}{NWNhLk6-nRuDO-7}\nwenddeflinemarkup
+int mex_handle_tag(int handle_id)
+\{
+    int index;
+    mex_handle_t* handle;
+
+    \LA{}find handle identifier~{\nwtagstyle{}\subpageref{NWNhLk6-kHjXn-1}}\RA{}
+
+    return (handle != NULL) ? handle->tag : 0;
+\}
+
+\nwused{\\{NWNhLk6-22fNlv-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWNhLk6-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWNhLk6-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-22fNlv-1}}\nwprevnextdefs{NWNhLk6-nRuDO-6}{\relax}\nwenddeflinemarkup
+void* mex_handle_data(int handle_id)
+\{
+    int index;
+    mex_handle_t* handle;
+
+    \LA{}find handle identifier~{\nwtagstyle{}\subpageref{NWNhLk6-kHjXn-1}}\RA{}
+
+    return (handle != NULL) ? handle->data : NULL;
+\}
+
+\nwused{\\{NWNhLk6-22fNlv-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+We keep a free list of deallocated handle slots for re-use, since
+it seems likely that they will be deallocated pretty often.
+The handle {\Tt{}id\nwendquote} field is used to point to the next slot on
+the free list, and $-1$ serves the role of a NULL.  If we want
+a new slot and there are none available from the free list, we
+just expand the array to accomodate a new handle.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWNhLk6-109qp6-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-109qp6-1}}}\moddef{allocate handle~{\nwtagstyle{}\subpageref{NWNhLk6-109qp6-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-nRuDO-3}}\nwenddeflinemarkup
+if (free_list >= 0) \{
+    index      = free_list;
+    handle     = dynarray_get(handles, index);
+    free_list  = handle->id;
+\} else \{
+    index      = dynarray_count(handles);
+    handle     = dynarray_append(handles, NULL);
+\}
+
+\nwused{\\{NWNhLk6-nRuDO-3}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWNhLk6-1mZPrH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-1mZPrH-1}}}\moddef{deallocate handle~{\nwtagstyle{}\subpageref{NWNhLk6-1mZPrH-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-nRuDO-4}}\nwenddeflinemarkup
+handle->tag  = 0;
+handle->data = NULL;
+handle->id   = free_list;
+free_list    = index;
+
+\nwused{\\{NWNhLk6-nRuDO-4}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+A natural way to pick handle identifiers would be to use the
+array index of the identifier.  There is a problem
+with this approach, though.  We would like small,
+common numbers like $0$ and $1$ \emph{not} to be valid handles.
+It makes it more difficult for the user to accidentally retrieve 
+a valid handle that was not returned to him.  Similarly, we would
+like the handles not to be too close together, so that taking a
+valid handle and adding one to it doesn't yield another valid handle.
+
+We can get a more scattered space of handles by putting some unique
+identifying information in the high order bits and using the low
+order bits for index information.  For the moment, we'll use the
+lower ten bits for indexing.  I doubt we'll ever have more than 256
+simultaneously active handles, so the for loop used to retrieve
+the handle identifiers will probably never go past the first iteration
+unless there is an error.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWNhLk6-48sA3f-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-48sA3f-1}}}\moddef{allocate handle identifier~{\nwtagstyle{}\subpageref{NWNhLk6-48sA3f-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-nRuDO-3}}\nwenddeflinemarkup
+(next_tag++ << 8) + (index & 255);
+\nwused{\\{NWNhLk6-nRuDO-3}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWNhLk6-kHjXn-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNhLk6-kHjXn-1}}}\moddef{find handle identifier~{\nwtagstyle{}\subpageref{NWNhLk6-kHjXn-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNhLk6-nRuDO-4}\\{NWNhLk6-nRuDO-6}\\{NWNhLk6-nRuDO-7}}\nwenddeflinemarkup
+for (index = (handle_id & 255);
+     (handle = dynarray_get(handles, index)) != NULL &&
+         handle->id != handle_id;
+     index += 256);
+\nwused{\\{NWNhLk6-nRuDO-4}\\{NWNhLk6-nRuDO-6}\\{NWNhLk6-nRuDO-7}}\nwendcode{}
+
+\nwixlogsorted{c}{{allocate handle}{NWNhLk6-109qp6-1}{\nwixu{NWNhLk6-nRuDO-3}\nwixd{NWNhLk6-109qp6-1}}}%
+\nwixlogsorted{c}{{allocate handle identifier}{NWNhLk6-48sA3f-1}{\nwixu{NWNhLk6-nRuDO-3}\nwixd{NWNhLk6-48sA3f-1}}}%
+\nwixlogsorted{c}{{deallocate handle}{NWNhLk6-1mZPrH-1}{\nwixu{NWNhLk6-nRuDO-4}\nwixd{NWNhLk6-1mZPrH-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWNhLk6-2gXoUc-1}{\nwixu{NWNhLk6-4fAjjr-1}\nwixd{NWNhLk6-2gXoUc-1}\nwixd{NWNhLk6-2gXoUc-2}\nwixd{NWNhLk6-2gXoUc-3}}}%
+\nwixlogsorted{c}{{find handle identifier}{NWNhLk6-kHjXn-1}{\nwixu{NWNhLk6-nRuDO-4}\nwixu{NWNhLk6-nRuDO-6}\nwixu{NWNhLk6-nRuDO-7}\nwixd{NWNhLk6-kHjXn-1}}}%
+\nwixlogsorted{c}{{functions}{NWNhLk6-nRuDO-1}{\nwixu{NWNhLk6-22fNlv-1}\nwixd{NWNhLk6-nRuDO-1}\nwixd{NWNhLk6-nRuDO-2}\nwixd{NWNhLk6-nRuDO-3}\nwixd{NWNhLk6-nRuDO-4}\nwixd{NWNhLk6-nRuDO-5}\nwixd{NWNhLk6-nRuDO-6}\nwixd{NWNhLk6-nRuDO-7}}}%
+\nwixlogsorted{c}{{mex-handle.c}{NWNhLk6-22fNlv-1}{\nwixd{NWNhLk6-22fNlv-1}}}%
+\nwixlogsorted{c}{{mex-handle.h}{NWNhLk6-4fAjjr-1}{\nwixd{NWNhLk6-4fAjjr-1}}}%
+\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}

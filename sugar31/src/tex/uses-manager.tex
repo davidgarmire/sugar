@@ -1,0 +1,336 @@
+\section{Introduction}% ===> this file was generated automatically by noweave --- better not edit it
+
+A uses manager object manages a set of included (used) files.
+In particular, the uses manager handles path lookups and
+tracks what files have been opened.
+
+
+\section{Interface}
+
+\nwfilename{uses-manager.nw}\nwbegincode{1}\sublabel{NW4P4tNC-1WKRGA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-1WKRGA-1}}}\moddef{uses-manager.h~{\nwtagstyle{}\subpageref{NW4P4tNC-1WKRGA-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef USES_MANAGER_H
+#define USES_MANAGER_H
+
+#include <stdio.h>
+#include <mempool.h>
+
+typedef struct uses_manager_struct* uses_manager_t;
+typedef char* (*uses_manager_search_t)(void* data, char* namebuf, 
+                                               unsigned buflen);
+
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NW4P4tNC-2gXoUc-1}}\RA{}
+
+#endif /* USES_MANAGER_H */
+\nwnotused{uses-manager.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+A uses manager is allocated on a pool, which is where it will
+keep its internal data structures.  There is no destructor
+function -- to free the memory for a uses manager, you must
+free the pool on which it was allocated.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW4P4tNC-2gXoUc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-2gXoUc-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW4P4tNC-2gXoUc-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-1WKRGA-1}}\nwprevnextdefs{\relax}{NW4P4tNC-2gXoUc-2}\nwenddeflinemarkup
+uses_manager_t uses_manager_create(mempool_t pool);
+
+\nwalsodefined{\\{NW4P4tNC-2gXoUc-2}\\{NW4P4tNC-2gXoUc-3}}\nwused{\\{NW4P4tNC-1WKRGA-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The uses manager keeps an internal list of paths for the purposes
+of looking things up.  The {\Tt{}uses{\_}manager{\_}addpath\nwendquote} function can
+be used to \emph{prepend} to that list of paths.  There currently is no
+function to \emph{append} to the list, and there probably
+should be one, since order matters.  The current directory is
+always implicitly the first thing on the path.  The {\Tt{}uses{\_}manager{\_}envpath\nwendquote}
+function includes a set of paths specified in the external environment.
+The {\Tt{}uses{\_}manager{\_}search\nwendquote} function searches its path for files
+matching the name passed in {\Tt{}namebuf\nwendquote}.
+If it finds a match, {\Tt{}namebuf\nwendquote} will be prepended with the appropriate
+path and return a pointer to {\Tt{}namebuf\nwendquote}.  If there is no match,
+namebuf will be unmodified, and the function will return NULL.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW4P4tNC-2gXoUc-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-2gXoUc-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW4P4tNC-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-1WKRGA-1}}\nwprevnextdefs{NW4P4tNC-2gXoUc-1}{NW4P4tNC-2gXoUc-3}\nwenddeflinemarkup
+void  uses_manager_addpath(uses_manager_t self, const char* path);
+void  uses_manager_envpath(uses_manager_t self, const char* envname);
+void  uses_manager_addfunc(uses_manager_t self, 
+                                   uses_manager_search_t search,
+                                   void* data);
+char* uses_manager_search (uses_manager_t self, char* namebuf, 
+                                   int buflen);
+
+\nwused{\\{NW4P4tNC-1WKRGA-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+We want to be able to register the files we use so that
+we can get a list for later debugging, and so that we can
+check whether a file has already been used.  The {\Tt{}uses{\_}manager{\_}use\nwendquote}
+function registers a file as used; the {\Tt{}uses{\_}manager{\_}already{\_}used\nwendquote}
+function returns true iff a filename has already been entered via
+{\Tt{}uses{\_}manager{\_}use\nwendquote}.  The matching algorithm is not all that sophisticated,
+so the same file accessed via different paths will be saved as two different
+files.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW4P4tNC-2gXoUc-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-2gXoUc-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW4P4tNC-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-1WKRGA-1}}\nwprevnextdefs{NW4P4tNC-2gXoUc-2}{\relax}\nwenddeflinemarkup
+void uses_manager_use         (uses_manager_t self, const char* name);
+int  uses_manager_already_used(uses_manager_t self, const char* name);
+\nwused{\\{NW4P4tNC-1WKRGA-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW4P4tNC-3YV8Zq-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-3YV8Zq-1}}}\moddef{uses-manager.c~{\nwtagstyle{}\subpageref{NW4P4tNC-3YV8Zq-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <string.h>
+
+#include <uses_manager.h>
+
+\LA{}types~{\nwtagstyle{}\subpageref{NW4P4tNC-4H4VOG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}\RA{}
+\nwnotused{uses-manager.c}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+A {\Tt{}name{\_}list{\_}t\nwendquote} is just a linked list entry containing a pointer
+to a path name (or file name).
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW4P4tNC-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NW4P4tNC-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{\relax}{NW4P4tNC-4H4VOG-2}\nwenddeflinemarkup
+typedef struct name_list_t \{
+    const char* name;
+    struct name_list_t* next;
+\} name_list_t;
+
+\nwalsodefined{\\{NW4P4tNC-4H4VOG-2}\\{NW4P4tNC-4H4VOG-3}}\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+A {\Tt{}searcher{\_}list{\_}t\nwendquote} is a list of functions and associated data
+for doing searches via externally handled means (searching the Matlab
+path, opening a file box, etc.)
+\nwenddocs{}\nwbegincode{13}\sublabel{NW4P4tNC-4H4VOG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-4H4VOG-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NW4P4tNC-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-4H4VOG-1}{NW4P4tNC-4H4VOG-3}\nwenddeflinemarkup
+typedef struct searcher_list_t \{
+    uses_manager_search_t fun;
+    void* data;
+    struct searcher_list_t* next;
+\} searcher_list_t;
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW4P4tNC-4H4VOG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-4H4VOG-3}}}\moddef{types~{\nwtagstyle{}\subpageref{NW4P4tNC-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-4H4VOG-2}{\relax}\nwenddeflinemarkup
+struct uses_manager_struct \{
+    mempool_t pool;
+    name_list_t* paths;
+    name_list_t* files;
+    searcher_list_t* searchers;
+\};
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+Creating a uses manager is simple.  We just need to remember to store
+a link to the pool for later allocations.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW4P4tNC-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{\relax}{NW4P4tNC-nRuDO-2}\nwenddeflinemarkup
+uses_manager_t uses_manager_create(mempool_t pool)
+\{
+    uses_manager_t self = (uses_manager_t) 
+        mempool_get(pool, sizeof(struct uses_manager_struct));
+
+    self->pool = pool;
+    self->paths = NULL;
+    self->files = NULL;
+    self->searchers = NULL;
+    return self;
+\}
+
+\nwalsodefined{\\{NW4P4tNC-nRuDO-2}\\{NW4P4tNC-nRuDO-3}\\{NW4P4tNC-nRuDO-4}\\{NW4P4tNC-nRuDO-5}\\{NW4P4tNC-nRuDO-6}\\{NW4P4tNC-nRuDO-7}\\{NW4P4tNC-nRuDO-8}}\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+When we add to the path, we \emph{prepend} by default.  The current
+directory is always implicitly at the start of the path.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW4P4tNC-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-nRuDO-1}{NW4P4tNC-nRuDO-3}\nwenddeflinemarkup
+void uses_manager_addpath(uses_manager_t self, const char* name)
+\{
+    name_list_t* link = (name_list_t*)
+        mempool_get(self->pool, sizeof(struct name_list_t));
+
+    link->name = mempool_strdup(self->pool, name);
+    link->next = self->paths;
+    self->paths = link;
+\}
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW4P4tNC-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-nRuDO-2}{NW4P4tNC-nRuDO-4}\nwenddeflinemarkup
+void uses_manager_envpath(uses_manager_t self, const char* envname)
+\{
+    char* names;
+    char* name;
+
+    if ((names = getenv(envname)) == NULL)
+        return;
+
+    names = mempool_strdup(self->pool, names);
+
+    while ((name = strtok(names, ":")) != NULL) \{
+        name_list_t* link = (name_list_t*)
+            mempool_get(self->pool, sizeof(struct name_list_t));
+        link->name = name;
+        link->next = self->paths;
+        self->paths = link;
+        names = NULL;
+    \}
+\}
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW4P4tNC-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-nRuDO-3}{NW4P4tNC-nRuDO-5}\nwenddeflinemarkup
+void uses_manager_addfunc(uses_manager_t self, 
+                                  uses_manager_search_t search,
+                                  void* data)
+\{
+    searcher_list_t* link = (searcher_list_t*)
+        mempool_get(self->pool, sizeof(struct searcher_list_t));
+
+    link->fun = search;
+    link->data = data;
+    link->next = self->searchers;
+    self->searchers = link;
+\}
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+
+If the world was POSIX compliant, I could use the {\Tt{}access\nwendquote} function.
+Alas, the world is not POSIX compliant.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW4P4tNC-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-nRuDO-4}{NW4P4tNC-nRuDO-6}\nwenddeflinemarkup
+int uses_manager_access(const char* name)
+\{
+    FILE* fp = fopen(name, "r");
+    if (fp) \{
+        fclose(fp);
+        return 0;
+    \}
+    return -1;
+\}
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW4P4tNC-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-nRuDO-5}{NW4P4tNC-nRuDO-7}\nwenddeflinemarkup
+char* uses_manager_search(uses_manager_t self, char* namebuf,
+                                  int buflen)
+\{
+    name_list_t* current_path = self->paths;
+    searcher_list_t* current_searcher = self->searchers;
+
+    \LA{}Check the current working directory~{\nwtagstyle{}\subpageref{NW4P4tNC-3gzf7Z-1}}\RA{}
+    \LA{}Check all the paths in the list~{\nwtagstyle{}\subpageref{NW4P4tNC-2xiPo4-1}}\RA{}
+    \LA{}Check all the searchers in the list~{\nwtagstyle{}\subpageref{NW4P4tNC-2hKoT7-1}}\RA{}
+
+    return NULL;
+\}
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW4P4tNC-3gzf7Z-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-3gzf7Z-1}}}\moddef{Check the current working directory~{\nwtagstyle{}\subpageref{NW4P4tNC-3gzf7Z-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-nRuDO-6}}\nwenddeflinemarkup
+if (uses_manager_access(namebuf) == 0)
+    return namebuf;
+\nwused{\\{NW4P4tNC-nRuDO-6}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+Note that {\Tt{}tmpbuf\nwendquote} has two characters extra space for the end-of-string
+and for a path separator character.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW4P4tNC-2xiPo4-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-2xiPo4-1}}}\moddef{Check all the paths in the list~{\nwtagstyle{}\subpageref{NW4P4tNC-2xiPo4-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-nRuDO-6}}\nwenddeflinemarkup
+while (current_path != NULL) \{
+
+    int tmpbuflen = strlen(current_path->name) +
+                    strlen(namebuf) + 2;
+    char* tmpbuf = (char*) mempool_geth(self->pool, tmpbuflen);
+
+    \LA{}Build path name~{\nwtagstyle{}\subpageref{NW4P4tNC-O5seq-1}}\RA{}
+    if (uses_manager_access(tmpbuf) == 0) \{
+        \LA{}Copy result to namebuf and return~{\nwtagstyle{}\subpageref{NW4P4tNC-1NmkcF-1}}\RA{}
+    \}
+    
+    mempool_freeh(tmpbuf);
+    current_path = current_path->next;
+\}
+
+\nwused{\\{NW4P4tNC-nRuDO-6}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW4P4tNC-2hKoT7-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-2hKoT7-1}}}\moddef{Check all the searchers in the list~{\nwtagstyle{}\subpageref{NW4P4tNC-2hKoT7-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-nRuDO-6}}\nwenddeflinemarkup
+while (current_searcher != NULL) \{
+    char* p = (current_searcher->fun)(current_searcher->data, namebuf, buflen);
+    if (p) 
+        return p;
+    current_searcher = current_searcher->next;
+\}
+
+\nwused{\\{NW4P4tNC-nRuDO-6}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+There should probably be something to handle platform-specific
+path component separator characters, too.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW4P4tNC-O5seq-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-O5seq-1}}}\moddef{Build path name~{\nwtagstyle{}\subpageref{NW4P4tNC-O5seq-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-2xiPo4-1}}\nwenddeflinemarkup
+strcpy(tmpbuf, current_path->name);
+strcat(tmpbuf, "/");
+strcat(tmpbuf, namebuf);
+\nwused{\\{NW4P4tNC-2xiPo4-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+Note that if the buffer isn't large enough, we return NULL.
+This perhaps isn't ideal, but returning the truncated file name
+seems evil.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW4P4tNC-1NmkcF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-1NmkcF-1}}}\moddef{Copy result to namebuf and return~{\nwtagstyle{}\subpageref{NW4P4tNC-1NmkcF-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-2xiPo4-1}}\nwenddeflinemarkup
+if (strlen(tmpbuf) + 1 > buflen) \{
+    mempool_freeh(tmpbuf);
+    return NULL;
+\} else \{
+    strcpy(namebuf, tmpbuf);
+    mempool_freeh(tmpbuf);
+    return namebuf;
+\}
+\nwused{\\{NW4P4tNC-2xiPo4-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+Saving a name in the ``used'' list and checking whether a name
+is in the use list are just basic linked list operations.
+This is \emph{not} a particularly time-efficient implementation.
+Something more sophisticated might use a hash table.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW4P4tNC-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-nRuDO-6}{NW4P4tNC-nRuDO-8}\nwenddeflinemarkup
+void uses_manager_use(uses_manager_t self, const char* name)
+\{
+    if (!uses_manager_already_used(self, name)) \{
+        name_list_t* new_link = (name_list_t*)
+            mempool_get(self->pool, sizeof(name_list_t));
+
+        new_link->name = mempool_strdup(self->pool, name);
+        new_link->next = self->files;
+        self->files = new_link;
+    \}
+\}
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW4P4tNC-nRuDO-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4P4tNC-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4P4tNC-3YV8Zq-1}}\nwprevnextdefs{NW4P4tNC-nRuDO-7}{\relax}\nwenddeflinemarkup
+int uses_manager_already_used(uses_manager_t self, const char* name)
+\{
+    name_list_t* link = self->files;
+    while (link != NULL) \{
+        if (strcmp(link->name, name) == 0)
+            return 1;
+        link = link->next;
+    \}
+    return 0;
+\}
+
+\nwused{\\{NW4P4tNC-3YV8Zq-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{Build path name}{NW4P4tNC-O5seq-1}{\nwixu{NW4P4tNC-2xiPo4-1}\nwixd{NW4P4tNC-O5seq-1}}}%
+\nwixlogsorted{c}{{Check all the paths in the list}{NW4P4tNC-2xiPo4-1}{\nwixu{NW4P4tNC-nRuDO-6}\nwixd{NW4P4tNC-2xiPo4-1}}}%
+\nwixlogsorted{c}{{Check all the searchers in the list}{NW4P4tNC-2hKoT7-1}{\nwixu{NW4P4tNC-nRuDO-6}\nwixd{NW4P4tNC-2hKoT7-1}}}%
+\nwixlogsorted{c}{{Check the current working directory}{NW4P4tNC-3gzf7Z-1}{\nwixu{NW4P4tNC-nRuDO-6}\nwixd{NW4P4tNC-3gzf7Z-1}}}%
+\nwixlogsorted{c}{{Copy result to namebuf and return}{NW4P4tNC-1NmkcF-1}{\nwixu{NW4P4tNC-2xiPo4-1}\nwixd{NW4P4tNC-1NmkcF-1}}}%
+\nwixlogsorted{c}{{exported functions}{NW4P4tNC-2gXoUc-1}{\nwixu{NW4P4tNC-1WKRGA-1}\nwixd{NW4P4tNC-2gXoUc-1}\nwixd{NW4P4tNC-2gXoUc-2}\nwixd{NW4P4tNC-2gXoUc-3}}}%
+\nwixlogsorted{c}{{functions}{NW4P4tNC-nRuDO-1}{\nwixu{NW4P4tNC-3YV8Zq-1}\nwixd{NW4P4tNC-nRuDO-1}\nwixd{NW4P4tNC-nRuDO-2}\nwixd{NW4P4tNC-nRuDO-3}\nwixd{NW4P4tNC-nRuDO-4}\nwixd{NW4P4tNC-nRuDO-5}\nwixd{NW4P4tNC-nRuDO-6}\nwixd{NW4P4tNC-nRuDO-7}\nwixd{NW4P4tNC-nRuDO-8}}}%
+\nwixlogsorted{c}{{types}{NW4P4tNC-4H4VOG-1}{\nwixu{NW4P4tNC-3YV8Zq-1}\nwixd{NW4P4tNC-4H4VOG-1}\nwixd{NW4P4tNC-4H4VOG-2}\nwixd{NW4P4tNC-4H4VOG-3}}}%
+\nwixlogsorted{c}{{uses-manager.c}{NW4P4tNC-3YV8Zq-1}{\nwixd{NW4P4tNC-3YV8Zq-1}}}%
+\nwixlogsorted{c}{{uses-manager.h}{NW4P4tNC-1WKRGA-1}{\nwixd{NW4P4tNC-1WKRGA-1}}}%
+\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}

@@ -1,0 +1,121 @@
+% Matlab side of things
+
+\section{The netlist data structure}
+
+The parsed representation of the netlist returned by 
+\texttt{cho\_load} is one of SUGAR's central data structures. 
+The netlist structure contains the following fields:
+
+\begin{itemize}
+
+\item{elements(i)} Information structure for the ith element.
+\begin{itemize}
+     \item{name} name of element
+     \item{model} model function name
+     \item{node\_ids} indices of nodes involving this element
+     \item{parameter} structure mapping model parameters to value
+     \item{var\_ids} list of indices of variables for this element. 
+                     Grounded variables are assigned index 0.
+\end{itemize}
+
+\item{nodes(j)} Information for the jth node.
+\begin{itemize}
+     \item{name} name of node. An element with branch variables has a dummy
+           node with the same name as the element, and any branch variables
+           are assigned to that node.
+     \item{elt\_ids} indices of elements involving this node
+     \item{vars} structure mapping variable names to indices
+     \item{pos} coordinates of the undisplaced node (mechanical nodes only)
+\end{itemize}
+
+\item{dof} number of (ungrounded) degrees of freedom
+
+\item{scales(k)} characteristic size of the kth ungrounded variable
+
+\end{itemize}
+
+   The final netlist data structure does not have the same heirarchy as the
+original design, which might contain subnets and array constructs. The only
+way that the structure of the original netlist is portrayed in the final data
+structure is in the node and element name fields. Element names have the form
+\begin{verbatim}
+            subnet element.subnet element. ... .element.
+\end{verbatim}
+For example, an element named bar in a subnet instance named foo would be
+called foo.bar. Similarly, the structure of a node name is
+\begin{verbatim}
+              subnet element.subnet element. ... .node.
+\end{verbatim}
+A single node may have several aliases if it is used as an argument to a subnet.
+For instance, in the netlist fragment
+\begin{verbatim}
+  subnet silly_anchor [x] [l=* w=*]
+  [ anchor parent [x] [l=l w=w]
+  ]
+
+  silly_anchor an_anchor p1 [A] [l=5u w=5u]
+\end{verbatim}
+the node A could also be called an anchor.x. In such cases, the name assigned
+to the node is the name at the highest scoping level; in this example, A. Elements
+which are not explicitly named are assigned unique names of the form anon plus
+a number. Anonymous elements use the same scoping rules as normal elements,
+so that an anonymous element inside an anonymous subnet instance has a name
+like anon5.anon10.
+
+\section{Assembly and Display}
+
+The assembly and display routines have very simple (and very similar) structure.
+Each routine loops through all the elements in turn, calls the model function
+to get a local contribution, and then merges the local contribution into a global
+structure. The body of assemble system is a typical example. Here net is the
+netlist data structure and mflag is a flag describing whether the mass ('M'),
+damping ('D'), or stiffness ('K') matrix should be assembled:
+
+\begin{verbatim}
+for i = 1:length(net.elements)
+  elt = net.elements(i);
+
+  % Get the local contribution
+  [Mlocal] = feval( elt.model, mflag, elt.R, elt.parameter );
+
+  % If this element has anything to contribute, incorporate it
+  if (~isempty(Mlocal))
+
+       j = find(elt.var_ids ~= 0);            % Find ungrounded variables
+       jdx = elt.var_ids(j);                  % Get associated global indices
+
+       M(jdx,jdx) = M(jdx,jdx) + Mlocal(j,j); % Add local contribution
+
+  end
+end
+\end{verbatim}
+
+Note the use of two different indexing systems. The element "stamps" returned
+by the model functions are ordered according to a local variable ordering cor-
+responding to the order in which variable names appear in the output of the
+'vars' case. Entry i in the var ids field then gives the global index for the ith
+local variable. However, some local variables may be grounded, and therefore
+will not have a corresponding global index. The matrix rows and columns cor-
+responding to grounded variables, represented in var ids by zero entries, are
+not added into the global matrix.
+   The matrix assembly routines take a flag is sp to indicate whether the
+matrices should be assembled using Matlab's sparse data structures. If the
+is sp flag is ommitted, sparse output is assumed by default.
+   There are only a few assembly functions:
+\begin{itemize}
+\item{assemble\_system} assembles the linear mass, damping, and stiffness matrices
+
+\item{assemble\_F} assembles the forcing term
+
+\item{assemble\_dFdx} assembles the Jacobian with respect to the position variables
+
+\item{assemble\_dFdxdot} assembles the Jacobian with respect to velocity variables
+
+\item{cho\_display} assembles local display output into a complete device picture
+
+\end{itemize}
+
+   Additionally, the structure of the netlist checking function check netlist
+is similar to the structure of the assembly routines.
+
+

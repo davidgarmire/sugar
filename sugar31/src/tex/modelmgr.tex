@@ -1,0 +1,649 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The model manager module defines the interfaces for element and
+material model functions.  It also defines the \emph{model manager},
+which manages a registry of available model functions.
+
+
+\section{Interface}
+
+\nwfilename{modelmgr.nw}\nwbegincode{1}\sublabel{NW3lE78L-4XzAqg-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-4XzAqg-1}}}\moddef{modelmgr.h~{\nwtagstyle{}\subpageref{NW3lE78L-4XzAqg-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MODELMGR_H
+#define MODELMGR_H
+
+#include <stdio.h>
+
+struct mesh_struct;
+struct mesh_param_t;
+struct vars_mgr_struct;
+struct assembler_struct;
+struct assemble_matrix_t;
+struct netdraw_gc_t;
+struct netout_t;
+typedef struct model_mgr_struct* model_mgr_t;
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NW3lE78L-4aCyDR-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}\RA{}
+
+#endif /* MODELMGR_H */
+\nwnotused{modelmgr.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\subsection{The element interface}
+
+The table of functions that implement a particular element are organized
+in an object of type {\Tt{}model{\_}element{\_}t\nwendquote}.  Not all the functions in the
+table need to be defined; if one of the function pointers is NULL, some
+default behavior will be assumed.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3lE78L-4aCyDR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-4aCyDR-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NW3lE78L-4aCyDR-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{\relax}{NW3lE78L-4aCyDR-2}\nwenddeflinemarkup
+typedef struct model_element_t \{
+    \LA{}element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}\RA{}
+\} model_element_t;
+
+typedef struct element_t \{
+    model_element_t* model;
+    void* data;
+\} element_t;
+
+\nwalsodefined{\\{NW3lE78L-4aCyDR-2}}\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The element {\Tt{}init\nwendquote} function constructs the data structures
+for a particular element.  The function can use the pool
+associated with a mesh to allocate space; what it does with that
+space is up to the element writer.  Typically, the init function
+will initialize a structure to store the indices of the attached
+nodes, whatever material models are used, parameters like beam
+width, etc.
+
+The initializer function gets a pointer to the current mesh,
+which it can use to access the mesh memory pool, to access
+the node and material tables, and to access the parameter lists.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3lE78L-3LFOhr-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-1}}\nwprevnextdefs{\relax}{NW3lE78L-3LFOhr-2}\nwenddeflinemarkup
+struct element_t* (*init)(struct mesh_struct* mesh, const char* model,
+                                  struct model_element_t* modelfunc);
+\nwalsodefined{\\{NW3lE78L-3LFOhr-2}\\{NW3lE78L-3LFOhr-3}\\{NW3lE78L-3LFOhr-4}\\{NW3lE78L-3LFOhr-5}\\{NW3lE78L-3LFOhr-6}\\{NW3lE78L-3LFOhr-7}\\{NW3lE78L-3LFOhr-8}}\nwused{\\{NW3lE78L-4aCyDR-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3lE78L-2gXoUc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{\relax}{NW3lE78L-2gXoUc-2}\nwenddeflinemarkup
+element_t* element_init(model_mgr_t model_mgr, 
+                                struct mesh_struct* mesh, const char* model);
+\nwalsodefined{\\{NW3lE78L-2gXoUc-2}\\{NW3lE78L-2gXoUc-3}\\{NW3lE78L-2gXoUc-4}\\{NW3lE78L-2gXoUc-5}\\{NW3lE78L-2gXoUc-6}\\{NW3lE78L-2gXoUc-7}\\{NW3lE78L-2gXoUc-8}\\{NW3lE78L-2gXoUc-9}\\{NW3lE78L-2gXoUc-A}\\{NW3lE78L-2gXoUc-B}\\{NW3lE78L-2gXoUc-C}\\{NW3lE78L-2gXoUc-D}\\{NW3lE78L-2gXoUc-E}\\{NW3lE78L-2gXoUc-F}\\{NW3lE78L-2gXoUc-G}}\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+If the model function performs any allocations outside the mesh
+pool, it may need to perform deallocation on shutdown.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3lE78L-3LFOhr-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-2}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-1}}\nwprevnextdefs{NW3lE78L-3LFOhr-1}{NW3lE78L-3LFOhr-3}\nwenddeflinemarkup
+void (*destroy)(void* self);
+\nwused{\\{NW3lE78L-4aCyDR-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3lE78L-2gXoUc-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-1}{NW3lE78L-2gXoUc-3}\nwenddeflinemarkup
+void element_destroy(element_t* self);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+The {\Tt{}set{\_}position\nwendquote} method can be used to compute or update any 
+quantities that rely on undisplaced node positions.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW3lE78L-3LFOhr-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-3}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-1}}\nwprevnextdefs{NW3lE78L-3LFOhr-2}{NW3lE78L-3LFOhr-4}\nwenddeflinemarkup
+void (*set_position)(void* self, struct mesh_struct* mesh);
+\nwused{\\{NW3lE78L-4aCyDR-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW3lE78L-2gXoUc-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-2}{NW3lE78L-2gXoUc-4}\nwenddeflinemarkup
+void element_set_position(element_t* self, struct mesh_struct* mesh);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The {\Tt{}vars\nwendquote} function is responsible for assigning variable indices.
+It may be called multiple times, so it probably should not be doing
+new allocations every time.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW3lE78L-3LFOhr-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-4}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-1}}\nwprevnextdefs{NW3lE78L-3LFOhr-3}{NW3lE78L-3LFOhr-5}\nwenddeflinemarkup
+void (*vars)(void* self, struct vars_mgr_struct* vars);
+\nwused{\\{NW3lE78L-4aCyDR-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW3lE78L-2gXoUc-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-3}{NW3lE78L-2gXoUc-5}\nwenddeflinemarkup
+void element_vars(element_t* self, struct vars_mgr_struct* vars);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+
+The {\Tt{}displace\nwendquote} function is responsible for assigning displacement
+boundary conditions, if there are any such to be assigned.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW3lE78L-3LFOhr-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-5}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-1}}\nwprevnextdefs{NW3lE78L-3LFOhr-4}{NW3lE78L-3LFOhr-6}\nwenddeflinemarkup
+void (*displace)(void* self, struct assemble_matrix_t* assembler);
+\nwused{\\{NW3lE78L-4aCyDR-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW3lE78L-2gXoUc-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-5}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-4}{NW3lE78L-2gXoUc-6}\nwenddeflinemarkup
+void element_displace(element_t* self, 
+                              struct assemble_matrix_t* assembler);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+
+The {\Tt{}R\nwendquote} and {\Tt{}dR\nwendquote} routines contribute the local contributions
+to the residual function and the tangent matrix, respectively.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW3lE78L-3LFOhr-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-6}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-1}}\nwprevnextdefs{NW3lE78L-3LFOhr-5}{NW3lE78L-3LFOhr-7}\nwenddeflinemarkup
+void (*R) (void* self, struct assemble_matrix_t* R, 
+           struct assemble_matrix_t* x,
+           struct assemble_matrix_t* v,
+           struct assemble_matrix_t* a);
+void (*dR)(void* self, struct assemble_matrix_t* dR,
+           double cx, struct assemble_matrix_t* x,
+           double cv, struct assemble_matrix_t* v,
+           double ca, struct assemble_matrix_t* a);
+\nwused{\\{NW3lE78L-4aCyDR-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW3lE78L-2gXoUc-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-6}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-5}{NW3lE78L-2gXoUc-7}\nwenddeflinemarkup
+void element_R (element_t* self, struct assemble_matrix_t* R,
+                struct assemble_matrix_t* x,
+                struct assemble_matrix_t* v,
+                struct assemble_matrix_t* a);
+void element_dR(element_t* self, struct assemble_matrix_t* dR,
+                double cx, struct assemble_matrix_t* x,
+                double cv, struct assemble_matrix_t* v,
+                double ca, struct assemble_matrix_t* a);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+
+The {\Tt{}output\nwendquote} function for an element is currently solely
+responsible for dumping out a text representation of whatever
+the element data structure might be.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW3lE78L-3LFOhr-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-7}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-1}}\nwprevnextdefs{NW3lE78L-3LFOhr-6}{NW3lE78L-3LFOhr-8}\nwenddeflinemarkup
+void (*output)(void* self, struct netout_t* netout);
+\nwused{\\{NW3lE78L-4aCyDR-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW3lE78L-2gXoUc-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-7}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-6}{NW3lE78L-2gXoUc-8}\nwenddeflinemarkup
+void element_output(element_t* self, struct netout_t* netout);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+
+The {\Tt{}display\nwendquote} function is responsible for drawing the element
+to a {\Tt{}netdraw\nwendquote} context.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW3lE78L-3LFOhr-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-8}}}\moddef{element functions~{\nwtagstyle{}\subpageref{NW3lE78L-3LFOhr-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-1}}\nwprevnextdefs{NW3lE78L-3LFOhr-7}{\relax}\nwenddeflinemarkup
+void (*display)(void* self, struct netdraw_gc_t* gc);
+\nwused{\\{NW3lE78L-4aCyDR-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW3lE78L-2gXoUc-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-8}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-7}{NW3lE78L-2gXoUc-9}\nwenddeflinemarkup
+void element_display(element_t* self, struct netdraw_gc_t* gc);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+
+\subsection{The material interface}
+
+The table of functions to implement a material model are stored in
+a {\Tt{}model{\_}material{\_}t\nwendquote} structure.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW3lE78L-4aCyDR-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-4aCyDR-2}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NW3lE78L-4aCyDR-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-4aCyDR-1}{\relax}\nwenddeflinemarkup
+typedef struct model_material_t \{
+    \LA{}material functions~{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-1}}\RA{}
+\} model_material_t;
+
+typedef struct material_t \{
+    model_material_t* model;
+    void* data;
+\} material_t;
+
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+Like the element initializer function, the model initializer function
+constructs the data structures used by the model and does basic
+checking on the model parameters.
+
+The {\Tt{}mesh\nwendquote} argument provides a handle by which the initializer can
+access most of the information it will need: the parameter list,
+any other materials, etc.  The model name is useful since it may
+be the case that a single model may go by multiple aliases,
+or that a default model that calls through to Matlab (for instance)
+might need the model name.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW3lE78L-1Foy7-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-1}}}\moddef{material functions~{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-2}}\nwprevnextdefs{\relax}{NW3lE78L-1Foy7-2}\nwenddeflinemarkup
+struct material_t* (*init)(struct mesh_struct* mesh, const char* model,
+                                   struct model_material_t* modelfunc);
+\nwalsodefined{\\{NW3lE78L-1Foy7-2}\\{NW3lE78L-1Foy7-3}\\{NW3lE78L-1Foy7-4}}\nwused{\\{NW3lE78L-4aCyDR-2}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW3lE78L-2gXoUc-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-9}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-8}{NW3lE78L-2gXoUc-A}\nwenddeflinemarkup
+struct material_t* material_init(model_mgr_t model_mgr, 
+                                 struct mesh_struct* mesh, const char* model);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+If the material allocated anything outside the mesh pool,
+we may need to do some cleanup.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NW3lE78L-1Foy7-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-2}}}\moddef{material functions~{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-2}}\nwprevnextdefs{NW3lE78L-1Foy7-1}{NW3lE78L-1Foy7-3}\nwenddeflinemarkup
+void (*destroy)(void* self);
+\nwused{\\{NW3lE78L-4aCyDR-2}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NW3lE78L-2gXoUc-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-A}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-9}{NW3lE78L-2gXoUc-B}\nwenddeflinemarkup
+void material_destroy(material_t* self);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+
+One of the roles of the material objects is to keep track of any
+parameters to be passed forward to the individual elements.
+The {\Tt{}param\nwendquote} function is a query method to get those parameters
+by name.
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NW3lE78L-1Foy7-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-3}}}\moddef{material functions~{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-2}}\nwprevnextdefs{NW3lE78L-1Foy7-2}{NW3lE78L-1Foy7-4}\nwenddeflinemarkup
+struct mesh_param_t* (*param)(void* self, const char* name);
+\nwused{\\{NW3lE78L-4aCyDR-2}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NW3lE78L-2gXoUc-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-B}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-A}{NW3lE78L-2gXoUc-C}\nwenddeflinemarkup
+struct mesh_param_t* material_param(material_t* self, const char* name);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+The {\Tt{}output\nwendquote} function for a material is responsible for printing
+a text representation of the material data structure.
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NW3lE78L-1Foy7-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-4}}}\moddef{material functions~{\nwtagstyle{}\subpageref{NW3lE78L-1Foy7-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4aCyDR-2}}\nwprevnextdefs{NW3lE78L-1Foy7-3}{\relax}\nwenddeflinemarkup
+void (*output)(void* self, struct netout_t* netout);
+\nwused{\\{NW3lE78L-4aCyDR-2}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NW3lE78L-2gXoUc-C}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-C}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-B}{NW3lE78L-2gXoUc-D}\nwenddeflinemarkup
+void material_output(material_t* self, struct netout_t* netout);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+
+\subsection{Manager interface}
+
+The {\Tt{}model{\_}mgr{\_}t\nwendquote} type is an opaque pointer to a model manager
+object.  Since the model manager object maintains its own memory
+pool, it has a nontrivial destructor function associated with it.
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NW3lE78L-2gXoUc-D}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-D}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-C}{NW3lE78L-2gXoUc-E}\nwenddeflinemarkup
+model_mgr_t model_mgr_init();
+void        model_mgr_destroy(model_mgr_t self);
+
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+To add a set of standard model functions, call the {\Tt{}standard{\_}register\nwendquote}.
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NW3lE78L-2gXoUc-E}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-E}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-D}{NW3lE78L-2gXoUc-F}\nwenddeflinemarkup
+void        model_mgr_standard_register(model_mgr_t self);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+The {\Tt{}add{\_}element\nwendquote} and {\Tt{}add{\_}material\nwendquote} functions add function
+tables to the registry.  Though the function table is passed in
+by reference, the model manager makes its own copy for safe
+keeping rather than just storing the pointer.  If the {\Tt{}name\nwendquote}
+argument is NULL, the model will be registered as the default model.
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NW3lE78L-2gXoUc-F}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-F}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-E}{NW3lE78L-2gXoUc-G}\nwenddeflinemarkup
+void model_mgr_add_element (model_mgr_t self, const char* name, 
+                                    model_element_t*  funcs);
+void model_mgr_add_material(model_mgr_t self, const char* name, 
+                                    model_material_t* funcs);
+
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+The {\Tt{}element\nwendquote} and {\Tt{}material\nwendquote} functions retrieve function
+tables from the registry.  If the table does not contain any models
+matching the requested name, these functions will return NULL.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NW3lE78L-2gXoUc-G}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-G}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3lE78L-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-4XzAqg-1}}\nwprevnextdefs{NW3lE78L-2gXoUc-F}{\relax}\nwenddeflinemarkup
+model_element_t*  model_mgr_element (model_mgr_t self, 
+                                             const char* name);
+model_material_t* model_mgr_material(model_mgr_t self, 
+                                             const char* name);
+\nwused{\\{NW3lE78L-4XzAqg-1}}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NW3lE78L-1vlQ0o-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-1vlQ0o-1}}}\moddef{modelmgr.c~{\nwtagstyle{}\subpageref{NW3lE78L-1vlQ0o-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <mempool.h>
+#include <hash.h>
+#include <mesh.h>
+#include <modelmgr.h>
+
+\LA{}model headers~{\nwtagstyle{}\subpageref{NW3lE78L-Y5bA-1}}\RA{}
+
+\LA{}types~{\nwtagstyle{}\subpageref{NW3lE78L-4H4VOG-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW3lE78L-1duChy-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}\RA{}
+\nwnotused{modelmgr.c}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\subsection{Material and element interface wrappers}
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NW3lE78L-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{\relax}{NW3lE78L-nRuDO-2}\nwenddeflinemarkup
+element_t* element_init(model_mgr_t model_mgr,
+                                mesh_t mesh, const char* model)
+\{
+    model_element_t* modelfunc = model_mgr_element(model_mgr, model);
+    if (modelfunc == NULL) \{
+        mesh_error(mesh, "Unknown model");
+        return NULL;
+    \}
+
+    return modelfunc->init(mesh, model, modelfunc);
+\}
+
+void element_destroy(element_t* self)
+\{
+    if (self->model->destroy)
+        self->model->destroy(self->data);
+\}
+
+\nwalsodefined{\\{NW3lE78L-nRuDO-2}\\{NW3lE78L-nRuDO-3}\\{NW3lE78L-nRuDO-4}\\{NW3lE78L-nRuDO-5}\\{NW3lE78L-nRuDO-6}\\{NW3lE78L-nRuDO-7}\\{NW3lE78L-nRuDO-8}\\{NW3lE78L-nRuDO-9}\\{NW3lE78L-nRuDO-A}\\{NW3lE78L-nRuDO-B}\\{NW3lE78L-nRuDO-C}\\{NW3lE78L-nRuDO-D}\\{NW3lE78L-nRuDO-E}\\{NW3lE78L-nRuDO-F}}\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NW3lE78L-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-1}{NW3lE78L-nRuDO-3}\nwenddeflinemarkup
+void element_set_position(element_t* self, struct mesh_struct* mesh)
+\{
+    if (self->model->set_position)
+        self->model->set_position(self->data, mesh);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NW3lE78L-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-2}{NW3lE78L-nRuDO-4}\nwenddeflinemarkup
+void element_vars(element_t* self, struct vars_mgr_struct* vars)
+\{
+    if (self->model->vars)
+        self->model->vars(self->data, vars);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NW3lE78L-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-3}{NW3lE78L-nRuDO-5}\nwenddeflinemarkup
+void element_displace(element_t* self, 
+                              struct assemble_matrix_t* assembler)
+\{
+    if (self->model->displace)
+        self->model->displace(self->data, assembler);
+\}
+
+void element_R(element_t* self, struct assemble_matrix_t* R,
+               struct assemble_matrix_t* x,
+               struct assemble_matrix_t* v,
+               struct assemble_matrix_t* a)
+\{
+    if (self->model->R)
+        self->model->R(self->data, R, x, v, a);
+\}
+
+void element_dR(element_t* self, struct assemble_matrix_t* dR,
+                double cx, struct assemble_matrix_t* x,
+                double cv, struct assemble_matrix_t* v,
+                double ca, struct assemble_matrix_t* a)
+\{
+    if (self->model->dR)
+        self->model->dR(self->data, dR, cx, x, cv, v, ca, a);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NW3lE78L-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-4}{NW3lE78L-nRuDO-6}\nwenddeflinemarkup
+void element_output(element_t* self, struct netout_t* netout)
+\{
+    if (self->model->output)
+        self->model->output(self->data, netout);
+\}
+
+void element_display(element_t* self, struct netdraw_gc_t* gc)
+\{
+    if (self->model->display)
+        self->model->display(self->data, gc);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NW3lE78L-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-5}{NW3lE78L-nRuDO-7}\nwenddeflinemarkup
+material_t* material_init(model_mgr_t model_mgr,
+                                  mesh_t mesh, const char* model)
+\{
+    model_material_t* modelfunc = model_mgr_material(model_mgr, model);
+    if (modelfunc == NULL) \{
+        mesh_error(mesh, "Unknown model");
+        return NULL;
+    \}
+
+    return modelfunc->init(mesh, model, modelfunc);
+\}
+
+void material_destroy(material_t* self)
+\{
+    if (self->model->destroy)
+        self->model->destroy(self->data);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NW3lE78L-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-6}{NW3lE78L-nRuDO-8}\nwenddeflinemarkup
+struct mesh_param_t* material_param(material_t* self, const char* name)
+\{
+    if (self->model->param)
+        return self->model->param(self->data, name);
+    return NULL;
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NW3lE78L-nRuDO-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-7}{NW3lE78L-nRuDO-9}\nwenddeflinemarkup
+void material_output(material_t* self, struct netout_t* netout)
+\{
+    if (self->model->output)
+        self->model->output(self->data, netout);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+\subsection{Model manager}
+
+A model manager has an associated pool and two hash tables: one for
+storing element function tables, and the other for material function
+tables.
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NW3lE78L-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NW3lE78L-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{\relax}{NW3lE78L-4H4VOG-2}\nwenddeflinemarkup
+struct model_mgr_struct \{
+    mempool_t pool;
+    hash_t element_table;
+    hash_t material_table;
+    model_element_t*  default_element;
+    model_material_t* default_material;
+\};
+
+\nwalsodefined{\\{NW3lE78L-4H4VOG-2}}\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+The entries in the hash tables are just (name, function table) pairs.
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NW3lE78L-4H4VOG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-4H4VOG-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NW3lE78L-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-4H4VOG-1}{\relax}\nwenddeflinemarkup
+typedef struct element_entry_t \{
+    const char* name;
+    model_element_t element;
+\} element_entry_t;
+
+typedef struct material_entry_t \{
+    const char* name;
+    model_material_t material;
+\} material_entry_t;
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+
+We allocate everything (including the model manager object) on
+a locally allocated pool.  Note that, lacking a better size estimate,
+I assume a ``small'' number of different element and material types 
+(on the order of 100).  There is no {\Tt{}copy\nwendquote} function defined;
+all the copying is done by the wrapper functions in this module.
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NW3lE78L-nRuDO-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-8}{NW3lE78L-nRuDO-A}\nwenddeflinemarkup
+model_mgr_t model_mgr_init()
+\{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr_t self = 
+        (model_mgr_t) mempool_cget(pool, sizeof(struct model_mgr_struct));
+
+    self->pool = pool;
+
+    self->element_table = hash_pcreate(pool, 100, 
+                                       (hash_compare_fun_t) element_compare,
+                                       (hash_hash_fun_t)    element_hash,
+                                       NULL);
+
+    self->material_table = hash_pcreate(pool, 100,
+                                        (hash_compare_fun_t) material_compare,
+                                        (hash_hash_fun_t)    material_hash,
+                                        NULL);
+
+    self->default_element = NULL;
+    self->default_material = NULL;
+
+    return self;
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}\nwbegincode{87}\sublabel{NW3lE78L-nRuDO-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-9}{NW3lE78L-nRuDO-B}\nwenddeflinemarkup
+void model_mgr_destroy(model_mgr_t self)
+\{
+    mempool_destroy(self->pool);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{88}\nwdocspar
+
+When we add a new element or material, we just copy everything
+(including the name) onto the pool and then insert the pointer
+into the hash.  Note that we make no special check to see if a
+model with the requested name already exists; if there is a conflict,
+the old model just goes away.
+
+\nwenddocs{}\nwbegincode{89}\sublabel{NW3lE78L-nRuDO-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-A}{NW3lE78L-nRuDO-C}\nwenddeflinemarkup
+void model_mgr_add_element(model_mgr_t self, const char* name,
+                                   model_element_t* element)
+\{
+    element_entry_t* entry = 
+        (element_entry_t*) mempool_get(self->pool, sizeof(*entry));
+    
+    entry->name = mempool_strdup(self->pool, name);
+    memcpy(&(entry->element), element, sizeof(*element));
+    if (entry->name == NULL)
+        self->default_element = &(entry->element);
+    else
+        hash_insert(self->element_table, entry);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{90}\nwdocspar
+
+\nwenddocs{}\nwbegincode{91}\sublabel{NW3lE78L-nRuDO-C}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-B}{NW3lE78L-nRuDO-D}\nwenddeflinemarkup
+void model_mgr_add_material(model_mgr_t self, const char* name,
+                                    model_material_t* material)
+\{
+    material_entry_t* entry = 
+        (material_entry_t*) mempool_get(self->pool, sizeof(*entry));
+    
+    entry->name = mempool_strdup(self->pool, name);
+    memcpy(&(entry->material), material, sizeof(*material));
+    if (entry->name == NULL)
+        self->default_material = &(entry->material);
+    else
+        hash_insert(self->material_table, entry);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{92}\nwdocspar
+
+When we retrieve an element or material, we first check to make
+sure that it exists in the table.  If it does exist, we return
+a pointer to the function table (not to the entire entry pair);
+if it does not exist, we return the default.
+
+\nwenddocs{}\nwbegincode{93}\sublabel{NW3lE78L-nRuDO-D}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-D}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-C}{NW3lE78L-nRuDO-E}\nwenddeflinemarkup
+model_element_t* model_mgr_element(model_mgr_t self, const char* name)
+\{
+    element_entry_t key;
+    element_entry_t* entry = NULL;
+    key.name = name;
+    if (name != NULL)
+        entry = hash_retrieve(self->element_table, &key);
+    return (entry == NULL) ? self->default_element : &(entry->element);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{94}\nwdocspar
+
+\nwenddocs{}\nwbegincode{95}\sublabel{NW3lE78L-nRuDO-E}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-E}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-D}{NW3lE78L-nRuDO-F}\nwenddeflinemarkup
+model_material_t* model_mgr_material(model_mgr_t self, const char* name)
+\{
+    material_entry_t key;
+    material_entry_t* entry = NULL;
+    key.name = name;
+    if (name != NULL)
+        entry = hash_retrieve(self->material_table, &key);
+    return (entry == NULL) ? self->default_material : &(entry->material);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{96}\nwdocspar
+
+The hash table helper functions are just wrappers around
+the standard string hash and comparison functions.
+
+\nwenddocs{}\nwbegincode{97}\sublabel{NW3lE78L-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3lE78L-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{\relax}{NW3lE78L-1duChy-2}\nwenddeflinemarkup
+static unsigned element_hash(element_entry_t* entry)
+\{
+    return hash_strhash(entry->name);
+\}
+
+static unsigned material_hash(material_entry_t* entry)
+\{
+    return hash_strhash(entry->name);
+\}
+
+\nwalsodefined{\\{NW3lE78L-1duChy-2}}\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{98}\nwdocspar
+
+\nwenddocs{}\nwbegincode{99}\sublabel{NW3lE78L-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3lE78L-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-1duChy-1}{\relax}\nwenddeflinemarkup
+static int element_compare(element_entry_t* a, element_entry_t* b)
+\{
+    return strcmp(a->name, b->name);
+\}
+
+static int material_compare(material_entry_t* a, material_entry_t* b)
+\{
+    return strcmp(a->name, b->name);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{100}\nwdocspar
+
+\subsection{Registering standard models}
+
+\nwenddocs{}\nwbegincode{101}\sublabel{NW3lE78L-Y5bA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-Y5bA-1}}}\moddef{model headers~{\nwtagstyle{}\subpageref{NW3lE78L-Y5bA-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwenddeflinemarkup
+/* Standard model headers */
+#include <model_anchor.h>
+#include <model_force.h>
+#include <model_beam2d.h>
+#include <model_beam3d.h>
+#include <model_rigid.h>
+#include <model_gap.h>
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}\nwbegindocs{102}\nwdocspar
+
+\nwenddocs{}\nwbegincode{103}\sublabel{NW3lE78L-nRuDO-F}\nwmargintag{{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-F}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3lE78L-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3lE78L-1vlQ0o-1}}\nwprevnextdefs{NW3lE78L-nRuDO-E}{\relax}\nwenddeflinemarkup
+void model_mgr_standard_register(model_mgr_t self)
+\{
+    model_anchor_register (self);
+    model_force_register  (self);
+    model_beam2d_register (self);
+    model_beam3d_register (self);
+    model_rigid_register  (self);
+    model_gap_register    (self);
+\}
+
+\nwused{\\{NW3lE78L-1vlQ0o-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{element functions}{NW3lE78L-3LFOhr-1}{\nwixu{NW3lE78L-4aCyDR-1}\nwixd{NW3lE78L-3LFOhr-1}\nwixd{NW3lE78L-3LFOhr-2}\nwixd{NW3lE78L-3LFOhr-3}\nwixd{NW3lE78L-3LFOhr-4}\nwixd{NW3lE78L-3LFOhr-5}\nwixd{NW3lE78L-3LFOhr-6}\nwixd{NW3lE78L-3LFOhr-7}\nwixd{NW3lE78L-3LFOhr-8}}}%
+\nwixlogsorted{c}{{exported functions}{NW3lE78L-2gXoUc-1}{\nwixu{NW3lE78L-4XzAqg-1}\nwixd{NW3lE78L-2gXoUc-1}\nwixd{NW3lE78L-2gXoUc-2}\nwixd{NW3lE78L-2gXoUc-3}\nwixd{NW3lE78L-2gXoUc-4}\nwixd{NW3lE78L-2gXoUc-5}\nwixd{NW3lE78L-2gXoUc-6}\nwixd{NW3lE78L-2gXoUc-7}\nwixd{NW3lE78L-2gXoUc-8}\nwixd{NW3lE78L-2gXoUc-9}\nwixd{NW3lE78L-2gXoUc-A}\nwixd{NW3lE78L-2gXoUc-B}\nwixd{NW3lE78L-2gXoUc-C}\nwixd{NW3lE78L-2gXoUc-D}\nwixd{NW3lE78L-2gXoUc-E}\nwixd{NW3lE78L-2gXoUc-F}\nwixd{NW3lE78L-2gXoUc-G}}}%
+\nwixlogsorted{c}{{exported types}{NW3lE78L-4aCyDR-1}{\nwixu{NW3lE78L-4XzAqg-1}\nwixd{NW3lE78L-4aCyDR-1}\nwixd{NW3lE78L-4aCyDR-2}}}%
+\nwixlogsorted{c}{{functions}{NW3lE78L-nRuDO-1}{\nwixu{NW3lE78L-1vlQ0o-1}\nwixd{NW3lE78L-nRuDO-1}\nwixd{NW3lE78L-nRuDO-2}\nwixd{NW3lE78L-nRuDO-3}\nwixd{NW3lE78L-nRuDO-4}\nwixd{NW3lE78L-nRuDO-5}\nwixd{NW3lE78L-nRuDO-6}\nwixd{NW3lE78L-nRuDO-7}\nwixd{NW3lE78L-nRuDO-8}\nwixd{NW3lE78L-nRuDO-9}\nwixd{NW3lE78L-nRuDO-A}\nwixd{NW3lE78L-nRuDO-B}\nwixd{NW3lE78L-nRuDO-C}\nwixd{NW3lE78L-nRuDO-D}\nwixd{NW3lE78L-nRuDO-E}\nwixd{NW3lE78L-nRuDO-F}}}%
+\nwixlogsorted{c}{{material functions}{NW3lE78L-1Foy7-1}{\nwixu{NW3lE78L-4aCyDR-2}\nwixd{NW3lE78L-1Foy7-1}\nwixd{NW3lE78L-1Foy7-2}\nwixd{NW3lE78L-1Foy7-3}\nwixd{NW3lE78L-1Foy7-4}}}%
+\nwixlogsorted{c}{{model headers}{NW3lE78L-Y5bA-1}{\nwixu{NW3lE78L-1vlQ0o-1}\nwixd{NW3lE78L-Y5bA-1}}}%
+\nwixlogsorted{c}{{modelmgr.c}{NW3lE78L-1vlQ0o-1}{\nwixd{NW3lE78L-1vlQ0o-1}}}%
+\nwixlogsorted{c}{{modelmgr.h}{NW3lE78L-4XzAqg-1}{\nwixd{NW3lE78L-4XzAqg-1}}}%
+\nwixlogsorted{c}{{static functions}{NW3lE78L-1duChy-1}{\nwixu{NW3lE78L-1vlQ0o-1}\nwixd{NW3lE78L-1duChy-1}\nwixd{NW3lE78L-1duChy-2}}}%
+\nwixlogsorted{c}{{types}{NW3lE78L-4H4VOG-1}{\nwixu{NW3lE78L-1vlQ0o-1}\nwixd{NW3lE78L-4H4VOG-1}\nwixd{NW3lE78L-4H4VOG-2}}}%
+\nwbegindocs{104}\nwdocspar
+\nwenddocs{}

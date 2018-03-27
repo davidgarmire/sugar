@@ -1,0 +1,674 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+This model adds the basic linear resistor, capacitor, and
+inductor models, along with independent and dependent sources.
+The nodal variables are nodal voltages.
+
+
+\subsection{Interface}
+
+\nwfilename{model-circuit.nw}\nwbegincode{1}\sublabel{NW1sMoxw-fbqV3-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-fbqV3-1}}}\moddef{model-circuit.h~{\nwtagstyle{}\subpageref{NW1sMoxw-fbqV3-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MODEL_CIRCUIT_H
+#define MODEL_CIRCUIT_H
+
+#include <modelmgr.h>
+
+void model_circuit_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_CIRCUIT_H */
+\nwnotused{model-circuit.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW1sMoxw-3K6ONR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3K6ONR-1}}}\moddef{model-circuit.c~{\nwtagstyle{}\subpageref{NW1sMoxw-3K6ONR-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+
+#include <model_circuit.h>
+#include <mesh.h>
+#include <vars.h>
+#include <assemble.h>
+#include <netdraw.h>
+#include <netout.h>
+
+\LA{}types~{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-1}}\RA{}
+\LA{}model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}\RA{}
+\LA{}registration function~{\nwtagstyle{}\subpageref{NW1sMoxw-CkEIP-1}}\RA{}
+\nwnotused{model-circuit.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW1sMoxw-CkEIP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-CkEIP-1}}}\moddef{registration function~{\nwtagstyle{}\subpageref{NW1sMoxw-CkEIP-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwenddeflinemarkup
+void model_circuit_register(model_mgr_t model_mgr)
+\{
+    model_element_t model;
+
+    \LA{}register models~{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-1}}\RA{}
+\}
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{Resistor model}
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW1sMoxw-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{\relax}{NW1sMoxw-4H4VOG-2}\nwenddeflinemarkup
+typedef struct resistor_t \{
+    element_t element;
+    int nodes[2];
+    int vars[2];
+    double G;
+\} resistor_t;
+
+\nwalsodefined{\\{NW1sMoxw-4H4VOG-2}\\{NW1sMoxw-4H4VOG-3}\\{NW1sMoxw-4H4VOG-4}\\{NW1sMoxw-4H4VOG-5}\\{NW1sMoxw-4H4VOG-6}}\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW1sMoxw-3N4EZB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{\relax}{NW1sMoxw-3N4EZB-2}\nwenddeflinemarkup
+static element_t* resistor_init(mesh_t mesh, const char* model,
+                                        model_element_t* modelfunc)
+\{
+    resistor_t* self = (resistor_t*) 
+                       mempool_cget(mesh_pool(mesh), sizeof(*self));
+    material_t* material;
+    mesh_param_t* param;
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    mesh_param_get_nodes(mesh, self->nodes, 2);
+    material = mesh_param_get_material(mesh, "material");
+
+    if ((param = mesh_param_byname(mesh, material, "G")) != NULL) \{
+        self->G = mesh_param_number(mesh, param);
+    \} else if ((param = mesh_param_byname(mesh, material, "R")) != NULL) \{
+        self->G = 1 / mesh_param_number(mesh, param);
+    \} else \{
+        mesh_error(mesh, "Either conductivity or resistivity must be defined");
+    \}
+
+    return &(self->element);
+\}
+
+\nwalsodefined{\\{NW1sMoxw-3N4EZB-2}\\{NW1sMoxw-3N4EZB-3}\\{NW1sMoxw-3N4EZB-4}\\{NW1sMoxw-3N4EZB-5}\\{NW1sMoxw-3N4EZB-6}\\{NW1sMoxw-3N4EZB-7}\\{NW1sMoxw-3N4EZB-8}\\{NW1sMoxw-3N4EZB-9}\\{NW1sMoxw-3N4EZB-A}\\{NW1sMoxw-3N4EZB-B}\\{NW1sMoxw-3N4EZB-C}\\{NW1sMoxw-3N4EZB-D}\\{NW1sMoxw-3N4EZB-E}\\{NW1sMoxw-3N4EZB-F}\\{NW1sMoxw-3N4EZB-G}\\{NW1sMoxw-3N4EZB-H}\\{NW1sMoxw-3N4EZB-I}\\{NW1sMoxw-3N4EZB-J}\\{NW1sMoxw-3N4EZB-K}\\{NW1sMoxw-3N4EZB-L}\\{NW1sMoxw-3N4EZB-M}\\{NW1sMoxw-3N4EZB-N}\\{NW1sMoxw-3N4EZB-O}\\{NW1sMoxw-3N4EZB-P}\\{NW1sMoxw-3N4EZB-Q}\\{NW1sMoxw-3N4EZB-R}\\{NW1sMoxw-3N4EZB-S}}\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW1sMoxw-3N4EZB-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-2}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-1}{NW1sMoxw-3N4EZB-3}\nwenddeflinemarkup
+static void resistor_vars(void* pself, vars_mgr_t vars)
+\{
+    resistor_t* self = (resistor_t*) pself;
+
+    self->vars[0] = vars_node(vars, self->nodes[0], "e");
+    self->vars[1] = vars_node(vars, self->nodes[1], "e");
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW1sMoxw-3N4EZB-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-3}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-2}{NW1sMoxw-3N4EZB-4}\nwenddeflinemarkup
+static void resistor_R(void* pself, assemble_matrix_t *R, 
+                               assemble_matrix_t* x,
+                               assemble_matrix_t* v,
+                               assemble_matrix_t* a)
+\{
+    if (x) \{
+        resistor_t* self = (resistor_t*) pself;
+        double xlocal[2];
+        double Rlocal[2];
+
+        assemble_matrix_add(x, self->vars, 2, xlocal);
+        Rlocal[0] =  self->G * (xlocal[0] - xlocal[1]);
+        Rlocal[1] = -Rlocal[0];
+        assemble_matrix_add(R, self->vars, 2, Rlocal);
+    \}
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW1sMoxw-3N4EZB-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-4}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-3}{NW1sMoxw-3N4EZB-5}\nwenddeflinemarkup
+static void resistor_dR(void* pself, assemble_matrix_t* dR, 
+                                double cx, assemble_matrix_t* x,
+                                double cv, assemble_matrix_t* v,
+                                double ca, assemble_matrix_t* a)
+\{
+    if (cx) \{
+        resistor_t* self = (resistor_t*) pself;
+        double dRlocal[4];
+        dRlocal[0] =  cx * self->G;
+        dRlocal[1] = -cx * self->G;
+        dRlocal[2] = -cx * self->G;
+        dRlocal[3] =  cx * self->G;
+        assemble_matrix_add(dR, self->vars, 2, dRlocal);
+    \}
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW1sMoxw-3N4EZB-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-5}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-4}{NW1sMoxw-3N4EZB-6}\nwenddeflinemarkup
+static void resistor_output(void* pself, netout_t* netout)
+\{
+    resistor_t* self = (resistor_t*) pself;
+
+    netout_string        (netout, "model", "resistor");
+    netout_int_matrix    (netout, "nodes", self->nodes, 1, 2);
+    netout_int_matrix    (netout, "vars",  self->vars,  1, 2);
+    netout_double        (netout, "G",     self->G);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW1sMoxw-uej2X-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-1}}}\moddef{register models~{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-CkEIP-1}}\nwprevnextdefs{\relax}{NW1sMoxw-uej2X-2}\nwenddeflinemarkup
+memset(&model, 0, sizeof(model));
+model.init    = resistor_init;
+model.R       = resistor_R;
+model.dR      = resistor_dR;
+model.vars    = resistor_vars;
+model.output  = resistor_output;
+model_mgr_add_element(model_mgr, "resistor", &model);
+
+\nwalsodefined{\\{NW1sMoxw-uej2X-2}\\{NW1sMoxw-uej2X-3}\\{NW1sMoxw-uej2X-4}\\{NW1sMoxw-uej2X-5}\\{NW1sMoxw-uej2X-6}}\nwused{\\{NW1sMoxw-CkEIP-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+
+\subsection{Capacitor model}
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW1sMoxw-4H4VOG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-4H4VOG-1}{NW1sMoxw-4H4VOG-3}\nwenddeflinemarkup
+typedef struct capacitor_t \{
+    element_t element;
+    int nodes[2];
+    int vars[2];
+    double C;
+\} capacitor_t;
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW1sMoxw-3N4EZB-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-6}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-5}{NW1sMoxw-3N4EZB-7}\nwenddeflinemarkup
+static element_t* capacitor_init(mesh_t mesh, const char* model,
+                                         model_element_t* modelfunc)
+\{
+    capacitor_t* self = (capacitor_t*) 
+                        mempool_cget(mesh_pool(mesh), sizeof(*self));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    mesh_param_get_nodes(mesh, self->nodes, 2);
+    self->C = mesh_param_get_number(mesh, NULL, "C");
+
+    return &(self->element);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW1sMoxw-3N4EZB-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-7}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-6}{NW1sMoxw-3N4EZB-8}\nwenddeflinemarkup
+static void capacitor_vars(void* pself, vars_mgr_t vars)
+\{
+    capacitor_t* self = (capacitor_t*) pself;
+
+    self->vars[0] = vars_node(vars, self->nodes[0], "e");
+    self->vars[1] = vars_node(vars, self->nodes[1], "e");
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW1sMoxw-3N4EZB-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-8}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-7}{NW1sMoxw-3N4EZB-9}\nwenddeflinemarkup
+static void capacitor_R(void* pself, assemble_matrix_t *R, 
+                                assemble_matrix_t* x,
+                                assemble_matrix_t* v,
+                                assemble_matrix_t* a)
+\{
+    capacitor_t* self = (capacitor_t*) pself;
+
+    if (v) \{
+        double vlocal[2];
+        double Rlocal[2];
+
+        assemble_matrix_add(v, self->vars, 2, vlocal);
+        Rlocal[0] = self->C * (vlocal[0] - vlocal[1]);
+        Rlocal[1] = -Rlocal[0];
+        assemble_matrix_add(R, self->vars, 2, Rlocal);
+    \}
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW1sMoxw-3N4EZB-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-9}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-8}{NW1sMoxw-3N4EZB-A}\nwenddeflinemarkup
+static void capacitor_dR(void* pself, assemble_matrix_t* dR, 
+                                 double cx, assemble_matrix_t* x,
+                                 double cv, assemble_matrix_t* v,
+                                 double ca, assemble_matrix_t* a)
+\{
+    capacitor_t* self = (capacitor_t*) pself;
+
+    if (cv) \{
+        double dRlocal[4];
+        dRlocal[0] =  cv * self->C;
+        dRlocal[1] = -cv * self->C;
+        dRlocal[2] = -cv * self->C;
+        dRlocal[3] =  cv * self->C;
+        assemble_matrix_add(dR, self->vars, 2, dRlocal);
+    \}
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW1sMoxw-3N4EZB-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-A}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-9}{NW1sMoxw-3N4EZB-B}\nwenddeflinemarkup
+static void capacitor_output(void* pself, netout_t* netout)
+\{
+    capacitor_t* self = (capacitor_t*) pself;
+
+    netout_string        (netout, "model", "capacitor");
+    netout_int_matrix    (netout, "nodes", self->nodes, 1, 2);
+    netout_int_matrix    (netout, "vars",  self->vars,  1, 2);
+    netout_double        (netout, "C",     self->C);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW1sMoxw-uej2X-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-2}}}\moddef{register models~{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-CkEIP-1}}\nwprevnextdefs{NW1sMoxw-uej2X-1}{NW1sMoxw-uej2X-3}\nwenddeflinemarkup
+memset(&model, 0, sizeof(model));
+model.init    = capacitor_init;
+model.vars    = capacitor_vars;
+model.R       = capacitor_R;
+model.dR      = capacitor_dR;
+model.output  = capacitor_output;
+model_mgr_add_element(model_mgr, "capacitor", &model);
+
+\nwused{\\{NW1sMoxw-CkEIP-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+
+\subsection{Inductor model}
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW1sMoxw-4H4VOG-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-3}}}\moddef{types~{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-4H4VOG-2}{NW1sMoxw-4H4VOG-4}\nwenddeflinemarkup
+typedef struct inductor_t \{
+    element_t element;
+    int nodes[2];
+    int vars[3];
+    double L;
+\} inductor_t;
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW1sMoxw-3N4EZB-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-B}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-A}{NW1sMoxw-3N4EZB-C}\nwenddeflinemarkup
+static element_t* inductor_init(mesh_t mesh, const char* model,
+                                        model_element_t* modelfunc)
+\{
+    inductor_t* self = (inductor_t*) 
+                       mempool_cget(mesh_pool(mesh), sizeof(*self));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    mesh_param_get_nodes(mesh, self->nodes, 2);
+    self->L = mesh_param_get_number(mesh, NULL, "L");
+
+    return &(self->element);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW1sMoxw-3N4EZB-C}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-C}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-B}{NW1sMoxw-3N4EZB-D}\nwenddeflinemarkup
+static void inductor_vars(void* pself, vars_mgr_t vars)
+\{
+    inductor_t* self = (inductor_t*) pself;
+
+    self->vars[0] = vars_node(vars, self->nodes[0], "e");
+    self->vars[1] = vars_node(vars, self->nodes[1], "e");
+    self->vars[2] = vars_branch(vars, "i");
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW1sMoxw-3N4EZB-D}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-D}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-C}{NW1sMoxw-3N4EZB-E}\nwenddeflinemarkup
+static void inductor_R(void* pself, assemble_matrix_t *R, 
+                               assemble_matrix_t* x,
+                               assemble_matrix_t* v,
+                               assemble_matrix_t* a)
+\{
+    inductor_t* self = (inductor_t*) pself;
+
+    if (x) \{
+        double xlocal[3];
+        double Rlocal[3];
+
+        assemble_matrix_add(x, self->vars, 3, xlocal);
+        Rlocal[0] =  xlocal[0];
+        Rlocal[1] = -xlocal[1];
+        Rlocal[2] =  xlocal[0] - xlocal[1];
+        assemble_matrix_add(R, self->vars, 3, Rlocal);
+    \}
+
+    if (v) \{
+        double vlocal;
+        double Rlocal;
+
+        assemble_matrix_add(v, self->vars + 3, 1, &vlocal);
+        Rlocal = -self->L * vlocal;
+        assemble_matrix_add(v, self->vars + 3, 1, &Rlocal);
+    \}
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NW1sMoxw-3N4EZB-E}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-E}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-D}{NW1sMoxw-3N4EZB-F}\nwenddeflinemarkup
+static void inductor_dR(void* pself, assemble_matrix_t* dR, 
+                                double cx, assemble_matrix_t* x,
+                                double cv, assemble_matrix_t* v,
+                                double ca, assemble_matrix_t* a)
+\{
+    inductor_t* self = (inductor_t*) pself;
+
+    if (cx) \{
+        double dRlocal[9];
+        memset(dRlocal, 0, 9 * sizeof(double));
+        dRlocal[2] =  cx;
+        dRlocal[5] = -cx;
+        dRlocal[6] =  cx;
+        dRlocal[7] = -cx;
+        assemble_matrix_add(dR, self->vars, 3, dRlocal);
+    \}
+
+    if (cv) \{
+        double dRlocal = -cv * self->L;
+        assemble_matrix_add(dR, self->vars + 3, 1, &dRlocal);
+    \}
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NW1sMoxw-3N4EZB-F}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-F}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-E}{NW1sMoxw-3N4EZB-G}\nwenddeflinemarkup
+static void inductor_output(void* pself, netout_t* netout)
+\{
+    inductor_t* self = (inductor_t*) pself;
+
+    netout_string        (netout, "model", "inductor");
+    netout_int_matrix    (netout, "nodes", self->nodes, 1, 2);
+    netout_int_matrix    (netout, "vars",  self->vars,  1, 3);
+    netout_double        (netout, "L",     self->L);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NW1sMoxw-uej2X-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-3}}}\moddef{register models~{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-CkEIP-1}}\nwprevnextdefs{NW1sMoxw-uej2X-2}{NW1sMoxw-uej2X-4}\nwenddeflinemarkup
+memset(&model, 0, sizeof(model));
+model.init    = inductor_init;
+model.vars    = inductor_vars;
+model.R       = inductor_R;
+model.dR      = inductor_dR;
+model.output  = inductor_output;
+model_mgr_add_element(model_mgr, "inductor", &model);
+
+\nwused{\\{NW1sMoxw-CkEIP-1}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+
+\subsection{Current source model}
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NW1sMoxw-4H4VOG-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-4}}}\moddef{types~{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-4H4VOG-3}{NW1sMoxw-4H4VOG-5}\nwenddeflinemarkup
+typedef struct isrc_t \{
+    element_t element;
+    int nodes[2];
+    int vars[2];
+    double I;
+\} isrc_t;
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NW1sMoxw-3N4EZB-G}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-G}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-F}{NW1sMoxw-3N4EZB-H}\nwenddeflinemarkup
+static element_t* isrc_init(mesh_t mesh, const char* model,
+                                    model_element_t* modelfunc)
+\{
+    isrc_t* self = (isrc_t*) 
+                   mempool_cget(mesh_pool(mesh), sizeof(*self));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    mesh_param_get_nodes(mesh, self->nodes, 2);
+    self->I = mesh_param_get_number(mesh, NULL, "I");
+
+    return &(self->element);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NW1sMoxw-3N4EZB-H}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-H}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-G}{NW1sMoxw-3N4EZB-I}\nwenddeflinemarkup
+static void isrc_vars(void* pself, vars_mgr_t vars)
+\{
+    isrc_t* self = (isrc_t*) pself;
+
+    self->vars[0] = vars_node(vars, self->nodes[0], "e");
+    self->vars[1] = vars_node(vars, self->nodes[1], "e");
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NW1sMoxw-3N4EZB-I}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-I}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-H}{NW1sMoxw-3N4EZB-J}\nwenddeflinemarkup
+static void isrc_R(void* pself, assemble_matrix_t *R, 
+                           assemble_matrix_t* x,
+                           assemble_matrix_t* v,
+                           assemble_matrix_t* a)
+\{
+    isrc_t* self = (isrc_t*) pself;
+    double Rlocal[2];
+
+    Rlocal[0] =  self->I;
+    Rlocal[1] = -self->I;
+    assemble_matrix_add(R, self->vars, 2, Rlocal);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NW1sMoxw-3N4EZB-J}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-J}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-I}{NW1sMoxw-3N4EZB-K}\nwenddeflinemarkup
+static void isrc_output(void* pself, netout_t* netout)
+\{
+    isrc_t* self = (isrc_t*) pself;
+
+    netout_string        (netout, "model", "isrc");
+    netout_int_matrix    (netout, "nodes", self->nodes, 1, 2);
+    netout_int_matrix    (netout, "vars",  self->vars,  1, 2);
+    netout_double        (netout, "I",     self->I);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NW1sMoxw-uej2X-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-4}}}\moddef{register models~{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-CkEIP-1}}\nwprevnextdefs{NW1sMoxw-uej2X-3}{NW1sMoxw-uej2X-5}\nwenddeflinemarkup
+memset(&model, 0, sizeof(model));
+model.init    = isrc_init;
+model.vars    = isrc_vars;
+model.R       = isrc_R;
+model.output  = isrc_output;
+model_mgr_add_element(model_mgr, "isrc", &model);
+
+\nwused{\\{NW1sMoxw-CkEIP-1}}\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+
+\subsection{Voltage source model}
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NW1sMoxw-4H4VOG-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-5}}}\moddef{types~{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-4H4VOG-4}{NW1sMoxw-4H4VOG-6}\nwenddeflinemarkup
+typedef struct vsrc_t \{
+    element_t element;
+    int nodes[2];
+    int vars[3];
+    double V;
+\} vsrc_t;
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NW1sMoxw-3N4EZB-K}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-K}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-J}{NW1sMoxw-3N4EZB-L}\nwenddeflinemarkup
+static element_t* vsrc_init(mesh_t mesh, const char* model,
+                                    model_element_t* modelfunc)
+\{
+    vsrc_t* self = (vsrc_t*) 
+                   mempool_cget(mesh_pool(mesh), sizeof(*self));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    mesh_param_get_nodes(mesh, self->nodes, 2);
+    self->V = mesh_param_get_number(mesh, NULL, "V");
+
+    return &(self->element);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NW1sMoxw-3N4EZB-L}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-L}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-K}{NW1sMoxw-3N4EZB-M}\nwenddeflinemarkup
+static void vsrc_vars(void* pself, vars_mgr_t vars)
+\{
+    vsrc_t* self = (vsrc_t*) pself;
+
+    self->vars[0] = vars_node(vars, self->nodes[0], "e");
+    self->vars[1] = vars_node(vars, self->nodes[1], "e");
+    self->vars[2] = vars_branch(vars, "i");
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NW1sMoxw-3N4EZB-M}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-M}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-L}{NW1sMoxw-3N4EZB-N}\nwenddeflinemarkup
+static void vsrc_R(void* pself, assemble_matrix_t *R, 
+                           assemble_matrix_t* x,
+                           assemble_matrix_t* v,
+                           assemble_matrix_t* a)
+\{
+    vsrc_t* self = (vsrc_t*) pself;
+
+    double Rlocal[2];
+    double xlocal[2];
+
+    Rlocal[0] =  0;
+    Rlocal[1] =  0;
+    Rlocal[2] = -self->V;
+
+    if (x) \{
+        assemble_matrix_add(x, self->vars, 3, xlocal);
+        Rlocal[0] +=  xlocal[0];
+        Rlocal[1] += -xlocal[1];
+        Rlocal[2] +=  xlocal[0] - xlocal[1];
+    \}
+    assemble_matrix_add(R, self->vars, 3, Rlocal);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NW1sMoxw-3N4EZB-N}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-N}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-M}{NW1sMoxw-3N4EZB-O}\nwenddeflinemarkup
+static void vsrc_dR(void* pself, assemble_matrix_t* dR, 
+                            double cx, assemble_matrix_t* x,
+                            double cv, assemble_matrix_t* v,
+                            double ca, assemble_matrix_t* a)
+\{
+    vsrc_t* self = (vsrc_t*) pself;
+
+    if (cx) \{
+        double dRlocal[9];
+        memset(dRlocal, 0, 9 * sizeof(double));
+        dRlocal[2] =  cx;
+        dRlocal[5] = -cx;
+        dRlocal[6] =  cx;
+        dRlocal[7] = -cx;
+        assemble_matrix_add(dR, self->vars, 3, dRlocal);
+    \}
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NW1sMoxw-3N4EZB-O}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-O}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-N}{NW1sMoxw-3N4EZB-P}\nwenddeflinemarkup
+static void vsrc_output(void* pself, netout_t* netout)
+\{
+    vsrc_t* self = (vsrc_t*) pself;
+
+    netout_string        (netout, "model", "vsrc");
+    netout_int_matrix    (netout, "nodes", self->nodes, 1, 2);
+    netout_int_matrix    (netout, "vars",  self->vars,  1, 3);
+    netout_double        (netout, "V",     self->V);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NW1sMoxw-uej2X-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-5}}}\moddef{register models~{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-CkEIP-1}}\nwprevnextdefs{NW1sMoxw-uej2X-4}{NW1sMoxw-uej2X-6}\nwenddeflinemarkup
+memset(&model, 0, sizeof(model));
+model.init    = vsrc_init;
+model.vars    = vsrc_vars;
+model.R       = vsrc_R;
+model.dR      = vsrc_dR;
+model.output  = vsrc_output;
+model_mgr_add_element(model_mgr, "vsrc", &model);
+
+\nwused{\\{NW1sMoxw-CkEIP-1}}\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+
+\subsection{Electrical ground model}
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NW1sMoxw-4H4VOG-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-6}}}\moddef{types~{\nwtagstyle{}\subpageref{NW1sMoxw-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-4H4VOG-5}{\relax}\nwenddeflinemarkup
+typedef struct eground_t \{
+    element_t element;
+    int node;
+    int var;
+\} eground_t;
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NW1sMoxw-3N4EZB-P}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-P}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-O}{NW1sMoxw-3N4EZB-Q}\nwenddeflinemarkup
+static element_t* eground_init(mesh_t mesh, const char* model,
+                                       model_element_t* modelfunc)
+\{
+    eground_t* self = (eground_t*) 
+                   mempool_cget(mesh_pool(mesh), sizeof(*self));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    mesh_param_get_nodes(mesh, &(self->node), 1);
+
+    return &(self->element);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NW1sMoxw-3N4EZB-Q}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-Q}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-P}{NW1sMoxw-3N4EZB-R}\nwenddeflinemarkup
+static void eground_vars(void* pself, vars_mgr_t vars)
+\{
+    eground_t* self = (eground_t*) pself;
+
+    self->var = vars_node(vars, self->node, "e");
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NW1sMoxw-3N4EZB-R}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-R}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-Q}{NW1sMoxw-3N4EZB-S}\nwenddeflinemarkup
+static void eground_displace(void* pself, assemble_matrix_t* assembler)
+\{
+    eground_t* self = (eground_t*) pself;
+    assemble_matrix_add1(assembler, self->var, 0);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NW1sMoxw-3N4EZB-S}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-S}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW1sMoxw-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-3K6ONR-1}}\nwprevnextdefs{NW1sMoxw-3N4EZB-R}{\relax}\nwenddeflinemarkup
+static void eground_output(void* pself, netout_t* netout)
+\{
+    eground_t* self = (eground_t*) pself;
+
+    netout_string        (netout, "model", "eground");
+    netout_int_matrix    (netout, "node", &(self->node), 1, 1);
+    netout_int_matrix    (netout, "var",  &(self->var),  1, 1);
+\}
+
+\nwused{\\{NW1sMoxw-3K6ONR-1}}\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NW1sMoxw-uej2X-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-6}}}\moddef{register models~{\nwtagstyle{}\subpageref{NW1sMoxw-uej2X-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1sMoxw-CkEIP-1}}\nwprevnextdefs{NW1sMoxw-uej2X-5}{\relax}\nwenddeflinemarkup
+memset(&model, 0, sizeof(model));
+model.init     = eground_init;
+model.vars     = eground_vars;
+model.displace = eground_displace;
+model.output   = eground_output;
+model_mgr_add_element(model_mgr, "eground", &model);
+
+\nwused{\\{NW1sMoxw-CkEIP-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{model functions}{NW1sMoxw-3N4EZB-1}{\nwixu{NW1sMoxw-3K6ONR-1}\nwixd{NW1sMoxw-3N4EZB-1}\nwixd{NW1sMoxw-3N4EZB-2}\nwixd{NW1sMoxw-3N4EZB-3}\nwixd{NW1sMoxw-3N4EZB-4}\nwixd{NW1sMoxw-3N4EZB-5}\nwixd{NW1sMoxw-3N4EZB-6}\nwixd{NW1sMoxw-3N4EZB-7}\nwixd{NW1sMoxw-3N4EZB-8}\nwixd{NW1sMoxw-3N4EZB-9}\nwixd{NW1sMoxw-3N4EZB-A}\nwixd{NW1sMoxw-3N4EZB-B}\nwixd{NW1sMoxw-3N4EZB-C}\nwixd{NW1sMoxw-3N4EZB-D}\nwixd{NW1sMoxw-3N4EZB-E}\nwixd{NW1sMoxw-3N4EZB-F}\nwixd{NW1sMoxw-3N4EZB-G}\nwixd{NW1sMoxw-3N4EZB-H}\nwixd{NW1sMoxw-3N4EZB-I}\nwixd{NW1sMoxw-3N4EZB-J}\nwixd{NW1sMoxw-3N4EZB-K}\nwixd{NW1sMoxw-3N4EZB-L}\nwixd{NW1sMoxw-3N4EZB-M}\nwixd{NW1sMoxw-3N4EZB-N}\nwixd{NW1sMoxw-3N4EZB-O}\nwixd{NW1sMoxw-3N4EZB-P}\nwixd{NW1sMoxw-3N4EZB-Q}\nwixd{NW1sMoxw-3N4EZB-R}\nwixd{NW1sMoxw-3N4EZB-S}}}%
+\nwixlogsorted{c}{{model-circuit.c}{NW1sMoxw-3K6ONR-1}{\nwixd{NW1sMoxw-3K6ONR-1}}}%
+\nwixlogsorted{c}{{model-circuit.h}{NW1sMoxw-fbqV3-1}{\nwixd{NW1sMoxw-fbqV3-1}}}%
+\nwixlogsorted{c}{{register models}{NW1sMoxw-uej2X-1}{\nwixu{NW1sMoxw-CkEIP-1}\nwixd{NW1sMoxw-uej2X-1}\nwixd{NW1sMoxw-uej2X-2}\nwixd{NW1sMoxw-uej2X-3}\nwixd{NW1sMoxw-uej2X-4}\nwixd{NW1sMoxw-uej2X-5}\nwixd{NW1sMoxw-uej2X-6}}}%
+\nwixlogsorted{c}{{registration function}{NW1sMoxw-CkEIP-1}{\nwixu{NW1sMoxw-3K6ONR-1}\nwixd{NW1sMoxw-CkEIP-1}}}%
+\nwixlogsorted{c}{{types}{NW1sMoxw-4H4VOG-1}{\nwixu{NW1sMoxw-3K6ONR-1}\nwixd{NW1sMoxw-4H4VOG-1}\nwixd{NW1sMoxw-4H4VOG-2}\nwixd{NW1sMoxw-4H4VOG-3}\nwixd{NW1sMoxw-4H4VOG-4}\nwixd{NW1sMoxw-4H4VOG-5}\nwixd{NW1sMoxw-4H4VOG-6}}}%
+\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}

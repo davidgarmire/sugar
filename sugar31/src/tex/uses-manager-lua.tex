@@ -1,0 +1,200 @@
+\section{Introduction}% ===> this file was generated automatically by noweave --- better not edit it
+
+This module provides an interactive command interface to SUGAR
+using the Lua language.  It defines little functionality on its
+own.
+
+This module provides a Lua interface to the {\Tt{}uses\nwendquote} manager
+functionality.
+
+Commands to the interface include
+\begin{itemize}
+  \item {\Tt{}use\nwendquote}:
+    Read and execute a Lua script file in the current environment
+  \item {\Tt{}addpath\nwendquote}: Add to the search path
+\end{itemize}
+
+Besides these commands, the basic Lua library and the math library
+are included.  All the standard Lua syntax is, of course, available.
+
+
+\section{Interface}
+
+The module provides three functions: one to register the library
+functions with the Lua interpreter, and a setter/getter pair to
+access the uses manager associated with the interpreter.
+
+\nwfilename{uses-manager-lua.nw}\nwbegincode{1}\sublabel{NW3PgRiY-Hg6QS-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-Hg6QS-1}}}\moddef{uses-manager-lua.h~{\nwtagstyle{}\subpageref{NW3PgRiY-Hg6QS-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef USES_MANAGER_LUA_H
+#define USES_MANAGER_LUA_H
+
+#include <uses_manager.h>
+
+void lua_usesmgrlib(lua_State* L);
+void lua_set_usesmgr(lua_State* L, uses_manager_t uses_mgr);
+uses_manager_t lua_get_usesmgr(lua_State* L);
+
+#endif /* USES_MANAGER_LUA_H */
+\nwnotused{uses-manager-lua.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3PgRiY-2uBSOO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-2uBSOO-1}}}\moddef{uses-manager-lua.c~{\nwtagstyle{}\subpageref{NW3PgRiY-2uBSOO-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lua.h>
+#include <lualib.h>
+
+#include <uses_manager_lua.h>
+
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW3PgRiY-1duChy-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW3PgRiY-nRuDO-1}}\RA{}
+
+\nwnotused{uses-manager-lua.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Accessing the uses manager}
+
+The uses manager is stored in the Lua registry table in the entry
+keyed by ``SUGAR uses manager''.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3PgRiY-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3PgRiY-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-2uBSOO-1}}\nwprevnextdefs{\relax}{NW3PgRiY-nRuDO-2}\nwenddeflinemarkup
+void lua_set_usesmgr(lua_State* L, uses_manager_t uses_mgr)
+\{
+    lua_getregistry(L);
+    lua_pushstring(L, "SUGAR uses manager");
+    lua_pushuserdata(L, uses_mgr);
+    lua_settable(L,-3);
+    lua_pop(L,1);
+\}
+
+\nwalsodefined{\\{NW3PgRiY-nRuDO-2}\\{NW3PgRiY-nRuDO-3}}\nwused{\\{NW3PgRiY-2uBSOO-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3PgRiY-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3PgRiY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-2uBSOO-1}}\nwprevnextdefs{NW3PgRiY-nRuDO-1}{NW3PgRiY-nRuDO-3}\nwenddeflinemarkup
+uses_manager_t lua_get_usesmgr(lua_State* L)
+\{
+    uses_manager_t uses_mgr;
+
+    lua_getregistry(L);
+    lua_pushstring(L, "SUGAR uses manager");
+    lua_gettable(L,-2);
+    if (!lua_isuserdata(L,-1))
+        return NULL;
+    uses_mgr = (uses_manager_t) lua_touserdata(L,-1);
+    lua_pop(L,2);
+    return uses_mgr;
+\}
+
+\nwused{\\{NW3PgRiY-2uBSOO-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{{\Tt{}use\nwendquote} command}
+
+The {\Tt{}use\nwendquote} command executes a Lua file in the current environment.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3PgRiY-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3PgRiY-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-2uBSOO-1}}\nwprevnextdefs{\relax}{NW3PgRiY-1duChy-2}\nwenddeflinemarkup
+static int use_lua_file(lua_State* L)
+\{
+    uses_manager_t uses_manager = lua_get_usesmgr(L);
+    int n = lua_gettop(L);
+    int i;
+
+    \LA{}Assert presence of uses manager~{\nwtagstyle{}\subpageref{NW3PgRiY-sVs1q-1}}\RA{}
+
+    for (i = 1; i <= n; ++i) \{
+        char buf[256];
+        if (!lua_isstring(L,i))
+            lua_error(L, "Invalid argument to 'use'");
+        \LA{}Get complete name of file to use~{\nwtagstyle{}\subpageref{NW3PgRiY-1NdB2Y-1}}\RA{}
+        \LA{}Use lua file~{\nwtagstyle{}\subpageref{NW3PgRiY-41l6NP-1}}\RA{}
+    \}
+    return 0;
+\}
+
+\nwalsodefined{\\{NW3PgRiY-1duChy-2}}\nwused{\\{NW3PgRiY-2uBSOO-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+To get the full file name, including path, we consult 
+the uses manager.  If we find a full name, we store it in {\Tt{}buf\nwendquote};
+otherwise, we'd better complain.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3PgRiY-sVs1q-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-sVs1q-1}}}\moddef{Assert presence of uses manager~{\nwtagstyle{}\subpageref{NW3PgRiY-sVs1q-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-1duChy-1}\\{NW3PgRiY-1duChy-2}}\nwenddeflinemarkup
+if (uses_manager == NULL)
+    lua_error(L, "Uses manager not installed!\\n");
+\nwused{\\{NW3PgRiY-1duChy-1}\\{NW3PgRiY-1duChy-2}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW3PgRiY-1NdB2Y-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-1NdB2Y-1}}}\moddef{Get complete name of file to use~{\nwtagstyle{}\subpageref{NW3PgRiY-1NdB2Y-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-1duChy-1}}\nwenddeflinemarkup
+strncpy(buf, lua_tostring(L,i), sizeof(buf));
+if (uses_manager_search(uses_manager, buf, sizeof(buf)) == NULL)
+    lua_error(L, "Could not open file");
+\nwused{\\{NW3PgRiY-1duChy-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW3PgRiY-41l6NP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-41l6NP-1}}}\moddef{Use lua file~{\nwtagstyle{}\subpageref{NW3PgRiY-41l6NP-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-1duChy-1}}\nwenddeflinemarkup
+if (lua_dofile(L, buf) != 0)
+    lua_error(L, "Error opening file");
+\nwused{\\{NW3PgRiY-1duChy-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW3PgRiY-BzF6M-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-BzF6M-1}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW3PgRiY-BzF6M-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-nRuDO-3}}\nwprevnextdefs{\relax}{NW3PgRiY-BzF6M-2}\nwenddeflinemarkup
+lua_register(L, "use", use_lua_file);
+\nwalsodefined{\\{NW3PgRiY-BzF6M-2}}\nwused{\\{NW3PgRiY-nRuDO-3}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{{\Tt{}addpath\nwendquote} command}
+
+The {\Tt{}addpath\nwendquote} command adds to the list of paths to search in
+{\Tt{}use\nwendquote} commands.  Calls to the {\Tt{}uses{\_}manager{\_}addpath\nwendquote} command
+prepend to the list of available paths.  Note that you \emph{don't}
+want to try to add multiple paths in the same string (separated by
+a colon as in shell, say).  You can, however, add multiple paths
+in different string arguments in a single call to {\Tt{}addpath\nwendquote}
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW3PgRiY-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3PgRiY-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-2uBSOO-1}}\nwprevnextdefs{NW3PgRiY-1duChy-1}{\relax}\nwenddeflinemarkup
+static int addpath_lua(lua_State* L)
+\{
+    uses_manager_t uses_manager = lua_get_usesmgr(L);
+    int n = lua_gettop(L);
+    int i;
+
+    \LA{}Assert presence of uses manager~{\nwtagstyle{}\subpageref{NW3PgRiY-sVs1q-1}}\RA{}
+
+    for (i = 1; i <= n; ++i) \{
+        if (!lua_isstring(L,i))
+            lua_error(L, "Invalid argument to 'use'");
+        uses_manager_addpath(uses_manager, lua_tostring(L,i));
+    \}
+    return 0;
+\}
+
+\nwused{\\{NW3PgRiY-2uBSOO-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW3PgRiY-BzF6M-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-BzF6M-2}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW3PgRiY-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-nRuDO-3}}\nwprevnextdefs{NW3PgRiY-BzF6M-1}{\relax}\nwenddeflinemarkup
+lua_register(L, "addpath", addpath_lua);
+\nwused{\\{NW3PgRiY-nRuDO-3}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+
+\subsection{Registration}
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW3PgRiY-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3PgRiY-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3PgRiY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3PgRiY-2uBSOO-1}}\nwprevnextdefs{NW3PgRiY-nRuDO-2}{\relax}\nwenddeflinemarkup
+void lua_usesmgrlib(lua_State* L)
+\{
+    \LA{}register functions~{\nwtagstyle{}\subpageref{NW3PgRiY-BzF6M-1}}\RA{}
+\}
+
+\nwused{\\{NW3PgRiY-2uBSOO-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{Assert presence of uses manager}{NW3PgRiY-sVs1q-1}{\nwixu{NW3PgRiY-1duChy-1}\nwixd{NW3PgRiY-sVs1q-1}\nwixu{NW3PgRiY-1duChy-2}}}%
+\nwixlogsorted{c}{{functions}{NW3PgRiY-nRuDO-1}{\nwixu{NW3PgRiY-2uBSOO-1}\nwixd{NW3PgRiY-nRuDO-1}\nwixd{NW3PgRiY-nRuDO-2}\nwixd{NW3PgRiY-nRuDO-3}}}%
+\nwixlogsorted{c}{{Get complete name of file to use}{NW3PgRiY-1NdB2Y-1}{\nwixu{NW3PgRiY-1duChy-1}\nwixd{NW3PgRiY-1NdB2Y-1}}}%
+\nwixlogsorted{c}{{register functions}{NW3PgRiY-BzF6M-1}{\nwixd{NW3PgRiY-BzF6M-1}\nwixd{NW3PgRiY-BzF6M-2}\nwixu{NW3PgRiY-nRuDO-3}}}%
+\nwixlogsorted{c}{{static functions}{NW3PgRiY-1duChy-1}{\nwixu{NW3PgRiY-2uBSOO-1}\nwixd{NW3PgRiY-1duChy-1}\nwixd{NW3PgRiY-1duChy-2}}}%
+\nwixlogsorted{c}{{Use lua file}{NW3PgRiY-41l6NP-1}{\nwixu{NW3PgRiY-1duChy-1}\nwixd{NW3PgRiY-41l6NP-1}}}%
+\nwixlogsorted{c}{{uses-manager-lua.c}{NW3PgRiY-2uBSOO-1}{\nwixd{NW3PgRiY-2uBSOO-1}}}%
+\nwixlogsorted{c}{{uses-manager-lua.h}{NW3PgRiY-Hg6QS-1}{\nwixd{NW3PgRiY-Hg6QS-1}}}%
+\nwbegindocs{24}\nwdocspar
+
+
+\nwenddocs{}

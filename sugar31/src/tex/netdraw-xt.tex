@@ -1,0 +1,454 @@
+\section{Introduction}% ===> this file was generated automatically by noweave --- better not edit it
+
+The {\Tt{}xtnetdraw\nwendquote} module is an X toolkit implementation of the
+{\Tt{}netdraw\nwendquote} interface.
+
+
+\section{Interface}
+
+\nwfilename{netdraw-xt.nw}\nwbegincode{1}\sublabel{NW1O6D2a-3wIrEv-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-3wIrEv-1}}}\moddef{netdraw-xt.h~{\nwtagstyle{}\subpageref{NW1O6D2a-3wIrEv-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef NETDRAW_XT_H
+#define NETDRAW_XT_H
+
+#include <mesh.h>
+
+void xtnetdraw_init(int argc, char** argv);
+void xtnetdraw(mesh_t mesh, double* x);
+
+#endif /* NETDRAW_XT_H */
+\nwnotused{netdraw-xt.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+I am \emph{not} an expert X programmer.  Most of what I know about
+practical X programming is gleaned from manual pages, examples online,
+and experimenting with crossed fingers.  Caveat user.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW1O6D2a-1HWiET-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1HWiET-1}}}\moddef{netdraw-xt.c~{\nwtagstyle{}\subpageref{NW1O6D2a-1HWiET-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#ifdef HAVE_X11
+
+#include <stdlib.h>
+#include <assert.h>
+#include <math.h>
+
+#include <sys/types.h>
+#include <unistd.h>
+
+#include <X11/StringDefs.h>
+#include <X11/Intrinsic.h>
+#include <X11/Core.h>
+#include <X11/Xaw/Box.h>
+#include <X11/Xaw/Command.h>
+
+#include <netdraw_xt.h>
+#include <netdraw.h>
+#include <mesh.h>
+#include <affine.h>
+
+\LA{}types~{\nwtagstyle{}\subpageref{NW1O6D2a-4H4VOG-1}}\RA{}
+\LA{}macros~{\nwtagstyle{}\subpageref{NW1O6D2a-1VvxMr-1}}\RA{}
+\LA{}static data~{\nwtagstyle{}\subpageref{NW1O6D2a-IAwJm-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-1}}\RA{}
+\LA{}draw functions~{\nwtagstyle{}\subpageref{NW1O6D2a-2Q2ktV-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW1O6D2a-nRuDO-1}}\RA{}
+
+#endif /* HAVE_X11 */
+\nwnotused{netdraw-xt.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Draw commands}
+
+The {\Tt{}line\nwendquote} command is our one and only drawing function.  Its only
+exposure to the outside world will be when it is passed into the
+{\Tt{}draw\nwendquote} model using the {\Tt{}netdraw\nwendquote} interface.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW1O6D2a-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NW1O6D2a-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{\relax}{NW1O6D2a-IAwJm-2}\nwenddeflinemarkup
+static void line(void* pself, double* x1, double* x2);
+static double* get_x(void* pself);
+
+static netdraw_fun_t xt_draw_fun = \{line, NULL, NULL, get_x\};
+
+\nwalsodefined{\\{NW1O6D2a-IAwJm-2}}\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+There are two coordinate frames that we care about when displaying
+a line: global (world) coordinates, and view coordinates.
+There's also the screen coordinates. %'
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW1O6D2a-2Q2ktV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-2Q2ktV-1}}}\moddef{draw functions~{\nwtagstyle{}\subpageref{NW1O6D2a-2Q2ktV-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{\relax}{NW1O6D2a-2Q2ktV-2}\nwenddeflinemarkup
+static void line(void* pself, double* x1, double* x2)
+\{
+    xtnet_gc_t* self = (xtnet_gc_t*) pself;
+    double pts[6];
+
+    memcpy(pts + 0, x1, 3*sizeof(double));
+    memcpy(pts + 3, x2, 3*sizeof(double));
+
+    affine_apply(self->toview,   pts + 0);
+    affine_apply(self->toscreen, pts + 0);    
+    affine_apply(self->toview,   pts + 3);
+    affine_apply(self->toscreen, pts + 3);
+
+    XDrawLine(self->disp, self->win, self->gc, 
+              (int) pts[0], (int) pts[1], (int) pts[3], (int) pts[4]);
+\}
+
+\nwalsodefined{\\{NW1O6D2a-2Q2ktV-2}}\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW1O6D2a-2Q2ktV-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-2Q2ktV-2}}}\moddef{draw functions~{\nwtagstyle{}\subpageref{NW1O6D2a-2Q2ktV-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{NW1O6D2a-2Q2ktV-1}{\relax}\nwenddeflinemarkup
+static double* get_x(void* pself)
+\{
+    xtnet_gc_t* self = (xtnet_gc_t*) pself;
+    return self->x;
+\}
+
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{Draw all}
+
+The {\Tt{}draw{\_}all\nwendquote} function is called by the main X interface routine
+on display events, and is responsible for drawing the device.
+Naturally, the routine passes the buck on to the model functions.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW1O6D2a-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{\relax}{NW1O6D2a-1duChy-2}\nwenddeflinemarkup
+static void draw_all(xtnet_gc_t* self)
+\{
+    int i, n;
+    netdraw_gc_t netdraw;
+    netdraw.methods = &xt_draw_fun;
+    netdraw.data    = self;
+
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i)
+        element_display( mesh_element(self->mesh, i), &netdraw );
+\}
+
+\nwalsodefined{\\{NW1O6D2a-1duChy-2}\\{NW1O6D2a-1duChy-3}\\{NW1O6D2a-1duChy-4}\\{NW1O6D2a-1duChy-5}}\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{X interface routines}
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW1O6D2a-IAwJm-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-IAwJm-2}}}\moddef{static data~{\nwtagstyle{}\subpageref{NW1O6D2a-IAwJm-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{NW1O6D2a-IAwJm-1}{\relax}\nwenddeflinemarkup
+static int    argc;
+static char** argv;
+
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW1O6D2a-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW1O6D2a-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{\relax}{NW1O6D2a-nRuDO-2}\nwenddeflinemarkup
+void xtnetdraw_init(int my_argc, char** my_argv)
+\{
+    argc = my_argc;
+    argv = my_argv;
+\}
+
+\nwalsodefined{\\{NW1O6D2a-nRuDO-2}}\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+The main function {\Tt{}xtnetdraw\nwendquote} forks a new process to serve
+as the X client, and then sets up the main X loop in the new
+process.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW1O6D2a-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW1O6D2a-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{NW1O6D2a-nRuDO-1}{\relax}\nwenddeflinemarkup
+void xtnetdraw(mesh_t mesh, double* x)
+\{
+    \LA{}widget declarations~{\nwtagstyle{}\subpageref{NW1O6D2a-1OEBUZ-1}}\RA{}
+    xtnet_gc_t* self;
+
+    int n;
+    Arg wargs[10];
+
+    if (fork() != 0)
+        return;
+
+    \LA{}initialize \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NW1O6D2a-3ei8GD-1}}\RA{}
+    \LA{}initialize X client~{\nwtagstyle{}\subpageref{NW1O6D2a-lVBrR-1}}\RA{}
+\}
+
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+The {\Tt{}xtnet{\_}gc{\_}t\nwendquote} structure contains information about the
+graphics context needed by the drawing routines.
+The {\Tt{}mesh\nwendquote} and {\Tt{}x\nwendquote} fields store the mesh pointer and
+displacement vector; the {\Tt{}toview\nwendquote} and {\Tt{}toscreen\nwendquote} transformations
+describe how to map to view coordinates and to screen coordinates;
+and the {\Tt{}disp\nwendquote}, {\Tt{}win\nwendquote}, and {\Tt{}gc\nwendquote} fields store the X context
+on which to display.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW1O6D2a-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NW1O6D2a-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwenddeflinemarkup
+typedef struct xtnet_gc_t \{
+    mesh_t mesh;
+    double* x;
+
+    double toview[12];
+    double toscreen[12];
+
+    Display* disp;
+    Window   win;
+    GC       gc;
+\} xtnet_gc_t;
+
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+The X context fields are set during the display event, when we actually
+have an X context to work with.  For now, we just save the mesh and
+displacement vectors and initialize the transformations.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW1O6D2a-3ei8GD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-3ei8GD-1}}}\moddef{initialize \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NW1O6D2a-3ei8GD-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-nRuDO-2}}\nwenddeflinemarkup
+self = (xtnet_gc_t*) malloc(sizeof(struct xtnet_gc_t));
+
+self->mesh = mesh;
+self->x    = x;
+
+set_transforms(mesh, self->toview, self->toscreen);
+\nwused{\\{NW1O6D2a-nRuDO-2}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW1O6D2a-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{NW1O6D2a-1duChy-1}{NW1O6D2a-1duChy-3}\nwenddeflinemarkup
+static void set_transforms(mesh_t mesh, double* toview, double* toscreen)
+\{
+    int i, n;
+    double xmin, xmax, ymin, ymax, scale;
+
+    \LA{}get coordinate range information~{\nwtagstyle{}\subpageref{NW1O6D2a-2XykZa-1}}\RA{}
+    \LA{}set transformation to view coordinates~{\nwtagstyle{}\subpageref{NW1O6D2a-2gFa0b-1}}\RA{}
+    \LA{}set transformation to screen coordinates~{\nwtagstyle{}\subpageref{NW1O6D2a-406z1-1}}\RA{}
+\}
+
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The first step in figuring out our transformations is to figure out
+what ranges of coordinate values we'll see.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW1O6D2a-1VvxMr-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1VvxMr-1}}}\moddef{macros~{\nwtagstyle{}\subpageref{NW1O6D2a-1VvxMr-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{\relax}{NW1O6D2a-1VvxMr-2}\nwenddeflinemarkup
+#define min(a,b) (((a)<(b)) ? (a) : (b))
+#define max(a,b) (((a)>(b)) ? (a) : (b))
+
+\nwalsodefined{\\{NW1O6D2a-1VvxMr-2}}\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW1O6D2a-2XykZa-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-2XykZa-1}}}\moddef{get coordinate range information~{\nwtagstyle{}\subpageref{NW1O6D2a-2XykZa-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1duChy-2}}\nwenddeflinemarkup
+xmin = ymin = 1;
+xmax = ymax = -1;
+n = mesh_num_nodes(mesh);
+for (i = 1; i <= n; ++i) \{
+    mesh_node_t* node = mesh_node(mesh, i);
+    xmin = min(xmin, node->x[0]);
+    xmax = max(xmax, node->x[0]);
+    ymin = min(ymin, node->x[1]);
+    ymax = max(ymax, node->x[1]);
+\}
+
+\nwused{\\{NW1O6D2a-1duChy-2}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+Once we have the coordinate ranges, we use them to scale the device
+into the cube $[-0.5, 0.5]^3$.
+There should probably be a check here to ensure
+that the ranges aren't both zero.  We also want the bounding box for the
+device to be reasonably well-centered.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW1O6D2a-2gFa0b-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-2gFa0b-1}}}\moddef{set transformation to view coordinates~{\nwtagstyle{}\subpageref{NW1O6D2a-2gFa0b-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1duChy-2}}\nwenddeflinemarkup
+scale = 1/max(xmax-xmin, ymax-ymin);
+
+affine_identity(toview);
+affine_translate_xyz(toview, -(xmax+xmin)/2, -(ymax+ymin)/2, 0);
+affine_scale(toview, scale);
+\nwused{\\{NW1O6D2a-1duChy-2}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+We need some size information in order to figure out the
+transformation to screen coordinates.  From some experimentation,
+these look like good size values.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW1O6D2a-1VvxMr-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1VvxMr-2}}}\moddef{macros~{\nwtagstyle{}\subpageref{NW1O6D2a-1VvxMr-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{NW1O6D2a-1VvxMr-1}{\relax}\nwenddeflinemarkup
+#define FRAME_IN_SPACE 100
+#define FRAMEW 510
+#define FRAMEH 510
+
+#define FRAME_INW (FRAMEW - 2*FRAME_IN_SPACE)
+#define FRAME_INH (FRAMEH - 2*FRAME_IN_SPACE)
+
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+To get to the screen coordinates, we first reflect across
+the $y$ axis.  We then translate the
+interval $[-0.5, 0.5]$ into $[0,1]$, scale to screen widths,
+and then translate again to get a little border.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW1O6D2a-406z1-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-406z1-1}}}\moddef{set transformation to screen coordinates~{\nwtagstyle{}\subpageref{NW1O6D2a-406z1-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1duChy-2}}\nwenddeflinemarkup
+affine_identity(toscreen);
+toscreen[4] = -1;
+
+affine_translate_xyz(toscreen, 0.5, 0.5, 0);
+affine_scale_x(toscreen, FRAME_INW);
+affine_scale_y(toscreen, FRAME_INH);
+affine_translate_xyz(toscreen, FRAME_IN_SPACE, FRAME_IN_SPACE, 0);
+
+\nwused{\\{NW1O6D2a-1duChy-2}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+The setup for the X client is pretty standard: we create a top level
+widget, add children and event handlers, and then display the widget
+and enter the Xt event loop.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW1O6D2a-1OEBUZ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1OEBUZ-1}}}\moddef{widget declarations~{\nwtagstyle{}\subpageref{NW1O6D2a-1OEBUZ-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-nRuDO-2}}\nwprevnextdefs{\relax}{NW1O6D2a-1OEBUZ-2}\nwenddeflinemarkup
+Widget toplevel;
+\nwalsodefined{\\{NW1O6D2a-1OEBUZ-2}}\nwused{\\{NW1O6D2a-nRuDO-2}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW1O6D2a-lVBrR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-lVBrR-1}}}\moddef{initialize X client~{\nwtagstyle{}\subpageref{NW1O6D2a-lVBrR-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-nRuDO-2}}\nwenddeflinemarkup
+toplevel = XtInitialize(argv[0], "drawing", NULL, 0, &argc, argv);
+
+\LA{}add widgets~{\nwtagstyle{}\subpageref{NW1O6D2a-pzde1-1}}\RA{}
+\LA{}set frame size~{\nwtagstyle{}\subpageref{NW1O6D2a-1j16uN-1}}\RA{}
+\LA{}add event handlers~{\nwtagstyle{}\subpageref{NW1O6D2a-5ooJp-1}}\RA{}
+
+XtRealizeWidget(toplevel);
+XtMainLoop();
+\nwused{\\{NW1O6D2a-nRuDO-2}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+There are three widgets in the user interface: a parent box where
+everything lives, a drawing pad, and a ``quit'' button.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW1O6D2a-1OEBUZ-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1OEBUZ-2}}}\moddef{widget declarations~{\nwtagstyle{}\subpageref{NW1O6D2a-1OEBUZ-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-nRuDO-2}}\nwprevnextdefs{NW1O6D2a-1OEBUZ-1}{\relax}\nwenddeflinemarkup
+Widget box;
+Widget drawing;
+Widget quit;
+\nwused{\\{NW1O6D2a-nRuDO-2}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW1O6D2a-pzde1-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-pzde1-1}}}\moddef{add widgets~{\nwtagstyle{}\subpageref{NW1O6D2a-pzde1-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-lVBrR-1}}\nwenddeflinemarkup
+box     = XtCreateManagedWidget("box",  boxWidgetClass,  toplevel, NULL, 0);
+drawing = XtCreateManagedWidget("draw", coreWidgetClass,    box, NULL, 0);
+quit    = XtCreateManagedWidget("quit", commandWidgetClass, box, NULL, 0);
+\nwused{\\{NW1O6D2a-lVBrR-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NW1O6D2a-1j16uN-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1j16uN-1}}}\moddef{set frame size~{\nwtagstyle{}\subpageref{NW1O6D2a-1j16uN-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-lVBrR-1}}\nwenddeflinemarkup
+n = 0;
+XtSetArg(wargs[n], XtNheight, FRAMEH); n++;
+XtSetArg(wargs[n], XtNwidth,  FRAMEW); n++;
+XtSetValues(drawing, wargs, n);
+
+\nwused{\\{NW1O6D2a-lVBrR-1}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+The setup for the ``quit'' button is darned simple -- we just get
+out of dodge.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NW1O6D2a-5ooJp-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-5ooJp-1}}}\moddef{add event handlers~{\nwtagstyle{}\subpageref{NW1O6D2a-5ooJp-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-lVBrR-1}}\nwprevnextdefs{\relax}{NW1O6D2a-5ooJp-2}\nwenddeflinemarkup
+XtAddCallback(quit, XtNcallback, quit_func, NULL);
+\nwalsodefined{\\{NW1O6D2a-5ooJp-2}\\{NW1O6D2a-5ooJp-3}}\nwused{\\{NW1O6D2a-lVBrR-1}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NW1O6D2a-1duChy-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{NW1O6D2a-1duChy-2}{NW1O6D2a-1duChy-4}\nwenddeflinemarkup
+static void quit_func(Widget w, XtPointer client, XtPointer call)
+\{
+    exit(0);
+\}
+
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+The redraw event simply sets the appropriate fields in the {\Tt{}self\nwendquote}
+record, creates a new graphics context, and then calls the 
+{\Tt{}draw{\_}all\nwendquote} routine to do most of the work.
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NW1O6D2a-5ooJp-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-5ooJp-2}}}\moddef{add event handlers~{\nwtagstyle{}\subpageref{NW1O6D2a-5ooJp-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-lVBrR-1}}\nwprevnextdefs{NW1O6D2a-5ooJp-1}{NW1O6D2a-5ooJp-3}\nwenddeflinemarkup
+XtAddEventHandler(drawing, ExposureMask, FALSE,
+                  (XtEventHandler) redisplay_event, self);
+\nwused{\\{NW1O6D2a-lVBrR-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NW1O6D2a-1duChy-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{NW1O6D2a-1duChy-3}{NW1O6D2a-1duChy-5}\nwenddeflinemarkup
+static void redisplay_event(Widget w, XtPointer client, XExposeEvent* ev,
+                            Boolean* continue_dispatch)
+\{
+    xtnet_gc_t* self = (xtnet_gc_t*) client;
+
+    if (ev->count != 0)
+        return;
+
+    self->disp = XtDisplay(w);
+    self->win  = XtWindow(w);
+    XClearWindow(self->disp, self->win);
+
+    self->gc = XCreateGC(self->disp, self->win, 0, NULL);
+    XSetForeground(self->disp, self->gc, 1);
+    XSetBackground(self->disp, self->gc, 0);
+    draw_all(self);
+    XFreeGC(self->disp, self->gc);
+\}
+
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NW1O6D2a-2XnWFD-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-2XnWFD-1}}}\moddef{clear and redraw~{\nwtagstyle{}\subpageref{NW1O6D2a-2XnWFD-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1duChy-5}}\nwenddeflinemarkup
+self->disp = XtDisplay(w);
+self->win  = XtWindow(w);
+XClearWindow(self->disp, self->win);
+
+self->gc = XCreateGC(self->disp, self->win, 0, NULL);
+XSetForeground(self->disp, self->gc, 1);
+XSetBackground(self->disp, self->gc, 0);
+draw_all(self);
+XFreeGC(self->disp, self->gc);
+\nwused{\\{NW1O6D2a-1duChy-5}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+The key press event handler rotates the displayed device by
+composing the transformation to view coordinates with a
+rotation.  Up and down arrows rotate about the $x$ axis;
+left and right arrows about the $y$ axis; and page up and
+page down about the $z$ axis.
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NW1O6D2a-5ooJp-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-5ooJp-3}}}\moddef{add event handlers~{\nwtagstyle{}\subpageref{NW1O6D2a-5ooJp-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-lVBrR-1}}\nwprevnextdefs{NW1O6D2a-5ooJp-2}{\relax}\nwenddeflinemarkup
+XtAddEventHandler(drawing, KeyPressMask, FALSE,
+                  (XtEventHandler) keypress_event, self);
+\nwused{\\{NW1O6D2a-lVBrR-1}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NW1O6D2a-1duChy-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW1O6D2a-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1O6D2a-1HWiET-1}}\nwprevnextdefs{NW1O6D2a-1duChy-4}{\relax}\nwenddeflinemarkup
+static void keypress_event(Widget w, XtPointer client, XKeyEvent* ev,
+                           Boolean* continue_dispatch)
+\{
+    xtnet_gc_t* self = (xtnet_gc_t*) client;
+    double inc = (M_PI / 18);
+
+    switch (ev->keycode) \{
+        case 98:    /* Up    */
+            affine_rotate_ox(self->toview, -inc);
+            break;
+
+        case 104:   /* Down  */
+            affine_rotate_ox(self->toview, inc);
+            break;
+            
+        case 100:   /* Left  */
+            affine_rotate_oy(self->toview, inc);
+            break;
+            
+        case 102:   /* Right */
+            affine_rotate_oy(self->toview, -inc);
+            break;
+
+        case 99:    /* PgUp  */
+            affine_rotate_oz(self->toview, -inc);
+            break;
+
+        case 105:   /* PgDn  */
+            affine_rotate_oz(self->toview, inc);
+            break;
+    \}
+
+    \LA{}clear and redraw~{\nwtagstyle{}\subpageref{NW1O6D2a-2XnWFD-1}}\RA{}
+\}
+\nwused{\\{NW1O6D2a-1HWiET-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{add event handlers}{NW1O6D2a-5ooJp-1}{\nwixu{NW1O6D2a-lVBrR-1}\nwixd{NW1O6D2a-5ooJp-1}\nwixd{NW1O6D2a-5ooJp-2}\nwixd{NW1O6D2a-5ooJp-3}}}%
+\nwixlogsorted{c}{{add widgets}{NW1O6D2a-pzde1-1}{\nwixu{NW1O6D2a-lVBrR-1}\nwixd{NW1O6D2a-pzde1-1}}}%
+\nwixlogsorted{c}{{clear and redraw}{NW1O6D2a-2XnWFD-1}{\nwixd{NW1O6D2a-2XnWFD-1}\nwixu{NW1O6D2a-1duChy-5}}}%
+\nwixlogsorted{c}{{draw functions}{NW1O6D2a-2Q2ktV-1}{\nwixu{NW1O6D2a-1HWiET-1}\nwixd{NW1O6D2a-2Q2ktV-1}\nwixd{NW1O6D2a-2Q2ktV-2}}}%
+\nwixlogsorted{c}{{functions}{NW1O6D2a-nRuDO-1}{\nwixu{NW1O6D2a-1HWiET-1}\nwixd{NW1O6D2a-nRuDO-1}\nwixd{NW1O6D2a-nRuDO-2}}}%
+\nwixlogsorted{c}{{get coordinate range information}{NW1O6D2a-2XykZa-1}{\nwixu{NW1O6D2a-1duChy-2}\nwixd{NW1O6D2a-2XykZa-1}}}%
+\nwixlogsorted{c}{{initialize \code{}self\edoc{}}{NW1O6D2a-3ei8GD-1}{\nwixu{NW1O6D2a-nRuDO-2}\nwixd{NW1O6D2a-3ei8GD-1}}}%
+\nwixlogsorted{c}{{initialize X client}{NW1O6D2a-lVBrR-1}{\nwixu{NW1O6D2a-nRuDO-2}\nwixd{NW1O6D2a-lVBrR-1}}}%
+\nwixlogsorted{c}{{macros}{NW1O6D2a-1VvxMr-1}{\nwixu{NW1O6D2a-1HWiET-1}\nwixd{NW1O6D2a-1VvxMr-1}\nwixd{NW1O6D2a-1VvxMr-2}}}%
+\nwixlogsorted{c}{{netdraw-xt.c}{NW1O6D2a-1HWiET-1}{\nwixd{NW1O6D2a-1HWiET-1}}}%
+\nwixlogsorted{c}{{netdraw-xt.h}{NW1O6D2a-3wIrEv-1}{\nwixd{NW1O6D2a-3wIrEv-1}}}%
+\nwixlogsorted{c}{{set frame size}{NW1O6D2a-1j16uN-1}{\nwixu{NW1O6D2a-lVBrR-1}\nwixd{NW1O6D2a-1j16uN-1}}}%
+\nwixlogsorted{c}{{set transformation to screen coordinates}{NW1O6D2a-406z1-1}{\nwixu{NW1O6D2a-1duChy-2}\nwixd{NW1O6D2a-406z1-1}}}%
+\nwixlogsorted{c}{{set transformation to view coordinates}{NW1O6D2a-2gFa0b-1}{\nwixu{NW1O6D2a-1duChy-2}\nwixd{NW1O6D2a-2gFa0b-1}}}%
+\nwixlogsorted{c}{{static data}{NW1O6D2a-IAwJm-1}{\nwixu{NW1O6D2a-1HWiET-1}\nwixd{NW1O6D2a-IAwJm-1}\nwixd{NW1O6D2a-IAwJm-2}}}%
+\nwixlogsorted{c}{{static functions}{NW1O6D2a-1duChy-1}{\nwixu{NW1O6D2a-1HWiET-1}\nwixd{NW1O6D2a-1duChy-1}\nwixd{NW1O6D2a-1duChy-2}\nwixd{NW1O6D2a-1duChy-3}\nwixd{NW1O6D2a-1duChy-4}\nwixd{NW1O6D2a-1duChy-5}}}%
+\nwixlogsorted{c}{{types}{NW1O6D2a-4H4VOG-1}{\nwixu{NW1O6D2a-1HWiET-1}\nwixd{NW1O6D2a-4H4VOG-1}}}%
+\nwixlogsorted{c}{{widget declarations}{NW1O6D2a-1OEBUZ-1}{\nwixu{NW1O6D2a-nRuDO-2}\nwixd{NW1O6D2a-1OEBUZ-1}\nwixd{NW1O6D2a-1OEBUZ-2}}}%
+\nwbegindocs{58}\nwdocspar
+\nwenddocs{}

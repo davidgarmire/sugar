@@ -1,0 +1,914 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}mesh{\_}mex\nwendquote} module provides the Matlab interface to the 
+mesh routines.
+
+
+\section{Interface}
+
+\nwfilename{mesh-mex.nw}\nwbegincode{1}\sublabel{NW3HEBcB-2EZjTk-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-2EZjTk-1}}}\moddef{mesh-mex.h~{\nwtagstyle{}\subpageref{NW3HEBcB-2EZjTk-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MESH_MEX_H
+#define MESH_MEX_H
+
+#include <mex.h>
+#include <mesh.h>
+
+void mesh_mex_register();
+void mesh_mex_shutdown();
+int  mesh_mex_handle_tag();
+
+mesh_t       mx_to_mesh    (const mxArray* array);
+mesh_node_t* mx_to_node    (mesh_t mesh, const mxArray* array);
+material_t*  mx_to_material(mesh_t mesh, const mxArray* array);
+mxArray*     mx_from_param (mesh_param_t* param);
+mxArray*     mx_from_params(mesh_t mesh);
+
+#endif /* MESH_MEX_H */
+\nwnotused{mesh-mex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\Tt{}mesh{\_}mex{\_}register\nwendquote} command registers {\Tt{}addpath\nwendquote},
+{\Tt{}use\nwendquote}, {\Tt{}freemesh\nwendquote}, and {\Tt{}printmesh\nwendquote} commands with
+the main MEX routine.
+
+The {\Tt{}mesh{\_}mex{\_}shutdown\nwendquote} command frees the local memory
+associated with the {\Tt{}mesh{\_}mex\nwendquote} routines.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3HEBcB-4J1Dpw-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-4J1Dpw-1}}}\moddef{mesh-mex.c~{\nwtagstyle{}\subpageref{NW3HEBcB-4J1Dpw-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lua.h>
+#include <lualib.h>
+
+#include <modelmgr.h>
+#include <model_test.h>
+#include <model_matlab.h>
+#include <model_mf2wrap.h>
+#include <uses_manager.h>
+#include <netout.h>
+#include <netout_file.h>
+#include <netout_mlab.h>
+
+#include <mex_handle.h>
+#include <sugarmex.h>
+#include <mesh_mex.h>
+
+#include <uses_manager_lua.h>
+#include <meshgen_lua.h>
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NW3HEBcB-IAwJm-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-1}}\RA{}
+\LA{}mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}\RA{}
+\nwnotused{mesh-mex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Mesh reader data structures}
+
+The {\Tt{}pool\nwendquote}, {\Tt{}model{\_}mgr\nwendquote}, and {\Tt{}uses{\_}mgr\nwendquote} are the main memory
+pool, model manager, and path manager, respectively.  It makes sense
+for each of those objects to have global lifetime, so this is not
+a terrible place for them.
+
+The handle tag type for a mesh handle is {\Tt{}mesh{\_}handle{\_}tag\nwendquote}.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3HEBcB-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NW3HEBcB-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwenddeflinemarkup
+static mempool_t       pool;
+static model_mgr_t     model_mgr;
+static uses_manager_t  uses_mgr;
+static int             mesh_handle_tag;
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3HEBcB-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{\relax}{NW3HEBcB-nRuDO-2}\nwenddeflinemarkup
+void mesh_mex_register()
+\{
+    pool      = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr = model_mgr_init();
+    uses_mgr  = uses_manager_create(pool);
+
+    uses_manager_envpath(uses_mgr, "SUGAR_LUA_PATH");
+    uses_manager_addfunc(uses_mgr, path_via_matlab, NULL);
+
+    model_test_register         (model_mgr);
+    model_matlab_register       (model_mgr);
+    model_mf2wrap_register      (model_mgr);
+    model_mgr_standard_register (model_mgr);
+
+    mesh_handle_tag = mex_handle_new_tag();
+    \LA{}register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}\RA{}
+\}
+
+\nwalsodefined{\\{NW3HEBcB-nRuDO-2}\\{NW3HEBcB-nRuDO-3}\\{NW3HEBcB-nRuDO-4}\\{NW3HEBcB-nRuDO-5}\\{NW3HEBcB-nRuDO-6}\\{NW3HEBcB-nRuDO-7}\\{NW3HEBcB-nRuDO-8}}\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3HEBcB-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-nRuDO-1}{NW3HEBcB-nRuDO-3}\nwenddeflinemarkup
+void mesh_mex_shutdown()
+\{
+    mempool_destroy   (pool);
+    model_mgr_destroy (model_mgr);
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3HEBcB-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-nRuDO-2}{NW3HEBcB-nRuDO-4}\nwenddeflinemarkup
+int mesh_mex_handle_tag()
+\{
+    return mesh_handle_tag;
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\subsection{Conversion functions}
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW3HEBcB-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-nRuDO-3}{NW3HEBcB-nRuDO-5}\nwenddeflinemarkup
+mesh_t mx_to_mesh(const mxArray* array)
+\{
+    return mx_to_handle(array, mesh_handle_tag, "Invalid mesh handle");
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW3HEBcB-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-nRuDO-4}{NW3HEBcB-nRuDO-6}\nwenddeflinemarkup
+mesh_node_t* mx_to_node(mesh_t mesh, const mxArray* array)
+\{
+    int node_id;
+    mesh_node_t* node;
+
+    if (!mxIsNumeric(array))
+        mexErrMsgTxt("Invalid node identifier");
+
+    node_id = (int) mx_to_double(array);
+    node = mesh_node(mesh, node_id);
+    if (node == NULL)
+        mexErrMsgTxt("Invalid node identifier");
+
+    return node;
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW3HEBcB-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-nRuDO-5}{NW3HEBcB-nRuDO-7}\nwenddeflinemarkup
+material_t* mx_to_material(mesh_t mesh, const mxArray* array)
+\{
+    int material_id;
+    material_t* material;
+
+    if (!mxIsNumeric(array))
+        mexErrMsgTxt("Invalid material identifier");
+
+    material_id = (int) mx_to_double(array);
+    material = mesh_material(mesh, material_id);
+    if (material == NULL)
+        mexErrMsgTxt("Invalid node identifier");
+
+    return material;
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW3HEBcB-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-nRuDO-6}{NW3HEBcB-nRuDO-8}\nwenddeflinemarkup
+mxArray* mx_from_param(mesh_param_t* param)
+\{
+    mxArray* value;
+
+    if (param == NULL) \{
+        value = mxCreateDoubleMatrix(0, 0, mxREAL);
+    \} else if (param->tag == MESH_PARAM_NUMBER) \{
+        value = mx_from_double(param->val.d);
+    \} else if (param->tag == MESH_PARAM_STRING) \{
+        value = mxCreateString(param->val.s);
+    \} else if (param->tag == MESH_PARAM_MATRIX) \{
+        value = mxCreateDoubleMatrix(param->val.m.m, param->val.m.n, mxREAL);
+        memcpy(mxGetPr(value), param->val.m.data,
+               param->val.m.m * param->val.m.n * sizeof(double));
+    \} else
+        mxAssert(0, "Invalid SUGAR parameter type");
+    
+    return value;
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW3HEBcB-nRuDO-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3HEBcB-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-nRuDO-7}{\relax}\nwenddeflinemarkup
+mxArray* mx_from_params(mesh_t mesh)
+\{
+    int i, n;
+    const char** names;
+    mxArray* result;
+
+    n     = mesh_num_params(mesh);
+    names = mxCalloc(n, sizeof(char*));
+    for (i = 0; i < n; ++i)
+        names[i] = mesh_param(mesh, i)->name;
+
+    result = mxCreateStructMatrix(1,1,n,names);
+    mxFree(names);
+
+    for (i = 0; i < n; ++i)
+        mxSetFieldByNumber(result, 0, i, mx_from_param(mesh_param(mesh, i)));
+
+    return result;
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+
+\subsection{Looking up files in the Matlab path}
+
+The Matlab command {\Tt{}which\nwendquote} searches Matlab's path for an instance
+of a specified filename.  When we are within the Matlab environment,
+we want to search for all files (including Lua files) in the Matlab
+path, assuming we don't find them with the standard uses manager
+paths first.  The alternative, to have different paths for different
+types of files, seems to confuse Windows users who may not have
+had the benefit of learning about distinct {\Tt{}LD{\_}LIBRARY{\_}PATH\nwendquote},
+{\Tt{}PATH\nwendquote}, and related variables.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW3HEBcB-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{\relax}{NW3HEBcB-1duChy-2}\nwenddeflinemarkup
+static char* path_via_matlab(void* data, char* namebuf, unsigned buflen)
+\{
+    mxArray* prhs;
+    mxArray* plhs;
+    int status;
+    char* path;
+
+    prhs = mxCreateString(namebuf);
+    status = mexCallMATLAB(1, &plhs, 1, &prhs, "which");
+    mxDestroyArray(prhs);
+
+    if (status != 0) \{
+        return NULL;
+    \}
+
+    path = mx_to_string(plhs);
+    if (*path != 0 && strlen(path) + 1 <= buflen) \{
+        strcpy(namebuf, path);
+        mxFree(path);
+        return namebuf;
+    \} else \{
+        mxFree(path);
+        return NULL;
+    \}
+\}
+
+\nwalsodefined{\\{NW3HEBcB-1duChy-2}\\{NW3HEBcB-1duChy-3}\\{NW3HEBcB-1duChy-4}}\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+
+\subsection{{\Tt{}addpath\nwendquote} command}
+
+The {\Tt{}addpath(path)\nwendquote} function adds {\Tt{}path\nwendquote} to the 
+{\Tt{}uses\nwendquote} manager search path.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW3HEBcB-16QO0C-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-16QO0C-1}}}\moddef{cho-addpath.m~{\nwtagstyle{}\subpageref{NW3HEBcB-16QO0C-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Adds to the netlist search path.
+%
+% When netlists are accessed via cho_load or via a 'use' command inside
+% another netlist, SUGAR searches in the current directory and then in
+% the directories on the netlist search path.  cho_addpath adds a new
+% directory to the netlist search path.
+%
+% Inputs:
+%   path -- name of the file system path to be added.
+
+function cho_addpath(path)
+sugarmex('addpath', path);
+\nwnotused{cho-addpath.m}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW3HEBcB-Ye2uh-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{\relax}{NW3HEBcB-Ye2uh-2}\nwenddeflinemarkup
+mexmgr_add("addpath", mex_addpath);
+\nwalsodefined{\\{NW3HEBcB-Ye2uh-2}\\{NW3HEBcB-Ye2uh-3}\\{NW3HEBcB-Ye2uh-4}\\{NW3HEBcB-Ye2uh-5}\\{NW3HEBcB-Ye2uh-6}\\{NW3HEBcB-Ye2uh-7}\\{NW3HEBcB-Ye2uh-8}\\{NW3HEBcB-Ye2uh-9}\\{NW3HEBcB-Ye2uh-A}\\{NW3HEBcB-Ye2uh-B}}\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW3HEBcB-3MtIgE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{\relax}{NW3HEBcB-3MtIgE-2}\nwenddeflinemarkup
+static void mex_addpath(int nlhs, mxArray* plhs[],
+                        int nrhs, const mxArray* prhs[])
+\{
+    int i;
+    for (i = 0; i < nrhs; ++i) \{
+        char* name = mx_to_string(prhs[i]);
+        uses_manager_addpath(uses_mgr, name);
+        mxFree(name);
+    \}
+\}
+
+\nwalsodefined{\\{NW3HEBcB-3MtIgE-2}\\{NW3HEBcB-3MtIgE-3}\\{NW3HEBcB-3MtIgE-4}\\{NW3HEBcB-3MtIgE-5}\\{NW3HEBcB-3MtIgE-6}\\{NW3HEBcB-3MtIgE-7}\\{NW3HEBcB-3MtIgE-8}\\{NW3HEBcB-3MtIgE-9}\\{NW3HEBcB-3MtIgE-A}\\{NW3HEBcB-3MtIgE-B}\\{NW3HEBcB-3MtIgE-C}}\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+
+\subsection{{\Tt{}load\nwendquote} command}
+
+The {\Tt{}load(file)\nwendquote} function finds the (Lua) netlist {\Tt{}file\nwendquote} and
+executes it.  The function returns a handle to the generated mesh.
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW3HEBcB-f4oy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-f4oy-1}}}\moddef{cho-load.m~{\nwtagstyle{}\subpageref{NW3HEBcB-f4oy-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Load a netlist description into the SUGAR internal format.
+%
+% Inputs: 
+%   netname - netlist file name
+%   param   - (Optional) parameter settings
+%
+% Outputs:
+%   net - pointer to netlist structure
+
+function [handle] = cho_load(file, params)
+if nargin == 1
+  handle = sugarmex('use', file);
+else
+  handle = sugarmex('use', file, params);
+end
+\nwnotused{cho-load.m}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW3HEBcB-Ye2uh-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-2}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-1}{NW3HEBcB-Ye2uh-3}\nwenddeflinemarkup
+mexmgr_add("use", mex_use);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW3HEBcB-3MtIgE-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-2}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-1}{NW3HEBcB-3MtIgE-3}\nwenddeflinemarkup
+static void mex_use(int nlhs, mxArray* plhs[],
+                    int nrhs, const mxArray* prhs[])
+\{
+    char        name[256];
+    mesh_t      mesh;
+    lua_State*  L;
+
+    if (nrhs < 1 || !mxIsChar(prhs[0]))
+        mexErrMsgTxt("Syntax: sugarmex('use', filename, [params])");
+
+    mxGetString(prhs[0], name, sizeof(name));
+    if (uses_manager_search(uses_mgr, name, sizeof(name)) == NULL) \{
+        mexPrintf("Could not find %s\\n", name);
+        mexErrMsgTxt("Error loading file");
+    \}
+    
+    L = lua_open(0);
+
+    lua_usesmgrlib(L);
+    lua_set_usesmgr(L, uses_mgr);
+    lua_baselibopen(L);
+    lua_iolibopen(L);
+    lua_mathlibopen(L);
+    lua_register(L, "_ALERT", lua_alert);
+
+    if (nrhs >= 2) \{
+        if (mxIsStruct(prhs[1])) \{
+            \LA{}transfer parameters to Lua environment~{\nwtagstyle{}\subpageref{NW3HEBcB-1PuHjt-1}}\RA{}
+        \} else \{
+            lua_close(L);
+            mexErrMsgTxt("Parameters must be passed via structure");
+        \}
+    \}
+
+    mesh = mesh_lua_load(L, uses_mgr, name, model_mgr, lua_mesh_error_handler);
+    lua_close(L);
+
+    if (mesh == NULL)
+        mexErrMsgTxt("Error while interpreting net file");
+
+    if (nlhs == 0) \{
+        mesh_destroy(mesh);
+    \} else \{
+        mesh_set_handlers(mesh, matlab_mesh_error_handler, 
+                          matlab_mesh_warning_handler, NULL);
+        plhs[0] = mx_from_double(mex_handle_add(mesh, mesh_handle_tag));
+    \}
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW3HEBcB-1PuHjt-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-1PuHjt-1}}}\moddef{transfer parameters to Lua environment~{\nwtagstyle{}\subpageref{NW3HEBcB-1PuHjt-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-3MtIgE-2}}\nwenddeflinemarkup
+const mxArray* params = prhs[1];
+int nfields = mxGetNumberOfFields(params);
+int ifield;
+
+for (ifield = 0; ifield < nfields; ++ifield) \{
+    const char* name = mxGetFieldNameByNumber(params, ifield);
+    mxArray* field = mxGetFieldByNumber(params, 0, ifield);
+    if (mxIsChar(field)) \{
+        lua_pushstring(L, mx_to_string(field));
+    \} else if (mxIsDouble(field)) \{
+        lua_pushnumber(L, *mxGetPr(field));
+    \} else \{
+        lua_close(L);
+        mexErrMsgTxt("Only real scalars and strings allowed");
+    \}
+    lua_setglobal(L, name);
+\}
+
+\nwused{\\{NW3HEBcB-3MtIgE-2}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+After the initial phase where we use Lua, we want any mesh errors
+to be reported via the standard Matlab reporting functions.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW3HEBcB-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-1duChy-1}{NW3HEBcB-1duChy-3}\nwenddeflinemarkup
+static void matlab_mesh_error_handler(void* arg, const char* msg)
+\{
+    mexErrMsgTxt(msg);
+\}
+
+static void matlab_mesh_warning_handler(void* arg, const char* msg)
+\{
+    mexPrintf("Warning: %s\\n", msg);
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+When we are inside Lua, we make mesh errors generate Lua errors.
+The Lua errors in turn generate calls to {\Tt{}{\_}ALERT\nwendquote}, which prints
+using the MEX version of {\Tt{}printf\nwendquote}.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW3HEBcB-1duChy-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-1duChy-2}{NW3HEBcB-1duChy-4}\nwenddeflinemarkup
+static void lua_mesh_error_handler(void* arg, const char* msg)
+\{
+    lua_State* L = (lua_State*) arg;
+    lua_error(L, msg);
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NW3HEBcB-1duChy-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3HEBcB-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-1duChy-3}{\relax}\nwenddeflinemarkup
+static int lua_alert(lua_State* L)
+\{
+    int n = lua_gettop(L);  /* number of arguments */
+    const char* s;
+
+    lua_getglobal(L, "tostring");
+    lua_pushvalue(L, 1);
+    lua_rawcall(L, 1, 1);
+
+    s = lua_tostring(L, -1);
+    if (s != NULL)
+        mexPrintf("%s", s);
+
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+
+\subsection{{\Tt{}freemesh\nwendquote} command}
+
+The {\Tt{}mesh{\_}free(handle)\nwendquote} function frees the mesh indicated by {\Tt{}handle\nwendquote}.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NW3HEBcB-3Sxgux-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3Sxgux-1}}}\moddef{cho-mesh-free.m~{\nwtagstyle{}\subpageref{NW3HEBcB-3Sxgux-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Deallocates a netlist structure.
+%
+% Note that using the Matlab 'clear' command does not deallocate the
+% internal data structures used by SUGAR.  Use cho_mesh_free to deallocate
+% such structures.  In particular, it is a good idea to use cho_mesh_free
+% if you are doing a parameter sweep and creating lots of new netlist
+% data structures.
+%
+% Inputs:
+%   net -- a pointer to the netlist structure to be deallocated
+
+function cho_mesh_free(handle)
+sugarmex('mesh_free', handle);
+\nwnotused{cho-mesh-free.m}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NW3HEBcB-Ye2uh-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-3}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-2}{NW3HEBcB-Ye2uh-4}\nwenddeflinemarkup
+mexmgr_add("mesh_free", mex_mesh_free);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NW3HEBcB-3MtIgE-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-3}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-2}{NW3HEBcB-3MtIgE-4}\nwenddeflinemarkup
+static void mex_mesh_free(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    mesh_destroy(mx_to_mesh(prhs[0]));
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+
+\subsection{{\Tt{}printmesh\nwendquote} command}
+
+The {\Tt{}cho{\_}mesh{\_}print(handle)\nwendquote} function prints a text representation of the
+mesh indicated by {\Tt{}handle\nwendquote}.
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NW3HEBcB-39HAUh-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-39HAUh-1}}}\moddef{cho-mesh-print.m~{\nwtagstyle{}\subpageref{NW3HEBcB-39HAUh-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Print a text representation of a netlist to the standard output.
+%
+% Inputs:
+%   net -- a pointer to the netlist structure
+
+function cho_mesh_print(handle)
+sugarmex('mesh_print', handle);
+\nwnotused{cho-mesh-print.m}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NW3HEBcB-Ye2uh-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-4}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-3}{NW3HEBcB-Ye2uh-5}\nwenddeflinemarkup
+mexmgr_add("mesh_print", mex_printmesh);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NW3HEBcB-3MtIgE-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-4}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-3}{NW3HEBcB-3MtIgE-5}\nwenddeflinemarkup
+static void mex_printmesh(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    netout_file(stdout, mx_to_mesh(prhs[0]));
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+
+\subsection{{\Tt{}mesh{\_}to{\_}matlab\nwendquote} command}
+
+The {\Tt{}mesh{\_}to{\_}matlab(mesh)\nwendquote} command generates a Matlab data structure
+representing the mesh.  The generated structure has the same entries
+as the output from a {\Tt{}mesh{\_}print\nwendquote} command.
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NW3HEBcB-3t6NuG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3t6NuG-1}}}\moddef{cho-mesh-to-matlab.m~{\nwtagstyle{}\subpageref{NW3HEBcB-3t6NuG-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Create a Matlab representation of a netlist data structure maintained
+% internally by SUGAR.
+%
+% Inputs:
+%   net   -- a pointer to the netlist data structure
+%
+% Outputs:
+%   meshm -- a Matlab representation of the netlist data structure
+
+function [meshm] = cho_mesh_to_matlab(handle)
+meshm = sugarmex('mesh_to_matlab', handle);
+\nwnotused{cho-mesh-to-matlab.m}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NW3HEBcB-Ye2uh-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-5}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-4}{NW3HEBcB-Ye2uh-6}\nwenddeflinemarkup
+mexmgr_add("mesh_to_matlab", mex_mesh_to_matlab);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NW3HEBcB-3MtIgE-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-5}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-4}{NW3HEBcB-3MtIgE-6}\nwenddeflinemarkup
+static void mex_mesh_to_matlab(int nlhs, mxArray* plhs[],
+                               int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = netout_mlab(mx_to_mesh(prhs[0]));
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+
+\subsection{{\Tt{}mesh{\_}nelements\nwendquote}, {\Tt{}mesh{\_}nnodes\nwendquote}, 
+             and {\Tt{}mesh{\_}nmaterials\nwendquote} commands}
+
+The commands {\Tt{}mesh{\_}nelements(mesh{\_}handle)\nwendquote}, {\Tt{}mesh{\_}nnodes(mesh{\_}handle)\nwendquote},
+and {\Tt{}mesh{\_}nmaterials(mesh{\_}handle)\nwendquote} get the number of elements, nodes,
+and materials in the mesh.
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NW3HEBcB-WdKiu-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-WdKiu-1}}}\moddef{cho-mesh-nelements.m~{\nwtagstyle{}\subpageref{NW3HEBcB-WdKiu-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Return the number of elements in a netlist.
+%
+% Inputs:
+%   net -- pointer to the netlist structure
+%
+% Outputs:
+%   count -- count of the number of elements in the netlist
+
+function [count] = cho_mesh_nelements(handle)
+count = sugarmex('mesh_nelements', handle);
+\nwnotused{cho-mesh-nelements.m}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NW3HEBcB-2nDk73-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-2nDk73-1}}}\moddef{cho-mesh-nmaterials.m~{\nwtagstyle{}\subpageref{NW3HEBcB-2nDk73-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Return the number of materials in a netlist.
+%
+% Inputs:
+%   net -- pointer to the netlist structure
+%
+% Outputs:
+%   count -- count of the number of materials in the netlist
+
+function [count] = cho_mesh_nmaterials(handle)
+count = sugarmex('mesh_nmaterials', handle);
+\nwnotused{cho-mesh-nmaterials.m}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NW3HEBcB-PxcjO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-PxcjO-1}}}\moddef{cho-mesh-nnodes.m~{\nwtagstyle{}\subpageref{NW3HEBcB-PxcjO-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Return the number of materials in a netlist.
+%
+% Inputs:
+%   net -- pointer to the netlist structure
+%
+% Outputs:
+%   count -- count of the number of materials in the netlist
+
+function [count] = cho_mesh_nnodes(handle)
+count = sugarmex('mesh_nnodes', handle)
+\nwnotused{cho-mesh-nnodes.m}\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NW3HEBcB-Ye2uh-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-6}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-5}{NW3HEBcB-Ye2uh-7}\nwenddeflinemarkup
+mexmgr_add("mesh_nelements",  mex_num_elements );
+mexmgr_add("mesh_nmaterials", mex_num_materials);
+mexmgr_add("mesh_nnodes",     mex_num_nodes    );
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NW3HEBcB-3MtIgE-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-6}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-5}{NW3HEBcB-3MtIgE-7}\nwenddeflinemarkup
+static void mex_num_elements(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_elements(mx_to_mesh(prhs[0])));
+\}
+
+static void mex_num_materials(int nlhs, mxArray* plhs[],
+                              int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_materials(mx_to_mesh(prhs[0])));
+\}
+
+static void mex_num_nodes(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+\{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_nodes(mx_to_mesh(prhs[0])));
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+
+\subsection{{\Tt{}mesh{\_}node{\_}pos\nwendquote} and {\Tt{}mesh{\_}node{\_}name\nwendquote} commands}
+
+The {\Tt{}mesh{\_}node{\_}pos(mesh{\_}handle,\ node{\_}id)\nwendquote} and 
+{\Tt{}mesh{\_}node{\_}name(mesh{\_}handle,\ node{\_}id)\nwendquote} commands find the name
+and position of an indicated node.
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NW3HEBcB-1gBQRo-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-1gBQRo-1}}}\moddef{cho-mesh-node.m~{\nwtagstyle{}\subpageref{NW3HEBcB-1gBQRo-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Return a description (name and position) of a netlist node.
+%
+% Inputs:
+%   net     -- netlist handle
+%   node_id -- node number
+%
+% Outputs:
+%   node.name -- name of the node
+%       .x    -- position of the node
+
+function [node] = cho_mesh_node(handle, node_id)
+
+node.name = sugarmex('mesh_node_name', handle, node_id);
+node.x    = sugarmex('mesh_node_pos',  handle, node_id);
+\nwnotused{cho-mesh-node.m}\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NW3HEBcB-Ye2uh-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-7}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-6}{NW3HEBcB-Ye2uh-8}\nwenddeflinemarkup
+mexmgr_add("mesh_node_pos", mex_get_node_pos);
+mexmgr_add("mesh_node_name", mex_get_node_name);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NW3HEBcB-3MtIgE-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-7}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-6}{NW3HEBcB-3MtIgE-8}\nwenddeflinemarkup
+static void mex_get_node_name(int nlhs, mxArray* plhs[],
+                              int nrhs, const mxArray* prhs[])
+\{
+    mesh_t       mesh;
+    mesh_node_t* node;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+    node = mx_to_node(mesh, prhs[1]);
+
+    plhs[0] = mxCreateString((node->name != NULL) ? node->name : "");
+\}
+
+static void mex_get_node_pos(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+\{
+    mesh_t       mesh;
+    mesh_node_t* node;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+    node = mx_to_node(mesh, prhs[1]);
+
+    plhs[0] = mxCreateDoubleMatrix(3,1,mxREAL);
+    memcpy(mxGetPr(plhs[0]), node->x, 3 * sizeof(double));
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+
+\subsection{{\Tt{}mesh{\_}node{\_}lookup\nwendquote} command}
+
+The {\Tt{}mesh{\_}node{\_}lookup(mesh{\_}handle,\ node{\_}name)\nwendquote} command
+finds the index of a node with a particular name.
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NW3HEBcB-2jDEsd-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-2jDEsd-1}}}\moddef{cho-mesh-node-lookup.m~{\nwtagstyle{}\subpageref{NW3HEBcB-2jDEsd-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Find the index of a netlist node with a particular name.
+%
+% Inputs:
+%   net      -- pointer to a netlist structure
+%   nodename -- name of a node in the netlist
+%
+% Outputs:
+%   node_id  -- node number.  If no match is found, node_id = [].
+
+function [node] = cho_mesh_node_lookup(handle, nodename)
+node = sugarmex('mesh_node_lookup', handle, nodename);
+\nwnotused{cho-mesh-node-lookup.m}\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NW3HEBcB-Ye2uh-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-8}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-7}{NW3HEBcB-Ye2uh-9}\nwenddeflinemarkup
+mexmgr_add("mesh_node_lookup", mex_mesh_node_lookup);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NW3HEBcB-3MtIgE-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-8}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-7}{NW3HEBcB-3MtIgE-9}\nwenddeflinemarkup
+static void mex_mesh_node_lookup(int nlhs, mxArray* plhs[],
+                                 int nrhs, const mxArray* prhs[])
+\{
+    mesh_t       mesh;
+    mesh_node_t* node;
+    const char*  name;
+    int          nnodes;
+    int          i;
+
+    mex_check_num_args(nrhs, 2);
+    mesh = mx_to_mesh(prhs[0]);
+    name = mx_to_string(prhs[1]);
+    nnodes = mesh_num_nodes(mesh);
+
+    for (i = 1; i <= nnodes; ++i) \{
+        if (strcmp(name, mesh_node(mesh, i)->name) == 0) \{
+            plhs[0] = mx_from_double(i);
+            return;
+        \}
+    \}
+
+    plhs[0] = mx_from_nil();
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+
+
+\subsection{{\Tt{}mesh{\_}material{\_}param\nwendquote} command}
+
+The {\Tt{}mesh{\_}material{\_}param(mesh,\ material{\_}id,\ name)\nwendquote} command gets a
+parameter from a specified material.
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NW3HEBcB-2kSmdb-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-2kSmdb-1}}}\moddef{cho-mesh-material-param.m~{\nwtagstyle{}\subpageref{NW3HEBcB-2kSmdb-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+% Return a parameter retrieved from a mesh material.
+%
+% Inputs:
+%   net         -- pointer to netlist structure
+%   material_id -- material number
+%   name        -- parameter name
+%
+% Outputs:
+%   param       -- material parameter value
+
+function [param] = cho_mesh_material_param(handle, material, name)
+param = sugarmex('mesh_material_param', handle, material, name);
+\nwnotused{cho-mesh-material-param.m}\nwendcode{}\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}\nwbegincode{87}\sublabel{NW3HEBcB-Ye2uh-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-9}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-8}{NW3HEBcB-Ye2uh-A}\nwenddeflinemarkup
+mexmgr_add("mesh_material_param", mex_material_param);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{88}\nwdocspar
+
+\nwenddocs{}\nwbegincode{89}\sublabel{NW3HEBcB-3MtIgE-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-9}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-8}{NW3HEBcB-3MtIgE-A}\nwenddeflinemarkup
+static void mex_material_param(int nlhs, mxArray* plhs[],
+                               int nrhs, const mxArray* prhs[])
+\{
+    mesh_t        mesh;
+    material_t*   material;
+    char*         name;
+    mesh_param_t* param;
+
+    mex_check_num_args(nrhs, 3);
+    mesh     = mx_to_mesh(prhs[0]);
+    material = mx_to_material(mesh, prhs[1]);
+    name     = mx_to_string(prhs[2]);
+
+    if (material->model->param)
+        param = (material->model->param)(material->data, name);
+
+    mxFree(name);
+    plhs[0] = mx_from_param(param);
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{90}\nwdocspar
+
+
+\subsection{{\Tt{}mesh{\_}param\nwendquote}}
+
+The {\Tt{}mesh{\_}param(mesh,\ id)\nwendquote} function gets a parameter by name or
+numeric identifier.  The {\Tt{}mesh{\_}params(mesh)\nwendquote} function gets all
+the parameters in a structure.  The Matlab interface function
+can be called as {\Tt{}cho{\_}mesh{\_}param(mesh)\nwendquote} to get all parameters
+in a structure, {\Tt{}cho{\_}mesh{\_}param(mesh,\ name)\nwendquote} to get a named
+parameter, or {\Tt{}cho{\_}mesh{\_}param(mesh,\ material,\ name)\nwendquote} to get a named
+parameter from material or mesh.
+
+\nwenddocs{}\nwbegincode{91}\sublabel{NW3HEBcB-4XwISz-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-4XwISz-1}}}\moddef{cho-mesh-param.m~{\nwtagstyle{}\subpageref{NW3HEBcB-4XwISz-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [param] = cho_mesh_param(mesh, arg1, arg2)
+
+if nargin == 1
+    param = sugarmex('mesh_params', mesh);
+elseif nargin == 2
+    param = sugarmex('mesh_param', mesh, arg1);
+elseif nargin == 3
+    param = sugarmex('mesh_param', mesh, arg2);
+    if (isempty(param))
+        param = sugarmex('mesh_material_param', mesh, arg1, arg2)
+    end
+end
+\nwnotused{cho-mesh-param.m}\nwendcode{}\nwbegindocs{92}\nwdocspar
+
+\nwenddocs{}\nwbegincode{93}\sublabel{NW3HEBcB-Ye2uh-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-A}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-9}{NW3HEBcB-Ye2uh-B}\nwenddeflinemarkup
+mexmgr_add("mesh_param",  mex_mesh_param );
+mexmgr_add("mesh_params", mex_mesh_params);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{94}\nwdocspar
+
+\nwenddocs{}\nwbegincode{95}\sublabel{NW3HEBcB-3MtIgE-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-A}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-9}{NW3HEBcB-3MtIgE-B}\nwenddeflinemarkup
+static void mex_mesh_params(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    mesh_t mesh;
+    int i, n;
+    const char** names;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+
+    plhs[0] = mx_from_params(mesh);
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{96}\nwdocspar
+
+\nwenddocs{}\nwbegincode{97}\sublabel{NW3HEBcB-3MtIgE-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-B}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-A}{NW3HEBcB-3MtIgE-C}\nwenddeflinemarkup
+static void mex_mesh_param(int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[])
+\{
+    mesh_t mesh;
+
+    mex_check_num_args(nrhs, 2);
+    mesh = mx_to_mesh(prhs[0]);
+
+    if (mxIsChar(prhs[1])) \{
+        char* name = mx_to_string(prhs[1]);
+        plhs[0] = mx_from_param(mesh_param_byname(mesh, NULL, name));
+    \} else \{
+        int i = (int) mx_to_double(prhs[1]);
+        plhs[0] = mx_from_param(mesh_param(mesh, i));
+    \}
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}\nwbegindocs{98}\nwdocspar
+
+
+\subsection{{\Tt{}mesh{\_}nodes\nwendquote}}
+
+The {\Tt{}mesh{\_}nodes(mesh)\nwendquote} function returns the current vector of node
+identifiers.
+
+\nwenddocs{}\nwbegincode{99}\sublabel{NW3HEBcB-1ZmpFC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-1ZmpFC-1}}}\moddef{cho-mesh-param-nodes.m~{\nwtagstyle{}\subpageref{NW3HEBcB-1ZmpFC-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [nodes] = cho_mesh_param_nodes(mesh)
+nodes = sugarmex('mesh_param_nodes', mesh);
+\nwnotused{cho-mesh-param-nodes.m}\nwendcode{}\nwbegindocs{100}\nwdocspar
+
+\nwenddocs{}\nwbegincode{101}\sublabel{NW3HEBcB-Ye2uh-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-B}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-nRuDO-1}}\nwprevnextdefs{NW3HEBcB-Ye2uh-A}{\relax}\nwenddeflinemarkup
+mexmgr_add("mesh_param_nodes", mex_mesh_param_nodes);
+\nwused{\\{NW3HEBcB-nRuDO-1}}\nwendcode{}\nwbegindocs{102}\nwdocspar
+
+\nwenddocs{}\nwbegincode{103}\sublabel{NW3HEBcB-3MtIgE-C}\nwmargintag{{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-C}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NW3HEBcB-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3HEBcB-4J1Dpw-1}}\nwprevnextdefs{NW3HEBcB-3MtIgE-B}{\relax}\nwenddeflinemarkup
+static void mex_mesh_param_nodes(int nhls, mxArray* plhs[],
+                                 int nrhs, const mxArray* prhs[])
+\{
+    mesh_t mesh;
+    int i, n;
+    double* data;
+
+    mex_check_num_args(nrhs, 1);    
+    mesh = mx_to_mesh(prhs[0]);
+
+    n = mesh_num_param_nodes(mesh);
+    plhs[0] = mxCreateDoubleMatrix(n,1,mxREAL);
+
+    data = mxGetPr(plhs[0]);
+    for (i = 0; i < n; ++i)
+        data[i] = mesh_param_node(mesh, i);
+\}
+
+\nwused{\\{NW3HEBcB-4J1Dpw-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{cho-addpath.m}{NW3HEBcB-16QO0C-1}{\nwixd{NW3HEBcB-16QO0C-1}}}%
+\nwixlogsorted{c}{{cho-load.m}{NW3HEBcB-f4oy-1}{\nwixd{NW3HEBcB-f4oy-1}}}%
+\nwixlogsorted{c}{{cho-mesh-free.m}{NW3HEBcB-3Sxgux-1}{\nwixd{NW3HEBcB-3Sxgux-1}}}%
+\nwixlogsorted{c}{{cho-mesh-material-param.m}{NW3HEBcB-2kSmdb-1}{\nwixd{NW3HEBcB-2kSmdb-1}}}%
+\nwixlogsorted{c}{{cho-mesh-nelements.m}{NW3HEBcB-WdKiu-1}{\nwixd{NW3HEBcB-WdKiu-1}}}%
+\nwixlogsorted{c}{{cho-mesh-nmaterials.m}{NW3HEBcB-2nDk73-1}{\nwixd{NW3HEBcB-2nDk73-1}}}%
+\nwixlogsorted{c}{{cho-mesh-nnodes.m}{NW3HEBcB-PxcjO-1}{\nwixd{NW3HEBcB-PxcjO-1}}}%
+\nwixlogsorted{c}{{cho-mesh-node-lookup.m}{NW3HEBcB-2jDEsd-1}{\nwixd{NW3HEBcB-2jDEsd-1}}}%
+\nwixlogsorted{c}{{cho-mesh-node.m}{NW3HEBcB-1gBQRo-1}{\nwixd{NW3HEBcB-1gBQRo-1}}}%
+\nwixlogsorted{c}{{cho-mesh-param-nodes.m}{NW3HEBcB-1ZmpFC-1}{\nwixd{NW3HEBcB-1ZmpFC-1}}}%
+\nwixlogsorted{c}{{cho-mesh-param.m}{NW3HEBcB-4XwISz-1}{\nwixd{NW3HEBcB-4XwISz-1}}}%
+\nwixlogsorted{c}{{cho-mesh-print.m}{NW3HEBcB-39HAUh-1}{\nwixd{NW3HEBcB-39HAUh-1}}}%
+\nwixlogsorted{c}{{cho-mesh-to-matlab.m}{NW3HEBcB-3t6NuG-1}{\nwixd{NW3HEBcB-3t6NuG-1}}}%
+\nwixlogsorted{c}{{functions}{NW3HEBcB-nRuDO-1}{\nwixu{NW3HEBcB-4J1Dpw-1}\nwixd{NW3HEBcB-nRuDO-1}\nwixd{NW3HEBcB-nRuDO-2}\nwixd{NW3HEBcB-nRuDO-3}\nwixd{NW3HEBcB-nRuDO-4}\nwixd{NW3HEBcB-nRuDO-5}\nwixd{NW3HEBcB-nRuDO-6}\nwixd{NW3HEBcB-nRuDO-7}\nwixd{NW3HEBcB-nRuDO-8}}}%
+\nwixlogsorted{c}{{mesh-mex.c}{NW3HEBcB-4J1Dpw-1}{\nwixd{NW3HEBcB-4J1Dpw-1}}}%
+\nwixlogsorted{c}{{mesh-mex.h}{NW3HEBcB-2EZjTk-1}{\nwixd{NW3HEBcB-2EZjTk-1}}}%
+\nwixlogsorted{c}{{mex functions}{NW3HEBcB-3MtIgE-1}{\nwixu{NW3HEBcB-4J1Dpw-1}\nwixd{NW3HEBcB-3MtIgE-1}\nwixd{NW3HEBcB-3MtIgE-2}\nwixd{NW3HEBcB-3MtIgE-3}\nwixd{NW3HEBcB-3MtIgE-4}\nwixd{NW3HEBcB-3MtIgE-5}\nwixd{NW3HEBcB-3MtIgE-6}\nwixd{NW3HEBcB-3MtIgE-7}\nwixd{NW3HEBcB-3MtIgE-8}\nwixd{NW3HEBcB-3MtIgE-9}\nwixd{NW3HEBcB-3MtIgE-A}\nwixd{NW3HEBcB-3MtIgE-B}\nwixd{NW3HEBcB-3MtIgE-C}}}%
+\nwixlogsorted{c}{{register mex functions}{NW3HEBcB-Ye2uh-1}{\nwixu{NW3HEBcB-nRuDO-1}\nwixd{NW3HEBcB-Ye2uh-1}\nwixd{NW3HEBcB-Ye2uh-2}\nwixd{NW3HEBcB-Ye2uh-3}\nwixd{NW3HEBcB-Ye2uh-4}\nwixd{NW3HEBcB-Ye2uh-5}\nwixd{NW3HEBcB-Ye2uh-6}\nwixd{NW3HEBcB-Ye2uh-7}\nwixd{NW3HEBcB-Ye2uh-8}\nwixd{NW3HEBcB-Ye2uh-9}\nwixd{NW3HEBcB-Ye2uh-A}\nwixd{NW3HEBcB-Ye2uh-B}}}%
+\nwixlogsorted{c}{{static data}{NW3HEBcB-IAwJm-1}{\nwixu{NW3HEBcB-4J1Dpw-1}\nwixd{NW3HEBcB-IAwJm-1}}}%
+\nwixlogsorted{c}{{static functions}{NW3HEBcB-1duChy-1}{\nwixu{NW3HEBcB-4J1Dpw-1}\nwixd{NW3HEBcB-1duChy-1}\nwixd{NW3HEBcB-1duChy-2}\nwixd{NW3HEBcB-1duChy-3}\nwixd{NW3HEBcB-1duChy-4}}}%
+\nwixlogsorted{c}{{transfer parameters to Lua environment}{NW3HEBcB-1PuHjt-1}{\nwixu{NW3HEBcB-3MtIgE-2}\nwixd{NW3HEBcB-1PuHjt-1}}}%
+\nwbegindocs{104}\nwdocspar
+
+\nwenddocs{}

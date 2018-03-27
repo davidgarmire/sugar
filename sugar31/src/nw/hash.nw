@@ -1,0 +1,636 @@
+
+\section{Introduction}
+
+The [[hash]] module implements a basic fixed-size hash table.
+It is loosely based on the [[Table]] module from David Hanson's %'
+\emph{C Interfaces and Implementations}~\cite{Hans96} 
+and on the OpenSSL / SSLeay [[LHASH]] structure.  
+I also mimiced some of the STL hash extension 
+that comes with [[g++]] version.
+
+The [[hash]] module also provides special support for string tables.
+
+
+\section{Interface}
+
+<<hash.h>>=
+#ifndef HASH_H
+#define HASH_H
+
+#include <mempool.h>
+
+typedef struct hash_t* hash_t;
+
+<<exported types>>
+<<exported functions>>
+
+#endif /* HASH_H */
+@ 
+
+The [[hash_create]] and [[hash_destroy]] function create and
+destroy hash table entries, respectively.  Hash tables created
+using [[hash_create]] normally have their own internal pool;
+to make a hash table that allocates from an externally defined
+pool, use the [[hash_pcreate]] function.
+
+<<exported functions>>=
+hash_t hash_create (<<hash creation arguments>>);
+hash_t hash_pcreate(mempool_t pool,
+                            <<hash creation arguments>>);
+void   hash_destroy(hash_t hash);
+
+@ 
+
+To create a hash table, you \emph{must} specify a comparison
+function (a la [[strcmp]]) and a hash function.  You \emph{may}
+also specify a size hint and a copy function.  The [[size_hint]]
+argument specifies the approximate table size to be used.
+The actual size used will generally be the value given by 
+[[size_hint]] rounded up to one of a small number of primes.
+If a non-NULL [[copy]] function is specified, it will be used to
+copy all inserted data items into the memory pool.  If the
+[[copy]] function is NULL, only a pointer is saved in the table.
+
+<<exported types>>=
+typedef int      (*hash_compare_fun_t)(const void* x, const void* y);
+typedef unsigned (*hash_hash_fun_t)   (const void* key);
+typedef void*    (*hash_copy_fun_t)   (mempool_t pool, const void* data);
+
+@
+
+<<hash creation arguments>>=
+int size_hint,
+hash_compare_fun_t compare,
+hash_hash_fun_t    hash,
+hash_copy_fun_t    copy
+@ 
+
+Two simple hash functions are provided: one for strings, and
+one for fixed-size blocks of data
+
+<<exported functions>>=
+unsigned hash_strhash (const char* key);
+unsigned hash_bytehash(const void* key, int n);
+
+@ 
+
+The basic operations on a table are insertion, deletion, and retrieval.
+The [[hash_insert]] routine will return NULL if the specified insertion
+does not overwrite any existing entries with the same key.  If the
+insertion \emph{does} overwrite an existing entry, then the pointer to
+that entry will be returned.  Similarly, the [[hash_remove]] function
+will return the deleted entry if a match was found or NULL if there
+was no match.  The [[hash_add]] routine retrieves a match if there is
+one; otherwise, it adds a new entry to the table and returns that.
+
+Requests with NULL data or key arguments are ignored.
+
+<<exported functions>>=
+void* hash_insert  (hash_t hash, void* data);
+void* hash_remove  (hash_t hash, const void* key);
+void* hash_retrieve(hash_t hash, const void* key);
+void* hash_add     (hash_t hash, void* data);
+
+@ 
+
+It is also possible to iterate over all the entries in the hash
+table.  The [[hash_doall]] and [[hash_doall_arg]] functions call
+a specified function for each entry in the hash table.
+<<exported functions>>=
+void hash_doall    (hash_t hash, 
+                            void (*func)(void* data));
+void hash_doall_arg(hash_t hash, 
+                            void (*func)(void* data, void* arg),
+                            void* arg);
+
+@ 
+
+Hash tables are sufficiently often used as \emph{string tables}
+that we provide special constructors for that purpose.  A
+string table, as indicated by the name, is a hash table of just
+string entries.
+
+The [[hstrings_add]] and [[hstrings_retrieve]] wrappers are just
+macros around [[hash_retrieve]] and [[hash_add]] that make it a
+little less obnoxious to manage the type casts.
+
+<<exported functions>>=
+hash_t  hstrings_create (int size_hint);
+hash_t  hstrings_pcreate(mempool_t pool, int size_hint);
+#define hstrings_add(h, s)      ((const char*) (hash_add(h, (void*) s)))
+#define hstrings_retrieve(h, s) ((const char*) hash_retrieve(h, s))
+@ 
+
+
+\section{Implementation}
+
+<<hash.c>>=
+#include <sugar.h>
+
+#include <assert.h>
+#include <string.h>
+
+#include <mempool.h>
+#include <hash.h>
+
+<<static functions>>
+<<types>>
+<<functions>>
+@ 
+
+
+\subsection{Creating and destroying hash tables}
+
+The hash table structure stores the functions passed to [[hash_create]],
+a pool on which to to allocation (along with a flag indicating whether
+the pool is managed by the hash table), the table array itself, and
+the number of buckets in the table.
+
+<<types>>=
+typedef struct hash_entry_t hash_entry_t;
+
+struct hash_t {
+    int             size;
+    hash_entry_t**  table;
+    mempool_t       pool;
+    int             own_pool_flag;
+
+    hash_compare_fun_t compare;
+    hash_hash_fun_t    hash;
+    hash_copy_fun_t    copy;
+};
+
+@ 
+
+Hash bucket entries are basic linked list entries.
+<<types>>=
+struct hash_entry_t {
+    struct hash_entry_t* next;
+    void* data;
+};
+
+@ 
+
+The [[hash_create]] function is essentially just a wrapper around
+[[hash_pcreate]].
+
+<<functions>>=
+hash_t hash_create(<<hash creation arguments>>)
+{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    hash_t    h    = hash_pcreate(pool, size_hint, compare, hash, copy);
+    h->own_pool_flag = 1;
+    return h;
+}
+
+@ 
+
+The only trick to the [[hash_pcreate]] routine is in picking the
+table size based on the [[size_hint]].  A small table of primes
+is used to look up a reasonable size somewhat larger than the
+specified hint.
+
+<<functions>>=
+hash_t hash_pcreate(mempool_t pool,
+                    <<hash creation arguments>>)
+{
+    <<define list of primes>>
+
+    hash_t h = (hash_t) mempool_get(pool, sizeof(struct hash_t));
+    int i;
+
+    <<initialize hash fields>>
+    return h;
+}
+
+@ 
+
+<<initialize hash fields>>=
+for (i = 0; i < num_primes && size_hint < primes[i]; ++i);
+h->size          = primes[i];
+h->pool          = pool;
+h->own_pool_flag = 1;
+h->compare  = compare;
+h->hash     = hash;
+h->copy     = copy;
+h->table    = (hash_entry_t**) 
+              mempool_cget(pool, h->size * sizeof(hash_entry_t*));
+@ 
+
+<<define list of primes>>=
+static int primes[] = {119,  253,  509,   1021,  2053, 
+                       4093, 8191, 16381, 32771, 65521};
+static int num_primes = 10;
+@ 
+
+The [[hash_destroy]] function basically just destroys the pool
+(if the pool is managed by the hash table).
+
+<<functions>>=
+void hash_destroy(hash_t hash)
+{
+    if (hash->own_pool_flag)
+        mempool_destroy(hash->pool);
+}
+
+@ 
+
+
+\subsection{Creating string tables}
+
+The string table creation functions really are just wrappers
+around the ordinary hash creation functions.
+
+<<functions>>=
+hash_t hstrings_create(int size_hint)
+{
+    return hash_create(<<string table [[hash_create]] arguments>>);
+}
+
+hash_t hstrings_pcreate(mempool_t pool, int size_hint)
+{
+    return hash_pcreate(pool,
+                        <<string table [[hash_create]] arguments>>);
+}
+
+@ 
+
+All the functions we need (compare, hash, and copy) are already
+implemented elsewhere.  The only reason the casts are there is
+to prevent the compiler from complaining about [[const void*]] and
+[[const char*]] not being the same thing.  I'm not even completely
+sure the casts are needed.
+
+<<static functions>>=
+int stdcall_strcmp(const char* a, const char* b)
+{
+    return strcmp(a, b);
+}
+@ 
+
+<<string table [[hash_create]] arguments>>=
+size_hint,
+(hash_compare_fun_t) stdcall_strcmp,
+(hash_hash_fun_t)    hash_strhash,
+(hash_copy_fun_t)    mempool_strdup
+@ 
+
+
+\subsection{Basic hash function}
+
+The string hash is [[hashpjw]], originally from P.J.~Weinberger's
+C compiler.  See the Dragon Book for details.
+
+<<functions>>=
+unsigned hash_strhash(const char* key)
+{
+    unsigned g, h = 0;
+    for (; *key != '\0'; ++key) {
+        h = (h << 4) + *key;
+        g = h & 0xF0000000;
+        if (g) {
+            h = h ^ (g >> 24);
+            h = h ^ g;
+        }
+    }
+    return h;   
+}
+
+@ 
+
+The binary hash function is pretty darned simple.
+Some day I will steal a decent one.
+
+<<functions>>=
+unsigned hash_bytehash(const void* key, int n)
+{
+    const unsigned char* s = (const unsigned char*) key;
+    unsigned h = 0;
+    while (n-- > 0) {
+        h *= 5;
+        h += *s++;
+    }
+    return h;
+}
+
+@ 
+
+\subsection{Adding, removing, and retrieving entries}
+
+The [[hash_search_bucket]] routine looks for an entry matching
+some key in a particular bucket.
+
+<<functions>>=
+static hash_entry_t* hash_search_bucket(hash_t hash, int bucket,
+                                                const void* key)
+{
+    hash_entry_t* entry = hash->table[bucket];
+
+    while (entry != NULL && (hash->compare)(entry->data, key) != 0)
+        entry = entry->next;
+
+    return entry;
+}
+
+@ 
+
+To insert a new entry, we just make a copy of the data (if the copy
+operation was defined), and either add a new entry to the list or
+overwrite an old entry with the same key.
+
+<<functions>>=
+void* hash_insert(hash_t hash, void* data)
+{
+    if (data == NULL) {
+        return NULL;
+    } else {
+        int index = (hash->hash)(data) % (hash->size);
+        hash_entry_t* entry = hash_search_bucket(hash, index, data);
+
+        <<copy the data into the hash pool>>
+
+        if (entry != NULL) {
+            <<overwrite the entry and return the old data>>
+        } else {
+            <<add a new entry>>
+            return NULL;
+        }
+    }
+}
+
+@ 
+
+<<copy the data into the hash pool>>=
+if (hash->copy)
+    data = (hash->copy)(hash->pool, data);
+@ 
+
+<<overwrite the entry and return the old data>>=
+void* old_data = entry->data;
+entry->data = data;
+return old_data;
+@ 
+
+<<add a new entry>>=
+entry = (hash_entry_t*) mempool_get(hash->pool, sizeof(hash_entry_t));
+entry->data = data;
+entry->next = hash->table[index];
+hash->table[index] = entry;
+@ 
+
+To remove an entry, we just find the pointer to that entry
+and change that pointer.  This works because [[entry]] is
+actually a pointer to one of the pointers \emph{in the list}
+(either to [[hash->table[index]]] or to some entry's [[next]]
+field).  It's the standard linked list trick.
+
+<<functions>>=
+void* hash_remove(hash_t hash, const void* key)
+{
+    if (key == NULL) {
+        return NULL;
+    } else {
+        int index = (hash->hash)(key) % (hash->size);
+
+        hash_entry_t* prev  = NULL;
+        hash_entry_t* entry = hash->table[index];
+
+        <<find entry to remove>>
+        <<return NULL if no entry>>
+        <<remove link>>
+        return entry->data;
+    }
+}
+
+@ 
+
+<<find entry to remove>>=
+while (entry != NULL && (hash->compare)(entry->data, key) != 0) {
+    prev  = entry;
+    entry = entry->next;
+}
+
+@ 
+
+<<return NULL if no entry>>=
+if (entry == NULL)
+    return NULL;
+
+@ 
+
+<<remove link>>=
+if (prev == NULL)
+    hash->table[index] = entry->next;
+else
+    prev->next = entry->next;
+
+@ 
+
+And the retrieval function is obvious.
+
+<<functions>>=
+void* hash_retrieve(hash_t hash, const void* key)
+{
+    if (key == NULL) {
+        return NULL;
+    } else {
+        int index = (hash->hash)(key) % (hash->size);
+        hash_entry_t* entry = hash_search_bucket(hash, index, key);
+        if (entry == NULL)
+            return NULL;
+        else
+            return entry->data;
+    }
+}
+
+@ 
+
+The [[hash_add]] function is basically a cross between the retrieval
+function and the insertion function.
+
+<<functions>>=
+void* hash_add(hash_t hash, void* data)
+{
+    if (data == NULL) {
+        return NULL;
+    } else {
+        int index = (hash->hash)(data) % (hash->size);
+        hash_entry_t* entry = hash_search_bucket(hash, index, data);
+        if (entry == NULL) {
+            if (hash->copy)
+                data = (hash->copy)(hash->pool, data);
+            <<add a new entry>>
+        } 
+        return entry->data;
+    }
+}
+@ 
+
+\subsection{Iteration}
+
+The iteration functions just run through the entries in each
+bucket in the order they appear.  There isn't very much to it.
+
+<<functions>>=
+void hash_doall(hash_t hash, void (*func)(void* data))
+{
+    int bucket;
+    hash_entry_t* entry;
+
+    for (bucket = 0; bucket < hash->size; ++bucket)
+        for (entry = hash->table[bucket]; entry != NULL; entry = entry->next)
+            (func)(entry->data);
+}
+
+@ 
+
+<<functions>>=
+void hash_doall_arg(hash_t hash, 
+                            void (*func)(void* data, void* arg),
+                            void* arg)
+{
+    int bucket;
+    hash_entry_t* entry;
+
+    for (bucket = 0; bucket < hash->size; ++bucket)
+        for (entry = hash->table[bucket]; entry != NULL; entry = entry->next)
+            (func)(entry->data, arg);
+}
+
+@ 
+
+
+\subsection{Test program}
+
+Our test program is a standard ``word count'' type of program.
+
+<<wc.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+#include <string.h>
+
+#include <hash.h>
+
+<<wc types>>
+<<wc hash functions>>
+<<wc support functions>>
+<<wc main function>>
+@ 
+
+We will keep a hash table whose entries consist of a character
+string and a counter.
+
+<<wc types>>=
+typedef struct wc_entry_t {
+    char* string;
+    int count;
+} wc_entry_t;
+
+@ 
+
+The basic functions [[compare]], [[hash]], and [[copy]] are all
+short, simple functions.
+
+<<wc hash functions>>=
+int wc_entry_compare(const void* x, const void* y)
+{
+    return strcmp( ((wc_entry_t*) x)->string, 
+                   ((wc_entry_t*) y)->string );
+}
+
+@ 
+
+<<wc hash functions>>=
+unsigned wc_entry_hash(const void* key)
+{
+    return hash_strhash(((wc_entry_t*) key)->string);
+}
+
+@ 
+
+<<wc hash functions>>=
+void* wc_entry_copy(mempool_t pool, const void* data)
+{
+    wc_entry_t* entry;
+
+    entry = (wc_entry_t*) mempool_memdup(pool, (void*) data, sizeof(wc_entry_t));
+    entry->string = mempool_strdup(pool, entry->string);
+    return entry;
+}
+
+@ 
+
+<<wc support functions>>=
+hash_t wc_hash_create(int size_hint)
+{
+    return hash_create(size_hint, 
+                       wc_entry_compare, 
+                       wc_entry_hash,
+                       wc_entry_copy);
+}
+
+@ 
+
+Now counting the strings in a file becomes pretty simple.
+For every string, check to see if it is in the table.
+If it is already in the table, increment the count; if it
+isn't in the table, create a new entry.
+
+<<wc support functions>>=
+void count_file(FILE* fp, hash_t hash)
+{
+    char buf[128];
+
+    wc_entry_t key;
+    key.string = buf;
+
+    while (fscanf(fp, "%s", buf) != EOF) {
+        wc_entry_t* entry = (wc_entry_t*) hash_retrieve(hash, &key);
+        if (entry == NULL) {
+            <<add new wc entry>>
+        } else {
+            entry->count++;
+        }
+    }   
+}
+
+@ 
+
+<<add new wc entry>>=
+wc_entry_t new_entry;
+new_entry.string = buf;
+new_entry.count  = 1;
+hash_insert(hash, &new_entry);
+@ 
+
+The main function counts all the files listed in the command line,
+and then prints all the entries in the table.
+
+<<wc main function>>=
+int main(int argc, char** argv)
+{
+    hash_t hash = wc_hash_create(1000);
+    --argc, ++argv;
+    while (argc != 0) {
+        FILE* fp = fopen(*argv, "r");
+        count_file(fp, hash);
+        fclose(fp);
+        --argc, ++argv;
+    }
+    hash_doall(hash, print_entry);
+    hash_destroy(hash);
+    return 0;
+}
+
+@ 
+
+<<wc support functions>>=
+void print_entry(void* data)
+{
+    wc_entry_t* entry = (wc_entry_t*) data;
+    printf("%03d: %s\n", entry->count, entry->string);
+}
+
+@ 
+

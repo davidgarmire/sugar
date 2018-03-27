@@ -1,0 +1,28 @@
+% Y-Axis Accelerometer                    
+
+uses mumps.net
+
+subnet XSusp [B] [susp_len=*]
+[
+  a1 anchor parent [A] [l=10u w=10u h=6u oz=deg(90)]
+  b1 beam3d parent [A  a1] [l=susp_len w=2u h=6u oz= deg(0)]
+  b2 beam3d parent [a1 a2] [l=10u      w=2u h=6u oz=-deg(90)]
+  b3 beam3d parent [a2 B ] [l=susp_len w=2u h=6u oz= deg(180)]
+  b4 beam3d parent [A  a3] [l=susp_len w=2u h=6u oz= deg(180)]
+  b5 beam3d parent [a3 a4] [l=10u      w=2u h=6u oz=-deg(90)]
+  b6 beam3d parent [a4 B ] [l=susp_len w=2u h=6u oz= deg(0)]
+]
+                   
+subnet XMass [A B] [finger_len=*]
+[
+  b1 beam3d parent [A  b1] [l=25u        w=50u h=6u oz=-deg(90)] 
+  b2 beam3d parent [b1 B ] [l=25u        w=50u h=6u oz=-deg(90)]
+  b3 beam3d parent [b1 b2] [l=finger_len w=2u  h=6u oz= deg(0) ]
+  b4 beam3d parent [b1 b3] [l=finger_len w=2u  h=6u oz=deg(180)]
+]
+                   
+XSusp p1 [c(1)] [susp_len=200u]
+for k=1:10 [
+  mass(k) XMass p1 [c(k) c(k+1)] [finger_len=100u]
+]
+XSusp p1 [c(11)] [susp_len=200u oz=pi]               

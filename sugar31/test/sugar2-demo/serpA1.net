@@ -1,0 +1,81 @@
+%For static analysis -
+%net=cho_load('serp-1.m');dq=cho_dc(net);figure(1);cho_display(net,dq);
+%deltaX = dq(lookup_coord(net,'u','x')); Kx=60e-6/deltaX
+%For modal analysis -
+%mode=1;magfactor=0.1;[freq,egv,q0]=cho_mode(net);figure(2);cho_modeshape(net,freq,egv,q0,magfactor,mode);
+%for stiffness
+%deltaX = dq(lookup_coord(net,'u','x(2)')); Kx=60e-6/deltaX
+%F=100e-6;dx=dq(lookup_coord(net,'x(3)','x')),dy=dq(lookup_coord(net,'x(3)','y')),dz=dq(lookup_coord(net,'x(3)','z')),kx=F/dx,ky=F/dy,kz=F/dz
+
+%param.dW=0e-6;param.dL=0e-6;net=cho_load('serpA1.m',param);dq=cho_dc(net);figure(1);cho_display(net,dq);
+%Y=dq(lookup_coord(net,'x1(1)','y')),2e-6/Y
+%mode=1;magfactor=0.1;[freq,egv,q0]=cho_mode(net);figure(2);cho_modeshape(net,freq,egv,q0,magfactor,mode);
+
+F1=1u
+WM=15.266u
+LM=100u 
+uses ProcessFedder.net
+uses serpA1meander1.net
+param dW=0
+param dL=0
+b=81u
+a=63u
+H=31.78u
+c=1.81u
+NumberMeanders=4
+
+%upper left meander
+N1=NumberMeanders
+inv=-1
+ozh=pi
+for k1 = 1:N1
+   [link(k1) serpA1meander1 p1 [x1(k1) x1(k1+1)][l_=dL w_=dW b_=b a_=a c_=c inv=inv ozh=ozh]]      
+beam3d p1 [x1(N1+1) x1(N1+2)][l=(a+dL) w=(c+dW) oz=ozh ] 
+beam3d p1 [x1(N1+2) x1(N1+4)][l=(b+dL) w=(c+dW) oz=-pi/2*inv ] 
+beam3d p1 [x1(N1+4) x1(N1+5)][l=(a+dL) w=(c+dW) oz=ozh ] 
+anchor p1 [x1(N1+5)][l=10u w=10u h=10u oz=pi ]
+
+%upper right meander
+N2=NumberMeanders
+inv=-1
+ozh=0
+for k2 = 1:N2
+   [link(k2+N1) serpA1meander1 p1 [x2(k2) x2(k2+1)][l_=dL w_=dW b_=b a_=a c_=c inv=inv ozh=ozh]]      
+beam3d p1 [x2(N2+1) x2(N2+2)][l=(a+dL) w=(c+dW) oz=ozh ] 
+beam3d p1 [x2(N2+2) x2(N2+4)][l=(b+dL) w=(c+dW) oz=-pi/2*inv ] 
+beam3d p1 [x2(N2+4) x2(N2+5)][l=(a+dL) w=(c+dW) oz=ozh ] 
+anchor p1 [x2(N2+5)][l=10u w=10u h=10u oz=pi ]
+
+%lower right meander
+N3=NumberMeanders
+inv=1
+ozh=0
+for k3 = 1:N3
+   [link(k3+N1+N2) serpA1meander1 p1 [x3(k3) x3(k3+1)][l_=dL w_=dW b_=b a_=a c_=c inv=inv ozh=ozh]]      
+beam3d p1 [x3(N3+1) x3(N3+2)][l=(a+dL) w=(c+dW) oz=ozh ] 
+beam3d p1 [x3(N3+2) x3(N3+4)][l=(b+dL) w=(c+dW) oz=-pi/2*inv ] 
+beam3d p1 [x3(N3+4) x3(N3+5)][l=(a+dL) w=(c+dW) oz=ozh ] 
+anchor p1 [x3(N3+5)][l=10u w=10u h=10u oz=pi]
+
+%lower left meander
+N4=NumberMeanders
+inv=1
+ozh=pi
+for k4 = 1:N4
+   [link(k4+N1+N2+N3) serpA1meander1 p1 [x4(k4) x4(k4+1)][l_=dL w_=dW b_=b a_=a c_=c inv=inv ozh=ozh]]      
+beam3d p1 [x4(N4+1) x4(N4+2)][l=(a+dL) w=(c+dW) oz=ozh ] 
+beam3d p1 [x4(N4+2) x4(N4+4)][l=(b+dL) w=(c+dW) oz=-pi/2*inv ] 
+beam3d p1 [x4(N4+4) x4(N4+5)][l=(a+dL) w=(c+dW) oz=ozh ] 
+anchor p1 [x4(N4+5)][l=10u w=10u h=10u oz=pi]
+
+%main mass
+beam3d p1 [x1(1) x2(1)][l=LM w=WM oz=0 ]
+beam3d p1 [x2(1) x3(1)][l=LM w=WM oz=-pi/2 ]
+beam3d p1 [x3(1) x4(1)][l=LM w=WM oz=pi ]
+beam3d p1 [x4(1) x1(1)][l=LM w=WM oz=pi/2 ]
+
+
+%f3d * [x1(N+1)][F=F1]
+f3d * [x1(1)][F=F1 oz=pi/2]
+f3d * [x2(1)][F=F1 oz=pi/2]
+%f3d * [x1(1)][F=F1 oy=-pi/2]

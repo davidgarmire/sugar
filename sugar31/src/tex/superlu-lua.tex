@@ -1,0 +1,252 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}superlu-lua\nwendquote} module adds Lua support for calls to the SuperLU
+interface defined in {\Tt{}superlu.nw\nwendquote}.  Supported functions are
+\begin{itemize}
+  \item {\Tt{}A.print()\nwendquote}:   print matrix
+  \item {\Tt{}A.factor()\nwendquote}:  factor matrix
+  \item {\Tt{}A.solve(x)\nwendquote}:  compute $x := A^{-1}x$
+  \item {\Tt{}A.free()\nwendquote}:    free matrix
+\end{itemize}
+
+
+\section{Interface}
+
+\nwfilename{superlu-lua.nw}\nwbegincode{1}\sublabel{NW3DCRmx-2NzynY-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-2NzynY-1}}}\moddef{superlu-lua.h~{\nwtagstyle{}\subpageref{NW3DCRmx-2NzynY-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef SUPERLU_LUA_H
+#define SUPERLU_LUA_H 
+
+#include <lua.h>
+#include <superlu.h>
+
+void      lua_superlu_register(lua_State* L);
+void      lua_superlu_push(lua_State* L, superlu_t matrix);
+superlu_t lua_superlu_get(lua_State* L, int index);
+
+#endif /* SUPERLU_LUA_H */
+\nwnotused{superlu-lua.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\Tt{}lua{\_}superlu{\_}register\nwendquote} function registers the functions of
+the module with the Lua interpreter.  The {\Tt{}lua{\_}superlu{\_}push\nwendquote}
+and {\Tt{}lua{\_}superlu{\_}get\nwendquote} functions add and get matrices
+on the Lua stack.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3DCRmx-M6sbw-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-M6sbw-1}}}\moddef{superlu-lua.c~{\nwtagstyle{}\subpageref{NW3DCRmx-M6sbw-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <superlu_lua.h>
+#include <matrix_lua.h>
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NW3DCRmx-IAwJm-1}}\RA{}
+
+#ifdef HAVE_SUPERLU
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-1}}\RA{}
+#endif
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NW3DCRmx-nRuDO-1}}\RA{}
+\nwnotused{superlu-lua.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Matrix tag}
+
+The {\Tt{}lua{\_}superlu{\_}tag\nwendquote} is the tag for the Lua SuperLU sparse matrix type.
+Note that you \emph{could} get into trouble
+with this if multiple interpreters are simultaneously active,
+since the different interpreters may not end up allocating the same
+tag value.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3DCRmx-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NW3DCRmx-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3DCRmx-M6sbw-1}}\nwenddeflinemarkup
+static int lua_superlu_tag;
+
+\nwused{\\{NW3DCRmx-M6sbw-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{Matrix {\Tt{}print\nwendquote} method}
+
+The {\Tt{}matrix{\_}print\nwendquote} routine (also known as the {\Tt{}print\nwendquote} method
+for a matrix object) uses {\Tt{}print{\_}matrix\nwendquote} to output a reasonably
+pretty representation of the matrix.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3DCRmx-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3DCRmx-M6sbw-1}}\nwprevnextdefs{\relax}{NW3DCRmx-1duChy-2}\nwenddeflinemarkup
+static int lua_matrix_print(lua_State* L)
+\{
+    superlu_t A = lua_touserdata(L,-1);
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Wrong number of arguments");
+
+    superlu_print(A);
+
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwalsodefined{\\{NW3DCRmx-1duChy-2}\\{NW3DCRmx-1duChy-3}\\{NW3DCRmx-1duChy-4}\\{NW3DCRmx-1duChy-5}}\nwused{\\{NW3DCRmx-M6sbw-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Matrix {\Tt{}factor\nwendquote} method}
+
+The {\Tt{}matrix{\_}factor\nwendquote} function calls the {\Tt{}superlu{\_}factor\nwendquote}
+wrapper to access SuperLU's factorization routine {\Tt{}dgstrf\nwendquote}. %'
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3DCRmx-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3DCRmx-M6sbw-1}}\nwprevnextdefs{NW3DCRmx-1duChy-1}{NW3DCRmx-1duChy-3}\nwenddeflinemarkup
+static int lua_matrix_factor(lua_State* L)
+\{
+    superlu_t A = lua_touserdata(L,-1);
+
+    superlu_factor(A);
+
+    lua_settop(L,0);
+    lua_pushusertag(L, A, lua_superlu_tag);
+    return 1;
+\}
+
+\nwused{\\{NW3DCRmx-M6sbw-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{Matrix {\Tt{}solve\nwendquote} method}
+
+The {\Tt{}matrix{\_}solve\nwendquote} function computes $x := A^{-1} x$ given a factored
+matrix $A$.  If the matrix has not already been factored, it will
+be automatically factored by the SuperLU wrapper.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3DCRmx-1duChy-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3DCRmx-M6sbw-1}}\nwprevnextdefs{NW3DCRmx-1duChy-2}{NW3DCRmx-1duChy-4}\nwenddeflinemarkup
+static int lua_matrix_solve(lua_State* L)
+\{
+    superlu_t A = lua_touserdata(L,-1);
+    lua_matrix_t B;
+
+    if (lua_gettop(L) != 2)
+        lua_error(L, "Wrong number of arguments");
+
+    B = lua_matrix_get(L,1);
+
+    if (superlu_n(A) != B->m)
+        lua_error(L, "Dimension mismatch");
+
+    superlu_solve(A, B->data);
+
+    lua_settop(L,0);
+    lua_pushusertag(L, B, lua_superlu_tag);
+    return 1;
+\}
+
+\nwused{\\{NW3DCRmx-M6sbw-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{Matrix {\Tt{}free\nwendquote} method}
+
+The {\Tt{}matrix{\_}free\nwendquote} function (also known as the {\Tt{}free\nwendquote} method)
+deallocates the object memory.  It should probably be called on
+Lua garbage collection, but it isn't yet. %'
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW3DCRmx-1duChy-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3DCRmx-M6sbw-1}}\nwprevnextdefs{NW3DCRmx-1duChy-3}{NW3DCRmx-1duChy-5}\nwenddeflinemarkup
+static int lua_matrix_free(lua_State* L)
+\{
+    superlu_t A = lua_touserdata(L,-1);
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    superlu_destroy(A);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwused{\\{NW3DCRmx-M6sbw-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+
+\subsection{Method recall}
+
+When a matrix object is indexed by a method name string,
+we return a Lua closure that implements the method.
+So when the user requests {\Tt{}A.print\nwendquote}, for instance,
+the returned closure object will have {\Tt{}A\nwendquote} as its final
+argument when it is called.
+
+On entry, the Lua stack contains the matrix object
+and the name string.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW3DCRmx-1duChy-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3DCRmx-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3DCRmx-M6sbw-1}}\nwprevnextdefs{NW3DCRmx-1duChy-4}{\relax}\nwenddeflinemarkup
+static int lua_matrix_getmethod(lua_State* L)
+\{
+    const char* name = lua_tostring(L,2);
+
+    lua_pop(L,1);
+    if (strcmp(name, "print") == 0)
+        lua_pushcclosure(L, lua_matrix_print, 1);
+    else if (strcmp(name, "free") == 0)
+        lua_pushcclosure(L, lua_matrix_free, 1);
+    else if (strcmp(name, "factor") == 0)
+        lua_pushcclosure(L, lua_matrix_factor, 1);
+    else if (strcmp(name, "solve") == 0)
+        lua_pushcclosure(L, lua_matrix_solve, 1);
+    else
+        lua_error(L, "Invalid method name");
+
+    return 1;
+\}
+
+\nwused{\\{NW3DCRmx-M6sbw-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{Setting and removing vectors}
+
+The {\Tt{}lua{\_}superlu{\_}push\nwendquote} function is a thin wrapper around
+{\Tt{}lua{\_}pushusertag\nwendquote}.  Similarly, {\Tt{}lua{\_}superlu{\_}get\nwendquote} is a
+thin wrapper around {\Tt{}lua{\_}touserdata\nwendquote}.  The only reason we
+don't want the user to directly use the {\Tt{}lua{\_}pushusertag\nwendquote} and 
+{\Tt{}lua{\_}touserdata\nwendquote} functions is that then we would have
+to expose the matrix tag value to the world.  That wouldn't
+be a tragedy, but it would be nice to keep it private.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW3DCRmx-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3DCRmx-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3DCRmx-M6sbw-1}}\nwprevnextdefs{\relax}{NW3DCRmx-nRuDO-2}\nwenddeflinemarkup
+void lua_superlu_push(lua_State* L, superlu_t matrix)
+\{
+    lua_pushusertag(L, matrix, lua_superlu_tag);
+\}
+
+superlu_t lua_superlu_get(lua_State* L, int index)
+\{
+    if (index > lua_gettop(L))
+        lua_error(L, "Index out of range");
+
+    if (lua_tag(L,index) != lua_superlu_tag)
+        lua_error(L, "Variable is not a SuperLU matrix");
+
+    return lua_touserdata(L,index);
+\}
+
+\nwalsodefined{\\{NW3DCRmx-nRuDO-2}}\nwused{\\{NW3DCRmx-M6sbw-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{Registration functions}
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW3DCRmx-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3DCRmx-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3DCRmx-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3DCRmx-M6sbw-1}}\nwprevnextdefs{NW3DCRmx-nRuDO-1}{\relax}\nwenddeflinemarkup
+void lua_superlu_register(lua_State* L)
+\{
+    lua_superlu_tag = lua_newtag(L);
+#ifdef HAVE_SUPERLU
+    lua_pushcclosure(L, lua_matrix_getmethod, 0);
+    lua_settagmethod(L, lua_superlu_tag, "gettable");
+#endif
+\}
+
+\nwused{\\{NW3DCRmx-M6sbw-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{functions}{NW3DCRmx-nRuDO-1}{\nwixu{NW3DCRmx-M6sbw-1}\nwixd{NW3DCRmx-nRuDO-1}\nwixd{NW3DCRmx-nRuDO-2}}}%
+\nwixlogsorted{c}{{static data}{NW3DCRmx-IAwJm-1}{\nwixu{NW3DCRmx-M6sbw-1}\nwixd{NW3DCRmx-IAwJm-1}}}%
+\nwixlogsorted{c}{{static functions}{NW3DCRmx-1duChy-1}{\nwixu{NW3DCRmx-M6sbw-1}\nwixd{NW3DCRmx-1duChy-1}\nwixd{NW3DCRmx-1duChy-2}\nwixd{NW3DCRmx-1duChy-3}\nwixd{NW3DCRmx-1duChy-4}\nwixd{NW3DCRmx-1duChy-5}}}%
+\nwixlogsorted{c}{{superlu-lua.c}{NW3DCRmx-M6sbw-1}{\nwixd{NW3DCRmx-M6sbw-1}}}%
+\nwixlogsorted{c}{{superlu-lua.h}{NW3DCRmx-2NzynY-1}{\nwixd{NW3DCRmx-2NzynY-1}}}%
+\nwbegindocs{20}\nwdocspar
+\nwenddocs{}

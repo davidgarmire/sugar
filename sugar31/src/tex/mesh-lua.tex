@@ -1,0 +1,480 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}mesh-lua\nwendquote} module provides Lua interfaces to the mesh manipulation
+(not generation!) commands.  The mesh object methods provided include
+\begin{itemize}
+  \item {\Tt{}m.print\nwendquote}:   Print out a textual representation of the mesh structure
+  \item {\Tt{}m.vars\nwendquote}:    Assign variable identifiers
+  \item {\Tt{}m.bc\nwendquote}:      Apply boundary conditions
+  \item {\Tt{}m.R(x)\nwendquote}:    Return $R$ and $dR$ at $x$ (0 if $x$ omitted)
+  \item {\Tt{}m.draw\nwendquote}:    Draws the undisplaced device
+  \item {\Tt{}m.free\nwendquote}:    Free the mesh object
+\end{itemize}
+The mesh variables include
+\begin{itemize}
+  \item {\Tt{}m.nvars\nwendquote}:   The number of variables in the mesh
+  \item {\Tt{}m.nactive\nwendquote}: The number of active variables in the mesh
+\end{itemize}
+
+
+\section{Interface}
+
+The functions {\Tt{}lua{\_}mesh{\_}add{\_}table\nwendquote} and {\Tt{}lua{\_}mesh{\_}rm{\_}table\nwendquote}
+respectively add and remove closure functions for the table at the
+top of the stack.
+
+\nwfilename{mesh-lua.nw}\nwbegincode{1}\sublabel{NWNN6Qp-3IR7dP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-3IR7dP-1}}}\moddef{mesh-lua.h~{\nwtagstyle{}\subpageref{NWNN6Qp-3IR7dP-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MESH_LUA_H
+#define MESH_LUA_H
+
+#include <lua.h>
+#include <mesh.h>
+#include <netdraw_xt.h>
+#include <netdraw_java.h>
+
+void lua_mesh_register(lua_State* L);
+
+void   lua_mesh_create(lua_State* L, mesh_t mesh);
+mesh_t lua_mesh_get   (lua_State* L, int i);
+
+#endif /* MESH_LUA_H */
+\nwnotused{mesh-lua.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWNN6Qp-gDMnX-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-gDMnX-1}}}\moddef{mesh-lua.c~{\nwtagstyle{}\subpageref{NWNN6Qp-gDMnX-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdlib.h>
+#include <string.h>
+
+#include <meshgen_lua.h>
+#include <mesh_lua.h>
+#include <matrix_lua.h>
+#include <superlu_lua.h>
+#include <vars.h>
+#include <assemble.h>
+#include <netout.h>
+#include <netout_file.h>
+#include <newton.h>
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NWNN6Qp-IAwJm-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWNN6Qp-nRuDO-1}}\RA{}
+\nwnotused{mesh-lua.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Mesh tag}
+
+The {\Tt{}lua{\_}mesh{\_}tag\nwendquote} is the tag for the Lua mesh type.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWNN6Qp-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWNN6Qp-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwenddeflinemarkup
+static int lua_mesh_tag;
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{{\Tt{}print\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWNN6Qp-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{\relax}{NWNN6Qp-1duChy-2}\nwenddeflinemarkup
+static int lua_mesh_print(lua_State* L)
+\{
+    mesh_t mesh = lua_touserdata(L,-1);
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    netout_file(stdout, mesh);
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwalsodefined{\\{NWNN6Qp-1duChy-2}\\{NWNN6Qp-1duChy-3}\\{NWNN6Qp-1duChy-4}\\{NWNN6Qp-1duChy-5}\\{NWNN6Qp-1duChy-6}\\{NWNN6Qp-1duChy-7}\\{NWNN6Qp-1duChy-8}\\{NWNN6Qp-1duChy-9}\\{NWNN6Qp-1duChy-A}\\{NWNN6Qp-1duChy-B}}\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{{\Tt{}vars\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWNN6Qp-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-1}{NWNN6Qp-1duChy-3}\nwenddeflinemarkup
+static int lua_mesh_vars(lua_State* L)
+\{
+    mesh_t     mesh;
+    vars_mgr_t vars;
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    mesh = lua_touserdata(L,-1);
+    vars = mesh_vars_mgr(mesh);
+    vars_get_vartypes(vars);
+    vars_assign(vars);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{{\Tt{}bc\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWNN6Qp-1duChy-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-2}{NWNN6Qp-1duChy-4}\nwenddeflinemarkup
+static int lua_mesh_bc(lua_State* L)
+\{
+    if (lua_gettop(L) != 1)
+        lua_error(L, "To many arguments");
+
+    assemble_displace(mesh_assembler(lua_touserdata(L,-1)));
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{{\Tt{}R\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWNN6Qp-1duChy-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-3}{NWNN6Qp-1duChy-5}\nwenddeflinemarkup
+static int lua_mesh_R(lua_State* L)
+\{
+    mesh_t      mesh      = lua_touserdata(L,-1);
+    vars_mgr_t  vars      = mesh_vars_mgr(mesh);
+    assembler_t assembler = mesh_assembler(mesh);
+    int         nvars     = vars_count(vars);
+    int         nactive   = assemble_get_active(assembler);
+
+    lua_matrix_t dR;
+    lua_matrix_t R;
+
+    double* x;
+    \LA{}get optional $x$ argument~{\nwtagstyle{}\subpageref{NWNN6Qp-4A1T6P-1}}\RA{}
+
+    R  = lua_matrix_create(nactive, 1);
+    dR = lua_matrix_create(nactive, nactive);
+
+    R->m  = nactive;
+    dR->m = nactive;
+    dR->n = nactive;
+
+    assemble_R   (assembler, x, NULL, NULL, R->data, nactive);
+    assemble_dR  (assembler, 1, x, 0, NULL, 0, NULL, dR->data, nactive);
+
+    free(x);
+    lua_settop(L,0);
+    lua_matrix_push(L,R);
+    lua_matrix_push(L,dR);
+    return 2;
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWNN6Qp-4A1T6P-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-4A1T6P-1}}}\moddef{get optional $x$ argument~{\nwtagstyle{}\subpageref{NWNN6Qp-4A1T6P-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-1duChy-4}\\{NWNN6Qp-1duChy-5}}\nwenddeflinemarkup
+if (lua_gettop(L) > 2)
+    lua_error(L, "Too many arguments");
+
+x = calloc(nvars, sizeof(double));
+memcpy(x, assemble_get_displacements(assembler), nvars * sizeof(double));
+if (lua_gettop(L) == 2) \{
+    lua_matrix_t xarg = lua_matrix_get(L,1);
+    if (xarg->m > nvars || xarg->n > 1) \{
+        free(x);
+        lua_error(L, "State vector too large");
+    \}
+    memcpy(x, xarg->data, xarg->m * sizeof(double));
+\}
+\nwused{\\{NWNN6Qp-1duChy-4}\\{NWNN6Qp-1duChy-5}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{{\Tt{}R{\_}csc\nwendquote} command}
+
+The {\Tt{}R{\_}csc\nwendquote} command \emph{prints} $R$, $dR$, and $(dR)^{-1} R$,
+but creates no Lua objects at the moment.  The only point is to test
+out that the sparse matrix assembly and solve routines work.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWNN6Qp-1duChy-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-4}{NWNN6Qp-1duChy-6}\nwenddeflinemarkup
+static int lua_mesh_R_csc(lua_State* L)
+\{
+#ifdef HAVE_SUPERLU
+    mesh_t mesh = lua_touserdata(L,-1);
+
+    vars_mgr_t  vars      = mesh_vars_mgr(mesh);
+    assembler_t assembler = mesh_assembler(mesh);
+    int         nvars     = vars_count(vars);
+
+    double*      x;
+    lua_matrix_t R;
+    superlu_t    dR;
+    \LA{}get optional $x$ argument~{\nwtagstyle{}\subpageref{NWNN6Qp-4A1T6P-1}}\RA{}
+
+    R = lua_matrix_create(nvars, 1);
+    R->m = assemble_get_active(assembler);
+
+    assemble_R(assembler, x, NULL, NULL, R->data, R->m);
+    dR = assemble_dR_csc(assembler, 1, x, 0, NULL, 0, NULL, R->m);
+
+    free(x);
+    lua_settop(L, 0);
+    lua_matrix_push(L, R);
+    lua_superlu_push(L, dR);
+    return 2;
+
+#else
+
+    lua_error(L, "SuperLU library not linked");
+    lua_settop(L, 0);
+    return 0;
+
+#endif
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\subsection{{\Tt{}newton\nwendquote} command}
+
+This command calls Jiawang's Newton code to solve the residual equations. %'
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWNN6Qp-1duChy-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-6}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-5}{NWNN6Qp-1duChy-7}\nwenddeflinemarkup
+static int lua_mesh_newton(lua_State* L)
+\{
+#ifdef HAVE_SUPERLU
+    mesh_t mesh = lua_touserdata(L,-1);
+    assembler_t assembler = mesh_assembler(mesh);
+
+    vars_mgr_t  vars      = mesh_vars_mgr(mesh);
+    int         nvars     = vars_count(vars);
+
+    lua_matrix_t x   = lua_matrix_create(nvars, 1);
+    lua_matrix_t R   = lua_matrix_create(nvars, 1);
+
+    memcpy(x->data, assemble_get_displacements(assembler), 
+           nvars * sizeof(double));
+    x->m = assemble_get_active(assembler);
+    R->m = assemble_get_active(assembler);
+
+    newton(mesh, x->m, x->data, R->data, NULL,
+           1e-4, 1e-10, 5);
+
+    lua_settop(L, 0);
+    lua_matrix_push(L, x);
+    lua_matrix_push(L, R);
+    return 2;
+
+#else
+
+    lua_error(L, "SuperLU library not linked");
+    lua_settop(L, 0);
+    return 0;
+
+#endif
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\subsection{{\Tt{}draw\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWNN6Qp-1duChy-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-7}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-6}{NWNN6Qp-1duChy-8}\nwenddeflinemarkup
+static int lua_mesh_draw(lua_State* L)
+\{
+    mesh_t mesh = lua_touserdata(L,-1);
+
+    const char* name = NULL;
+    double*     x    = NULL;
+
+    \LA{}get draw parameters~{\nwtagstyle{}\subpageref{NWNN6Qp-12qz0Y-1}}\RA{}
+
+    if (name != NULL) \{
+        \LA{}draw to Java file~{\nwtagstyle{}\subpageref{NWNN6Qp-3vMcFe-1}}\RA{}
+    \} else \{
+        \LA{}draw to X display~{\nwtagstyle{}\subpageref{NWNN6Qp-4Cr9vE-1}}\RA{}
+    \}
+
+    if (x)
+        free(x);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWNN6Qp-3vMcFe-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-3vMcFe-1}}}\moddef{draw to Java file~{\nwtagstyle{}\subpageref{NWNN6Qp-3vMcFe-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-1duChy-7}}\nwenddeflinemarkup
+#ifdef HAVE_XDR
+    FILE* fp = fopen(name, "w");
+    javawrite(fp, mesh, x, vars_count(mesh_vars_mgr(mesh)));
+    fclose(fp);
+#else
+    lua_error(L, "XDR libraries required for Java output\\n");
+#endif
+\nwused{\\{NWNN6Qp-1duChy-7}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWNN6Qp-4Cr9vE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-4Cr9vE-1}}}\moddef{draw to X display~{\nwtagstyle{}\subpageref{NWNN6Qp-4Cr9vE-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-1duChy-7}}\nwenddeflinemarkup
+#ifdef HAVE_X11
+    xtnetdraw(mesh, x);
+#else
+    lua_error(L, "X libraries not linked\\n");
+#endif
+\nwused{\\{NWNN6Qp-1duChy-7}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWNN6Qp-12qz0Y-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-12qz0Y-1}}}\moddef{get draw parameters~{\nwtagstyle{}\subpageref{NWNN6Qp-12qz0Y-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-1duChy-7}}\nwenddeflinemarkup
+lua_pop(L,1);
+if (lua_gettop(L) > 0 && lua_isuserdata(L,-1)) \{
+    \LA{}get draw displacement parameter~{\nwtagstyle{}\subpageref{NWNN6Qp-2uVVYn-1}}\RA{}
+    lua_pop(L,1);
+\}
+
+if (lua_gettop(L) > 0 && lua_isstring(L,-1)) \{
+    name = lua_tostring(L,-1);
+    lua_pop(L,1);
+\}
+
+if (lua_gettop(L) > 0)
+    lua_error(L, "Wrong number of parameters");
+
+\nwused{\\{NWNN6Qp-1duChy-7}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWNN6Qp-2uVVYn-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-2uVVYn-1}}}\moddef{get draw displacement parameter~{\nwtagstyle{}\subpageref{NWNN6Qp-2uVVYn-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-12qz0Y-1}}\nwenddeflinemarkup
+lua_matrix_t xarg = lua_matrix_get(L,-1);
+vars_mgr_t   vars_mgr  = mesh_vars_mgr(mesh);
+assembler_t  assembler = mesh_assembler(mesh);
+int          nvars     = vars_count(vars_mgr);
+int          nactive   = assemble_get_active(assembler);
+
+double*      displacements = assemble_get_displacements(assembler);
+
+if (xarg->m != nactive || xarg->n != 1)
+    lua_error(L, "State vector is wrong size");
+
+x = calloc(nvars, sizeof(double));
+memcpy(x, displacements, nvars * sizeof(double));
+memcpy(x, xarg->data, nactive * sizeof(double));
+ 
+\nwused{\\{NWNN6Qp-12qz0Y-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\subsection{{\Tt{}free\nwendquote} method}
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWNN6Qp-1duChy-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-8}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-7}{NWNN6Qp-1duChy-9}\nwenddeflinemarkup
+static int lua_mesh_free(lua_State* L)
+\{
+    mesh_t mesh = lua_touserdata(L,-1);
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    mesh_destroy(mesh);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+
+\subsection{{\Tt{}nvars\nwendquote} and {\Tt{}nactive\nwendquote}}
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWNN6Qp-1duChy-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-9}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-8}{NWNN6Qp-1duChy-A}\nwenddeflinemarkup
+static int lua_mesh_nvars(lua_State* L)
+\{
+    int nvars = vars_count(mesh_vars_mgr(lua_touserdata(L,-1)));
+    lua_settop(L,0);
+    lua_pushnumber(L, nvars);
+    return 1;
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWNN6Qp-1duChy-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-A}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-9}{NWNN6Qp-1duChy-B}\nwenddeflinemarkup
+static int lua_mesh_nactive(lua_State* L)
+\{
+    int nvars = assemble_get_active(mesh_assembler(lua_touserdata(L,-1)));
+    lua_settop(L,0);
+    lua_pushnumber(L, nvars);
+    return 1;
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+
+\subsection{Methods}
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWNN6Qp-1duChy-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-B}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWNN6Qp-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwprevnextdefs{NWNN6Qp-1duChy-A}{\relax}\nwenddeflinemarkup
+static int lua_mesh_getmethod(lua_State* L)
+\{
+    const char* name;
+
+    if (!lua_isstring(L,2))
+        lua_error(L, "Invalid index");
+    name = lua_tostring(L,2);
+    lua_pop(L,1);
+
+    if (strcmp(name, "print") == 0)
+        lua_pushcclosure(L, lua_mesh_print, 1);
+    else if (strcmp(name, "vars") == 0)
+        lua_pushcclosure(L, lua_mesh_vars, 1);
+    else if (strcmp(name, "bc") == 0)
+        lua_pushcclosure(L, lua_mesh_bc, 1);
+    else if (strcmp(name, "R") == 0)
+        lua_pushcclosure(L, lua_mesh_R, 1);
+    else if (strcmp(name, "R_csc") == 0)
+        lua_pushcclosure(L, lua_mesh_R_csc, 1);
+    else if (strcmp(name, "newton") == 0)
+        lua_pushcclosure(L, lua_mesh_newton, 1);
+    else if (strcmp(name, "draw") == 0)
+        lua_pushcclosure(L, lua_mesh_draw, 1);
+    else if (strcmp(name, "free") == 0)
+        lua_pushcclosure(L, lua_mesh_free, 1);
+    else if (strcmp(name, "nvars") == 0)
+        lua_mesh_nvars(L);
+    else if (strcmp(name, "nactive") == 0)
+        lua_mesh_nactive(L);
+    else
+        lua_error(L, "Invalid field or method name");
+
+    return 1;
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+
+\subsection{Registration function}
+
+The {\Tt{}lua{\_}mesh{\_}add{\_}table\nwendquote} and {\Tt{}lua{\_}mesh{\_}rm{\_}table\nwendquote} functions
+respectively add methods to and remove methods from a Lua table.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWNN6Qp-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWNN6Qp-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWNN6Qp-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWNN6Qp-gDMnX-1}}\nwenddeflinemarkup
+void lua_mesh_register(lua_State* L)
+\{
+    lua_mesh_tag = lua_newtag(L);
+    lua_pushcclosure(L, lua_mesh_getmethod, 0);
+    lua_settagmethod(L, lua_mesh_tag, "gettable");
+\}
+
+void lua_mesh_create(lua_State* L, mesh_t mesh)
+\{
+    lua_pushusertag(L, mesh, lua_mesh_tag);
+\}
+
+mesh_t lua_mesh_get(lua_State* L, int i)
+\{
+    if (lua_gettop(L) < i)
+        lua_error(L, "Index out of range");
+
+    if (lua_tag(L,i) != lua_mesh_tag)
+        lua_error(L, "Not a mesh!");
+
+    return lua_touserdata(L,i);
+\}
+
+\nwused{\\{NWNN6Qp-gDMnX-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{draw to Java file}{NWNN6Qp-3vMcFe-1}{\nwixu{NWNN6Qp-1duChy-7}\nwixd{NWNN6Qp-3vMcFe-1}}}%
+\nwixlogsorted{c}{{draw to X display}{NWNN6Qp-4Cr9vE-1}{\nwixu{NWNN6Qp-1duChy-7}\nwixd{NWNN6Qp-4Cr9vE-1}}}%
+\nwixlogsorted{c}{{functions}{NWNN6Qp-nRuDO-1}{\nwixu{NWNN6Qp-gDMnX-1}\nwixd{NWNN6Qp-nRuDO-1}}}%
+\nwixlogsorted{c}{{get draw displacement parameter}{NWNN6Qp-2uVVYn-1}{\nwixu{NWNN6Qp-12qz0Y-1}\nwixd{NWNN6Qp-2uVVYn-1}}}%
+\nwixlogsorted{c}{{get draw parameters}{NWNN6Qp-12qz0Y-1}{\nwixu{NWNN6Qp-1duChy-7}\nwixd{NWNN6Qp-12qz0Y-1}}}%
+\nwixlogsorted{c}{{get optional $x$ argument}{NWNN6Qp-4A1T6P-1}{\nwixu{NWNN6Qp-1duChy-4}\nwixd{NWNN6Qp-4A1T6P-1}\nwixu{NWNN6Qp-1duChy-5}}}%
+\nwixlogsorted{c}{{mesh-lua.c}{NWNN6Qp-gDMnX-1}{\nwixd{NWNN6Qp-gDMnX-1}}}%
+\nwixlogsorted{c}{{mesh-lua.h}{NWNN6Qp-3IR7dP-1}{\nwixd{NWNN6Qp-3IR7dP-1}}}%
+\nwixlogsorted{c}{{static data}{NWNN6Qp-IAwJm-1}{\nwixu{NWNN6Qp-gDMnX-1}\nwixd{NWNN6Qp-IAwJm-1}}}%
+\nwixlogsorted{c}{{static functions}{NWNN6Qp-1duChy-1}{\nwixu{NWNN6Qp-gDMnX-1}\nwixd{NWNN6Qp-1duChy-1}\nwixd{NWNN6Qp-1duChy-2}\nwixd{NWNN6Qp-1duChy-3}\nwixd{NWNN6Qp-1duChy-4}\nwixd{NWNN6Qp-1duChy-5}\nwixd{NWNN6Qp-1duChy-6}\nwixd{NWNN6Qp-1duChy-7}\nwixd{NWNN6Qp-1duChy-8}\nwixd{NWNN6Qp-1duChy-9}\nwixd{NWNN6Qp-1duChy-A}\nwixd{NWNN6Qp-1duChy-B}}}%
+\nwbegindocs{40}\nwdocspar
+\nwenddocs{}

@@ -1,0 +1,360 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}sugarmex\nwendquote} module provides the main interface between Matlab
+and the main SUGAR routines and data structures.  It also provides
+a registration mechanism so other modules can add new cases to the
+MEX file with only minor modifications to this file.
+
+
+\section{Interface}
+
+\nwfilename{sugarmex.nw}\nwbegincode{1}\sublabel{NW4CaGgf-41sybe-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-41sybe-1}}}\moddef{sugarmex.h~{\nwtagstyle{}\subpageref{NW4CaGgf-41sybe-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef SUGARMEX_H
+#define SUGARMEX_H
+
+#include <mex.h>
+
+typedef void (*mex_fun_t)(int nlhs, mxArray* plhs[], 
+                          int nrhs, const mxArray* prhs[]);
+
+void mexmgr_add(const char* name, mex_fun_t fun);
+
+void*    mx_to_handle  (const mxArray* array, int tag, const char* errmsg);
+char*    mx_to_string  (const mxArray* array);
+double   mx_to_double  (const mxArray* array);
+mxArray* mx_from_double(double x);
+mxArray* mx_from_nil   ();
+
+void     mex_check_num_args(int nrhs, int expected);
+
+#endif /* SUGARMEX_H */
+\nwnotused{sugarmex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\Tt{}mexmgr{\_}add\nwendquote} function registers a case with the main
+MEX function, so that when the user executes something like
+{\Tt{}sugarmex('foo',\ 1,\ 2)\nwendquote}, the function registered as ``foo''
+gets called with the argument list ``1, 2''.
+
+The {\Tt{}name\nwendquote} argument to {\Tt{}mexmgr{\_}add\nwendquote} should be a string
+that will persist (like a string constant).
+
+The conversion function {\Tt{}mx{\_}to{\_}string\nwendquote} and {\Tt{}mx{\_}to{\_}double\nwendquote}
+convert {\Tt{}mxArray\nwendquote} objects to strings and doubles.
+The {\Tt{}mx{\_}from{\_}double\nwendquote} converts a double precision number
+to an {\Tt{}mxArray\nwendquote} object, and the {\Tt{}mx{\_}from{\_}nil\nwendquote} function
+creates an empty matrix object.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW4CaGgf-1PfDlm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-1PfDlm-1}}}\moddef{sugarmex.c~{\nwtagstyle{}\subpageref{NW4CaGgf-1PfDlm-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <dynarray.h>
+#include <sugarmex.h>
+#include <mex_handle.h>
+#include <mesh_mex.h>
+#include <vars_mex.h>
+#include <assemble_mex.h>
+#include <netdraw_mex.h>
+#include <netout_mex.h>
+
+\LA{}types~{\nwtagstyle{}\subpageref{NW4CaGgf-4H4VOG-1}}\RA{}
+\LA{}static data~{\nwtagstyle{}\subpageref{NW4CaGgf-IAwJm-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}\RA{}
+\nwnotused{sugarmex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Mex handle manager}
+
+The handle manager (documented in {\Tt{}mex-handle\nwendquote}) lets us refer to C
+objects from Matlab.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW4CaGgf-VTCH2-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-VTCH2-1}}}\moddef{initialize mex~{\nwtagstyle{}\subpageref{NW4CaGgf-VTCH2-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1duChy-3}}\nwprevnextdefs{\relax}{NW4CaGgf-VTCH2-2}\nwenddeflinemarkup
+mex_handle_create();
+\nwalsodefined{\\{NW4CaGgf-VTCH2-2}}\nwused{\\{NW4CaGgf-1duChy-3}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW4CaGgf-2AJY7l-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-2AJY7l-1}}}\moddef{shutdown mex~{\nwtagstyle{}\subpageref{NW4CaGgf-2AJY7l-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1duChy-4}}\nwprevnextdefs{\relax}{NW4CaGgf-2AJY7l-2}\nwenddeflinemarkup
+mex_handle_destroy();
+\nwalsodefined{\\{NW4CaGgf-2AJY7l-2}}\nwused{\\{NW4CaGgf-1duChy-4}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Registering functions}
+
+The ``help!'' function is the equivalent of the venerable ``Hello world'' --
+something that demonstrates that the framework is working at the most
+basic level.  Eventually, it would probably be appropriate to actually
+make it print useful information.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW4CaGgf-Ye2uh-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-Ye2uh-1}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NW4CaGgf-Ye2uh-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1duChy-3}}\nwenddeflinemarkup
+mexmgr_add("help", mex_help);
+\nwused{\\{NW4CaGgf-1duChy-3}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW4CaGgf-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{\relax}{NW4CaGgf-1duChy-2}\nwenddeflinemarkup
+static void mex_help(int nlhs, mxArray* plhs[],
+                     int nrhs, const mxArray* prhs[])
+\{
+    mexPrintf("Help!\\n");
+\}
+
+\nwalsodefined{\\{NW4CaGgf-1duChy-2}\\{NW4CaGgf-1duChy-3}\\{NW4CaGgf-1duChy-4}}\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW4CaGgf-VTCH2-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-VTCH2-2}}}\moddef{initialize mex~{\nwtagstyle{}\subpageref{NW4CaGgf-VTCH2-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1duChy-3}}\nwprevnextdefs{NW4CaGgf-VTCH2-1}{\relax}\nwenddeflinemarkup
+mesh_mex_register();
+vars_mex_register();
+assemble_mex_register();
+netout_mex_register();
+gc_mex_register();
+\nwused{\\{NW4CaGgf-1duChy-3}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW4CaGgf-2AJY7l-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-2AJY7l-2}}}\moddef{shutdown mex~{\nwtagstyle{}\subpageref{NW4CaGgf-2AJY7l-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1duChy-4}}\nwprevnextdefs{NW4CaGgf-2AJY7l-1}{\relax}\nwenddeflinemarkup
+mesh_mex_shutdown();
+vars_mex_shutdown();
+gc_mex_shutdown();
+\nwused{\\{NW4CaGgf-1duChy-4}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{Conversion functions}
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW4CaGgf-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{\relax}{NW4CaGgf-nRuDO-2}\nwenddeflinemarkup
+void* mx_to_handle(const mxArray* array, int tag, const char* errmsg)
+\{
+    int handle_id;
+
+    if (!mxIsNumeric(array) || mxGetM(array) != 1 || mxGetN(array) != 1)
+        mexErrMsgTxt(errmsg);
+
+    handle_id = (int) mx_to_double(array);
+    if (mex_handle_tag(handle_id) != tag)
+        mexErrMsgTxt(errmsg);
+
+    return mex_handle_data(handle_id);
+\}
+
+\nwalsodefined{\\{NW4CaGgf-nRuDO-2}\\{NW4CaGgf-nRuDO-3}\\{NW4CaGgf-nRuDO-4}\\{NW4CaGgf-nRuDO-5}\\{NW4CaGgf-nRuDO-6}\\{NW4CaGgf-nRuDO-7}\\{NW4CaGgf-nRuDO-8}}\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW4CaGgf-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-nRuDO-1}{NW4CaGgf-nRuDO-3}\nwenddeflinemarkup
+char* mx_to_string(const mxArray* array)
+\{
+    if (!mxIsChar(array)) \{
+        mexErrMsgTxt("Value should be a string");
+    \} else \{
+        int namelen = mxGetN(array)+1;
+        char* name  = (char*) mxCalloc(namelen, sizeof(char));
+        mxGetString(array, name, namelen);
+        return name;
+    \}
+    return NULL;
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW4CaGgf-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-nRuDO-2}{NW4CaGgf-nRuDO-4}\nwenddeflinemarkup
+double mx_to_double(const mxArray* array)
+\{
+    if (!mxIsNumeric(array))
+        mexErrMsgTxt("Value should be numeric");
+
+    if (mxGetN(array) != 1)
+        mexErrMsgTxt("Value should be a scalar");
+
+    return *mxGetPr(array);
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW4CaGgf-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-nRuDO-3}{NW4CaGgf-nRuDO-5}\nwenddeflinemarkup
+mxArray* mx_from_double(double x)
+\{
+    mxArray* array  = mxCreateDoubleMatrix(1, 1, mxREAL);
+    *mxGetPr(array) = x;
+    return array;
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW4CaGgf-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-nRuDO-4}{NW4CaGgf-nRuDO-6}\nwenddeflinemarkup
+mxArray* mx_from_nil()
+\{
+    return mxCreateDoubleMatrix(0, 0, mxREAL);
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+
+\subsection{Common error handling}
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW4CaGgf-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-nRuDO-5}{NW4CaGgf-nRuDO-7}\nwenddeflinemarkup
+void mex_check_num_args(int nrhs, int expected)
+\{
+    if (nrhs < expected)
+        mxErrMsgTxt("Not enough arguments");
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+
+\subsection{Function list}
+
+The list of functions is kept in a dynamic array of
+(name, function) pairs.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW4CaGgf-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NW4CaGgf-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwenddeflinemarkup
+typedef struct mex_entry_t \{
+    const char*  name;
+    mex_fun_t    fun;
+\} mex_entry_t;
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW4CaGgf-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NW4CaGgf-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwenddeflinemarkup
+static dynarray_t entries;
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+The {\Tt{}mexmgr{\_}add\nwendquote} function simply appends to the {\Tt{}entries\nwendquote} array.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW4CaGgf-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-nRuDO-6}{NW4CaGgf-nRuDO-8}\nwenddeflinemarkup
+void mexmgr_add(const char* name, mex_fun_t fun)
+\{
+    mex_entry_t new_entry;
+    new_entry.name = name;
+    new_entry.fun  = fun;
+    dynarray_append(entries, &new_entry);
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+The {\Tt{}mexmgr{\_}find\nwendquote} function looks up a function in the {\Tt{}entries\nwendquote}
+array.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW4CaGgf-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-1duChy-1}{NW4CaGgf-1duChy-3}\nwenddeflinemarkup
+static mex_fun_t mexmgr_find(const char* name)
+\{
+    int i;
+    mex_entry_t* data;
+    int          n;
+
+    data = dynarray_data (entries);
+    n    = dynarray_count(entries);
+
+    for (i = 0; i < n; ++i)
+        if (strcmp(data[i].name, name) == 0)
+            return data[i].fun;
+
+    return NULL;
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+
+\subsection{Initialization and shutdown}
+
+The {\Tt{}mex{\_}initialize\nwendquote} and {\Tt{}mex{\_}shutdown\nwendquote} functions are called
+when the MEX file is loaded and unloaded, respectively.
+The {\Tt{}mex{\_}shutdown\nwendquote} function will probably not be called under
+normal circumstances, since we will almost always want the MEX
+file to remain locked.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW4CaGgf-1duChy-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-1duChy-2}{NW4CaGgf-1duChy-4}\nwenddeflinemarkup
+static void mex_initialize()
+\{
+    mexLock();
+    entries = dynarray_create(sizeof(struct mex_entry_t), 32);
+    \LA{}register mex functions~{\nwtagstyle{}\subpageref{NW4CaGgf-Ye2uh-1}}\RA{}
+    \LA{}initialize mex~{\nwtagstyle{}\subpageref{NW4CaGgf-VTCH2-1}}\RA{}
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW4CaGgf-1duChy-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW4CaGgf-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-1duChy-3}{\relax}\nwenddeflinemarkup
+static void mex_shutdown()
+\{
+    \LA{}shutdown mex~{\nwtagstyle{}\subpageref{NW4CaGgf-2AJY7l-1}}\RA{}
+    dynarray_destroy(entries);
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+
+\subsection{Gateway function}
+
+The {\Tt{}mexFunction\nwendquote} is the standard Matlab interface gateway.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW4CaGgf-nRuDO-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4CaGgf-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-1PfDlm-1}}\nwprevnextdefs{NW4CaGgf-nRuDO-7}{\relax}\nwenddeflinemarkup
+void mexFunction(int nlhs, mxArray* plhs[],
+                 int nrhs, const mxArray* prhs[])
+\{
+    int          namelen;
+    char*        name;
+    mex_fun_t    fun;
+    static int   first_call = 1;
+
+    \LA{}handle first call~{\nwtagstyle{}\subpageref{NW4CaGgf-m4dSK-1}}\RA{}        
+    \LA{}check \code{}mexFunction\edoc{} input variables~{\nwtagstyle{}\subpageref{NW4CaGgf-1HkFQU-1}}\RA{}
+
+    name = mx_to_string(prhs[0]);
+
+    \LA{}find the function entry~{\nwtagstyle{}\subpageref{NW4CaGgf-1T5YPP-1}}\RA{}
+    fun(nlhs, plhs, nrhs-1, prhs+1);
+
+    mxFree(name);
+\}
+
+\nwused{\\{NW4CaGgf-1PfDlm-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+On the first call, we run the initialization routine and register
+the shutdown routine.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NW4CaGgf-m4dSK-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-m4dSK-1}}}\moddef{handle first call~{\nwtagstyle{}\subpageref{NW4CaGgf-m4dSK-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-nRuDO-8}}\nwenddeflinemarkup
+if (first_call) \{
+    first_call = 0;
+    mex_initialize();
+    mexAtExit(mex_shutdown);
+\}
+
+\nwused{\\{NW4CaGgf-nRuDO-8}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+There are two types of errors that we can catch here.  First, the
+first argument must be a string.  Second, the string must specify
+a valid function entry.
+
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NW4CaGgf-1HkFQU-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-1HkFQU-1}}}\moddef{check \code{}mexFunction\edoc{} input variables~{\nwtagstyle{}\subpageref{NW4CaGgf-1HkFQU-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-nRuDO-8}}\nwenddeflinemarkup
+if (nrhs == 0 || !mxIsChar(prhs[0])) \{
+    mexPrintf(SUGAR_MESSAGE);
+    return;
+\}
+\nwused{\\{NW4CaGgf-nRuDO-8}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NW4CaGgf-1T5YPP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4CaGgf-1T5YPP-1}}}\moddef{find the function entry~{\nwtagstyle{}\subpageref{NW4CaGgf-1T5YPP-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4CaGgf-nRuDO-8}}\nwenddeflinemarkup
+fun = mexmgr_find(name);
+
+if (fun == NULL) \{
+    mexPrintf("Unknown function option: %s\\n", name);
+    mexErrMsgTxt("Error calling SUGAR MEX file.");
+\}
+
+\nwused{\\{NW4CaGgf-nRuDO-8}}\nwendcode{}
+
+\nwixlogsorted{c}{{check \code{}mexFunction\edoc{} input variables}{NW4CaGgf-1HkFQU-1}{\nwixu{NW4CaGgf-nRuDO-8}\nwixd{NW4CaGgf-1HkFQU-1}}}%
+\nwixlogsorted{c}{{find the function entry}{NW4CaGgf-1T5YPP-1}{\nwixu{NW4CaGgf-nRuDO-8}\nwixd{NW4CaGgf-1T5YPP-1}}}%
+\nwixlogsorted{c}{{functions}{NW4CaGgf-nRuDO-1}{\nwixu{NW4CaGgf-1PfDlm-1}\nwixd{NW4CaGgf-nRuDO-1}\nwixd{NW4CaGgf-nRuDO-2}\nwixd{NW4CaGgf-nRuDO-3}\nwixd{NW4CaGgf-nRuDO-4}\nwixd{NW4CaGgf-nRuDO-5}\nwixd{NW4CaGgf-nRuDO-6}\nwixd{NW4CaGgf-nRuDO-7}\nwixd{NW4CaGgf-nRuDO-8}}}%
+\nwixlogsorted{c}{{handle first call}{NW4CaGgf-m4dSK-1}{\nwixu{NW4CaGgf-nRuDO-8}\nwixd{NW4CaGgf-m4dSK-1}}}%
+\nwixlogsorted{c}{{initialize mex}{NW4CaGgf-VTCH2-1}{\nwixd{NW4CaGgf-VTCH2-1}\nwixd{NW4CaGgf-VTCH2-2}\nwixu{NW4CaGgf-1duChy-3}}}%
+\nwixlogsorted{c}{{register mex functions}{NW4CaGgf-Ye2uh-1}{\nwixd{NW4CaGgf-Ye2uh-1}\nwixu{NW4CaGgf-1duChy-3}}}%
+\nwixlogsorted{c}{{shutdown mex}{NW4CaGgf-2AJY7l-1}{\nwixd{NW4CaGgf-2AJY7l-1}\nwixd{NW4CaGgf-2AJY7l-2}\nwixu{NW4CaGgf-1duChy-4}}}%
+\nwixlogsorted{c}{{static data}{NW4CaGgf-IAwJm-1}{\nwixu{NW4CaGgf-1PfDlm-1}\nwixd{NW4CaGgf-IAwJm-1}}}%
+\nwixlogsorted{c}{{static functions}{NW4CaGgf-1duChy-1}{\nwixu{NW4CaGgf-1PfDlm-1}\nwixd{NW4CaGgf-1duChy-1}\nwixd{NW4CaGgf-1duChy-2}\nwixd{NW4CaGgf-1duChy-3}\nwixd{NW4CaGgf-1duChy-4}}}%
+\nwixlogsorted{c}{{sugarmex.c}{NW4CaGgf-1PfDlm-1}{\nwixd{NW4CaGgf-1PfDlm-1}}}%
+\nwixlogsorted{c}{{sugarmex.h}{NW4CaGgf-41sybe-1}{\nwixd{NW4CaGgf-41sybe-1}}}%
+\nwixlogsorted{c}{{types}{NW4CaGgf-4H4VOG-1}{\nwixu{NW4CaGgf-1PfDlm-1}\nwixd{NW4CaGgf-4H4VOG-1}}}%
+\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}

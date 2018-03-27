@@ -1,0 +1,906 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}matrix-lua\nwendquote} module adds simple matrix support to Lua.
+Supported functions are
+\begin{itemize}
+  \item {\Tt{}matrix(m,n)\nwendquote}: create a new zero matrix of size $m$ by $n$
+  \item {\Tt{}A(i,j)\nwendquote}:      get $A_{ij}$
+  \item {\Tt{}A[k]\nwendquote}:        get or set the $k$th element (column-major 1-based)
+  \item {\Tt{}C\ =\ A+B\nwendquote}:     add two matrices
+  \item {\Tt{}C\ =\ A-B\nwendquote}:     subtract two matrices
+  \item {\Tt{}C\ =\ -A\nwendquote}:      take the unary negation of a matrix
+  \item {\Tt{}C\ =\ A*B\nwendquote}:     multiply two matrices
+  \item {\Tt{}A.print()\nwendquote}:   print matrix
+  \item {\Tt{}A.factor()\nwendquote}:  factor matrix
+  \item {\Tt{}A.solve(x)\nwendquote}:  compute $x := A^{-1}x$
+  \item {\Tt{}A.clone()\nwendquote}:   create a copy of the matrix
+  \item {\Tt{}A.slice(i1,i2,j1,j2)\nwendquote}:   create a slice of the matrix
+  \item {\Tt{}A.free()\nwendquote}:    free matrix
+\end{itemize}
+Supported variables are
+\begin{itemize}
+  \item {\Tt{}A.m\nwendquote}:  return number of rows in matrix
+  \item {\Tt{}A.n\nwendquote}:  return number of columns in matrix
+\end{itemize}
+
+
+\section{Interface}
+
+\nwfilename{matrix-lua.nw}\nwbegincode{1}\sublabel{NW49APAR-2XOU18-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-2XOU18-1}}}\moddef{matrix-lua.h~{\nwtagstyle{}\subpageref{NW49APAR-2XOU18-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MATRIX_LUA_H
+#define MATRIX_LUA_H 
+
+#include <lua.h>
+
+struct lua_matrix_struct \{
+    int owns_data;  /* True if this matrix owns storage  */
+    int m, n, ld;   /* Array size and leading dimension  */
+    double* data;   /* Array data                        */
+    int* ipiv;      /* Pivot array for factored matrices */
+\};
+
+typedef struct lua_matrix_struct* lua_matrix_t;
+
+void         lua_matrix_register(lua_State* L);
+void         lua_matrix_push(lua_State* L, lua_matrix_t A);
+lua_matrix_t lua_matrix_get(lua_State* L, int index);
+
+lua_matrix_t lua_matrix_create(int m, int n);
+lua_matrix_t lua_matrix_slice(lua_matrix_t A, int i1, int i2, int j1, int j2);
+void         lua_matrix_destroy(lua_matrix_t self);
+
+#endif /* MATRIX_LUA_H */
+\nwnotused{matrix-lua.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\Tt{}lua{\_}matrix{\_}register\nwendquote} function registers the functions of
+the module with the Lua interpreter.  The {\Tt{}lua{\_}matrix{\_}push\nwendquote}
+and {\Tt{}lua{\_}matrix{\_}get\nwendquote} functions add and get matrices
+on the Lua stack.
+
+The {\Tt{}lua{\_}matrix{\_}create\nwendquote} and {\Tt{}lua{\_}matrix{\_}destroy\nwendquote} functions create
+new matrices.  The {\Tt{}lua{\_}matrix{\_}slice\nwendquote} function creates a ``parasite''
+matrix that uses the same storage as the original matrix but which
+has different indexing.  In Matlab parlance, the slice function returns
+{\Tt{}A(i1:i2,\ j1:j2)\nwendquote}.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW49APAR-VVNpW-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-VVNpW-1}}}\moddef{matrix-lua.c~{\nwtagstyle{}\subpageref{NW49APAR-VVNpW-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+#include <matrix_lua.h>
+
+\LA{}macros~{\nwtagstyle{}\subpageref{NW49APAR-1VvxMr-1}}\RA{}
+\LA{}static prototypes~{\nwtagstyle{}\subpageref{NW49APAR-4QyxLE-1}}\RA{}
+\LA{}static data~{\nwtagstyle{}\subpageref{NW49APAR-IAwJm-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-1}}\RA{}
+\nwnotused{matrix-lua.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Matrix tag}
+
+Lua provides \emph{tags} for user data, with semantics known only
+to the host program.  The {\Tt{}lua{\_}matrix{\_}tag\nwendquote} is the tag for
+the Lua matrix type.  Note that you \emph{could} get into trouble
+with this if multiple interpreters are simultaneously active,
+since the different interpreters may not end up allocating the same
+tag value.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW49APAR-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NW49APAR-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwenddeflinemarkup
+static int lua_matrix_tag;
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+
+\subsection{Accessor macros}
+
+We use a couple convenience macros for getting the matrix entries.
+The macros use one-based indexing for consistence with the Lua
+index conventions.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW49APAR-1VvxMr-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1VvxMr-1}}}\moddef{macros~{\nwtagstyle{}\subpageref{NW49APAR-1VvxMr-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwenddeflinemarkup
+#define Mij(M,i,j) (M->data[((j)-1)*M->ld + ((i)-1)])
+#define Mrow0(M,k) ( ((k)-1) % (M->m) )
+#define Mcol0(M,k) ( ((k)-1) / (M->m) )
+#define Mk(M,k)    ( M->data[Mcol0(M,k) * M->ld + Mrow0(M,k)] )
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\subsection{Matrix call getter}
+
+We use Lua tag methods to handle the case when the ``call'' syntax
+is applied to a matrix object.  If there is one numeric argument $i$,
+we get the $(i,1)$ matrix entry; if there are two numeric arguments,
+we get the $(i,j)$ entry.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW49APAR-BzF6M-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-nRuDO-4}}\nwprevnextdefs{\relax}{NW49APAR-BzF6M-2}\nwenddeflinemarkup
+lua_pushcclosure(L, lua_matrix_call, 0);
+lua_settagmethod(L, lua_matrix_tag, "function");
+\nwalsodefined{\\{NW49APAR-BzF6M-2}\\{NW49APAR-BzF6M-3}\\{NW49APAR-BzF6M-4}\\{NW49APAR-BzF6M-5}\\{NW49APAR-BzF6M-6}\\{NW49APAR-BzF6M-7}\\{NW49APAR-BzF6M-8}}\nwused{\\{NW49APAR-nRuDO-4}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW49APAR-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{\relax}{NW49APAR-1duChy-2}\nwenddeflinemarkup
+static int lua_matrix_call(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,1);
+    int n = lua_gettop(L);
+    int i, j;
+
+    if (n < 2 || n > 3)
+        lua_error(L, "Wrong number of arguments");
+
+    if (!lua_isnumber(L,2) || (n == 3 && !lua_isnumber(L,3)))
+        lua_error(L, "Index must be a number");
+
+    i = (int) lua_tonumber(L,2);
+    j = (n == 3) ? (int) lua_tonumber(L,3) : 1;
+
+    if (i <= 0 || i > A->m || j <= 0 || j > A->n)
+        lua_error(L, "Index out of range");
+
+    lua_settop(L,0);
+    lua_pushnumber(L, Mij(A,i,j));
+    return 1;
+\}
+
+\nwalsodefined{\\{NW49APAR-1duChy-2}\\{NW49APAR-1duChy-3}\\{NW49APAR-1duChy-4}\\{NW49APAR-1duChy-5}\\{NW49APAR-1duChy-6}\\{NW49APAR-1duChy-7}\\{NW49APAR-1duChy-8}\\{NW49APAR-1duChy-9}\\{NW49APAR-1duChy-A}\\{NW49APAR-1duChy-B}\\{NW49APAR-1duChy-C}\\{NW49APAR-1duChy-D}\\{NW49APAR-1duChy-E}\\{NW49APAR-1duChy-F}\\{NW49APAR-1duChy-G}\\{NW49APAR-1duChy-H}}\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+
+\subsection{Matrix table getter}
+
+The indexed read operation does two different things.  If the index
+is a number $k$, we try to return the $k$th element of the matrix
+(as arranged in column-major order with one-based indexing).
+If the index is a string, then we probably have a method call,
+which is handled by the {\Tt{}lua{\_}matrix{\_}getmethod\nwendquote} function described
+later.  (Recall that the dot syntax in Lua is a type of indexing,
+so that {\Tt{}A.print()\nwendquote} is equivalent to {\Tt{}A["print"]()\nwendquote}.)
+
+The {\Tt{}gettable\nwendquote} tag method receives the tagged object and the index.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW49APAR-BzF6M-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-2}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-nRuDO-4}}\nwprevnextdefs{NW49APAR-BzF6M-1}{NW49APAR-BzF6M-3}\nwenddeflinemarkup
+lua_pushcclosure(L, lua_matrix_gettable, 0);
+lua_settagmethod(L, lua_matrix_tag, "gettable");
+\nwused{\\{NW49APAR-nRuDO-4}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW49APAR-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-1}{NW49APAR-1duChy-3}\nwenddeflinemarkup
+static int lua_matrix_gettable(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,1);
+    int k;
+
+    if (!lua_isnumber(L,2)) \{
+        if (lua_isstring(L,2))
+            return lua_matrix_getmethod(L);
+        else
+            lua_error(L, "Index must be a number");
+    \}
+    k = (int) lua_tonumber(L,2);
+
+    if (k <= 0 || k > A->m * A->n)
+        lua_error(L, "Index out of range");
+
+    lua_settop(L,0);
+    lua_pushnumber(L, Mk(A,k));
+    return 1;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{Matrix setter}
+
+The indexed write operation can only do one thing: set a matrix
+entry.  The {\Tt{}settable\nwendquote} tag method gets the tagged object,
+the index, and the value to write on the stack.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW49APAR-BzF6M-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-3}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-nRuDO-4}}\nwprevnextdefs{NW49APAR-BzF6M-2}{NW49APAR-BzF6M-4}\nwenddeflinemarkup
+lua_pushcclosure(L, lua_matrix_settable, 0);
+lua_settagmethod(L, lua_matrix_tag, "settable");
+\nwused{\\{NW49APAR-nRuDO-4}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW49APAR-1duChy-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-3}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-2}{NW49APAR-1duChy-4}\nwenddeflinemarkup
+static int lua_matrix_settable(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,1);
+    int k;
+
+    if (!lua_isnumber(L,2))
+        lua_error(L, "Index must be a number");
+
+    if (!lua_isnumber(L,3))
+        lua_error(L, "Value must be a number");
+
+    k = (int) lua_tonumber(L,2);
+    if (k <= 0 || k > A->m*A->n)
+        lua_error(L, "Index out of range");
+
+    Mk(A,k) = lua_tonumber(L,3);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+
+\subsection{Matrix arithmetic operations}
+
+The {\Tt{}lua{\_}matrix{\_}add\nwendquote} and {\Tt{}lua{\_}matrix{\_}sub\nwendquote} methods are attached
+to the add and subtract events.  The {\Tt{}lua{\_}matrix{\_}unm\nwendquote} method is
+attached to the unary negation event.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW49APAR-BzF6M-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-4}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-nRuDO-4}}\nwprevnextdefs{NW49APAR-BzF6M-3}{NW49APAR-BzF6M-5}\nwenddeflinemarkup
+lua_pushcclosure(L, lua_matrix_add, 0);
+lua_settagmethod(L, lua_matrix_tag, "add");
+\nwused{\\{NW49APAR-nRuDO-4}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW49APAR-1duChy-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-4}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-3}{NW49APAR-1duChy-5}\nwenddeflinemarkup
+static int lua_matrix_add(lua_State* L)
+\{
+    int i, j;
+    \LA{}get binary operands~{\nwtagstyle{}\subpageref{NW49APAR-1rgxbt-1}}\RA{}
+
+    \LA{}check summand conformality~{\nwtagstyle{}\subpageref{NW49APAR-2op4lt-1}}\RA{}
+    C = lua_matrix_create(A->m, A->n);
+
+    for (i = 1; i <= A->m; ++i)
+        for (j = 1; j <= A->n; ++j)
+            Mij(C,i,j) = Mij(A,i,j) + Mij(B,i,j);
+
+    \LA{}return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NW49APAR-EyHPB-1}}\RA{}
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW49APAR-BzF6M-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-5}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-nRuDO-4}}\nwprevnextdefs{NW49APAR-BzF6M-4}{NW49APAR-BzF6M-6}\nwenddeflinemarkup
+lua_pushcclosure(L, lua_matrix_sub, 0);
+lua_settagmethod(L, lua_matrix_tag, "sub");
+\nwused{\\{NW49APAR-nRuDO-4}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW49APAR-1duChy-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-5}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-4}{NW49APAR-1duChy-6}\nwenddeflinemarkup
+static int lua_matrix_sub(lua_State* L)
+\{
+    int i, j;
+    \LA{}get binary operands~{\nwtagstyle{}\subpageref{NW49APAR-1rgxbt-1}}\RA{}
+
+    \LA{}check summand conformality~{\nwtagstyle{}\subpageref{NW49APAR-2op4lt-1}}\RA{}
+    C = lua_matrix_create(A->m, A->n);
+
+    for (i = 1; i <= A->m; ++i)
+        for (j = 1; j <= A->n; ++j)
+            Mij(C,i,j) = Mij(A,i,j) - Mij(B,i,j);
+
+    \LA{}return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NW49APAR-EyHPB-1}}\RA{}
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW49APAR-BzF6M-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-6}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-nRuDO-4}}\nwprevnextdefs{NW49APAR-BzF6M-5}{NW49APAR-BzF6M-7}\nwenddeflinemarkup
+lua_pushcclosure(L, lua_matrix_unm, 0);
+lua_settagmethod(L, lua_matrix_tag, "unm");
+\nwused{\\{NW49APAR-nRuDO-4}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW49APAR-1duChy-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-6}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-5}{NW49APAR-1duChy-7}\nwenddeflinemarkup
+static int lua_matrix_unm(lua_State* L)
+\{
+    int i, j;
+    \LA{}get unary operand~{\nwtagstyle{}\subpageref{NW49APAR-2Wr2g8-1}}\RA{}
+
+    C = lua_matrix_create(A->m, A->n);
+
+    for (i = 1; i <= A->m; ++i)
+        for (j = 1; j <= A->n; ++j)
+            Mij(C,i,j) = -Mij(A,i,j);
+
+    \LA{}return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NW49APAR-EyHPB-1}}\RA{}
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW49APAR-BzF6M-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-7}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-nRuDO-4}}\nwprevnextdefs{NW49APAR-BzF6M-6}{NW49APAR-BzF6M-8}\nwenddeflinemarkup
+lua_pushcclosure(L, lua_matrix_mul, 0);
+lua_settagmethod(L, lua_matrix_tag, "mul");
+\nwused{\\{NW49APAR-nRuDO-4}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW49APAR-1duChy-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-7}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-6}{NW49APAR-1duChy-8}\nwenddeflinemarkup
+static int lua_matrix_mul(lua_State* L)
+\{
+    extern int dgemm_(char* transA, char* transB, int* m, int* n, int* k,
+                      double* alpha, double* A, int* ldA,
+                      double* B, int* ldB,
+                      double* beta, double* C, int* ldC);
+#ifdef HAVE_LAPACK
+    double one  = 1;
+    double zero = 0;
+#endif
+
+    \LA{}get binary operands~{\nwtagstyle{}\subpageref{NW49APAR-1rgxbt-1}}\RA{}
+
+    if (A->n != B->m)
+        lua_error(L, "Nonconformal matrices");
+
+    C = lua_matrix_create(A->m, B->n);
+
+#ifdef HAVE_LAPACK
+
+    dgemm_("N", "N", &(C->m), &(C->n), &(A->m),
+           &one, A->data, &(A->ld),
+           B->data, &(B->ld),
+           &zero, C->data, &(C->ld));
+
+#else
+    lua_error(L, "Dense linear algebra routines not linked\\n");
+#endif /* HAVE_LAPACK */
+
+    \LA{}return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NW49APAR-EyHPB-1}}\RA{}
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW49APAR-1rgxbt-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1rgxbt-1}}}\moddef{get binary operands~{\nwtagstyle{}\subpageref{NW49APAR-1rgxbt-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-4}\\{NW49APAR-1duChy-5}\\{NW49APAR-1duChy-7}}\nwenddeflinemarkup
+lua_matrix_t A, B, C;
+
+if (lua_tag(L,1) != lua_matrix_tag || lua_tag(L,2) != lua_matrix_tag)
+    lua_error(L, "Invalid operands");
+
+A = lua_touserdata(L,1);
+B = lua_touserdata(L,2);
+\nwused{\\{NW49APAR-1duChy-4}\\{NW49APAR-1duChy-5}\\{NW49APAR-1duChy-7}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW49APAR-2Wr2g8-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-2Wr2g8-1}}}\moddef{get unary operand~{\nwtagstyle{}\subpageref{NW49APAR-2Wr2g8-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-6}}\nwenddeflinemarkup
+lua_matrix_t A = lua_touserdata(L,1);
+lua_matrix_t C;
+\nwused{\\{NW49APAR-1duChy-6}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW49APAR-2op4lt-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-2op4lt-1}}}\moddef{check summand conformality~{\nwtagstyle{}\subpageref{NW49APAR-2op4lt-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-4}\\{NW49APAR-1duChy-5}}\nwenddeflinemarkup
+if (A->m != B->m || A->n != B->n)
+    lua_error(L, "Noncomformal matrices");
+
+\nwused{\\{NW49APAR-1duChy-4}\\{NW49APAR-1duChy-5}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NW49APAR-EyHPB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-EyHPB-1}}}\moddef{return \code{}C\edoc{}~{\nwtagstyle{}\subpageref{NW49APAR-EyHPB-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-4}\\{NW49APAR-1duChy-5}\\{NW49APAR-1duChy-6}\\{NW49APAR-1duChy-7}}\nwenddeflinemarkup
+lua_settop(L,0);
+lua_pushusertag(L, C, lua_matrix_tag);
+return 1;
+\nwused{\\{NW49APAR-1duChy-4}\\{NW49APAR-1duChy-5}\\{NW49APAR-1duChy-6}\\{NW49APAR-1duChy-7}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\subsection{{\Tt{}matrix\nwendquote} command}
+
+The {\Tt{}matrix\nwendquote} command creates a new matrix of a specified size.
+The user is allowed to leave off the second argument $n$;
+if it is not explicitly specified, $n$ is assumed to be $1$.
+The sizes are only somewhat sanity checked -- there is no
+check to make sure that $mn$ is not humongous, and we fail
+gracelessly if the memory allocations fail.
+
+After the numeric arguments, the user may also specify a table
+of array contents in \emph{row-major} order.  The idea is that
+\begin{verbatim}
+  A = matrix(2,2, {1, 2,
+                   3, 4})
+\end{verbatim}
+is probably the most natural way to initialize a little two-by-two
+example matrix.  It should also be possible to write
+\begin{verbatim}
+  A = matrix{1, 2, 3}
+\end{verbatim}
+to get a three-element vector.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NW49APAR-BzF6M-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-8}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-nRuDO-4}}\nwprevnextdefs{NW49APAR-BzF6M-7}{\relax}\nwenddeflinemarkup
+lua_register(L, "matrix", lua_matrix);
+\nwused{\\{NW49APAR-nRuDO-4}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NW49APAR-1duChy-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-8}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-7}{NW49APAR-1duChy-9}\nwenddeflinemarkup
+static int lua_matrix(lua_State* L)
+\{
+    int nargs = lua_gettop(L);
+    lua_matrix_t A;
+    int i,j;
+    int m = 0, n = 0;
+    int init_table = 0;
+
+    \LA{}get \code{}matrix\edoc{} parameters~{\nwtagstyle{}\subpageref{NW49APAR-JzBPi-1}}\RA{}
+
+    A = lua_matrix_create(m,n);
+
+    \LA{}initialize matrix from table~{\nwtagstyle{}\subpageref{NW49APAR-3n1EGq-1}}\RA{}
+
+    lua_settop(L,0);
+    lua_pushusertag(L, A, lua_matrix_tag);
+    return 1;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NW49APAR-JzBPi-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-JzBPi-1}}}\moddef{get \code{}matrix\edoc{} parameters~{\nwtagstyle{}\subpageref{NW49APAR-JzBPi-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-8}}\nwprevnextdefs{\relax}{NW49APAR-JzBPi-2}\nwenddeflinemarkup
+for (i = 1; i <= nargs; ++i) \{
+    if (lua_isnumber(L,i)) \{
+        int val = (int) lua_tonumber(L,i);
+        if (val <= 0)
+            lua_error(L, "Size out of bounds");
+
+        if      (m == 0)  m = val;
+        else if (n == 0)  n = val;
+        else              lua_error(L, "Too many size parameters");
+
+    \} else if (lua_istable(L,i)) \{
+        if (init_table == 0)
+            init_table = i;
+        else
+            lua_error(L, "Too many initializers");
+    \}
+\}
+
+\nwalsodefined{\\{NW49APAR-JzBPi-2}}\nwused{\\{NW49APAR-1duChy-8}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NW49APAR-JzBPi-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-JzBPi-2}}}\moddef{get \code{}matrix\edoc{} parameters~{\nwtagstyle{}\subpageref{NW49APAR-JzBPi-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-8}}\nwprevnextdefs{NW49APAR-JzBPi-1}{\relax}\nwenddeflinemarkup
+if (m == 0) \{
+    if (init_table) \{
+        m = lua_getn(L,init_table);
+        if (m == 0)
+            lua_error(L, "Insufficient initializer entries");
+    \}
+\}
+
+if (n == 0)
+    n = 1;
+
+if (init_table && lua_getn(L,init_table) > m*n)
+    lua_error(L, "Initializer too large");
+
+\nwused{\\{NW49APAR-1duChy-8}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NW49APAR-3n1EGq-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-3n1EGq-1}}}\moddef{initialize matrix from table~{\nwtagstyle{}\subpageref{NW49APAR-3n1EGq-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-8}}\nwenddeflinemarkup
+if (init_table) \{
+    int k = 1;
+    for (i = 1; i <= m; ++i) \{
+        for (j = 1; j <= n; ++j) \{
+            lua_rawgeti(L,init_table, k++);
+            if (lua_isnumber(L,-1))
+                Mij(A,i,j) = lua_tonumber(L,-1);
+            lua_pop(L,1);
+        \}
+    \}
+\}
+\nwused{\\{NW49APAR-1duChy-8}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\subsection{Matrix {\Tt{}print\nwendquote} method}
+
+Matlab's wrapped matrix output format is \emph{really} nice when you
+have to inspect matrices of moderate size.  The {\Tt{}print{\_}matrix\nwendquote} routine
+emulates Matlab's behavior for {\Tt{}format\ short\ e\nwendquote}.
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NW49APAR-2e3CeC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-2e3CeC-1}}}\moddef{call Lua print for buffer~{\nwtagstyle{}\subpageref{NW49APAR-2e3CeC-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-9}}\nwenddeflinemarkup
+lua_pushvalue(L, -1);
+lua_pushstring(L, buf);
+lua_rawcall(L, 1, 0);
+\nwused{\\{NW49APAR-1duChy-9}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NW49APAR-1duChy-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-9}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-8}{NW49APAR-1duChy-A}\nwenddeflinemarkup
+static void print_matrix(lua_State* L, lua_matrix_t A)
+\{
+    int i, j, c;
+    int m = A->m;
+    int n = A->n;
+    char buf[256];
+
+    lua_getglobal(L, "print");
+    for (c = 1; c <= n; c += 6) \{
+
+        if (n > 6) \{
+            sprintf(buf, "  Columns %d through %d\\n", 
+                    c, (c+5 > n) ? n : c+5);
+            \LA{}call Lua print for buffer~{\nwtagstyle{}\subpageref{NW49APAR-2e3CeC-1}}\RA{}
+        \}
+
+        for (i = 1; i <= m; ++i) \{
+            char num[64];
+
+            *buf = '\\0';
+            for (j = c; j <= n && j < c+6; ++j) \{
+                if (Mij(A,i,j))
+                    sprintf(num, "  % .4e", Mij(A,i,j));
+                else
+                    sprintf(num, "            0");
+                strcat(buf, num);
+            \}
+            \LA{}call Lua print for buffer~{\nwtagstyle{}\subpageref{NW49APAR-2e3CeC-1}}\RA{}
+
+        \}
+        buf[0] = ' ';
+        buf[1] = '\\0';
+        \LA{}call Lua print for buffer~{\nwtagstyle{}\subpageref{NW49APAR-2e3CeC-1}}\RA{}
+    \}
+    lua_pop(L,1);
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+The {\Tt{}matrix{\_}print\nwendquote} routine (also known as the {\Tt{}print\nwendquote} method
+for a matrix object) uses {\Tt{}print{\_}matrix\nwendquote} to output a reasonably
+pretty representation of the matrix.
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NW49APAR-1duChy-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-A}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-9}{NW49APAR-1duChy-B}\nwenddeflinemarkup
+static int lua_matrix_print(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Wrong number of arguments");
+
+    print_matrix(L, A);
+    lua_settop(L, 0);
+    return 0;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+
+\subsection{Matrix {\Tt{}factor\nwendquote} method}
+
+The {\Tt{}matrix{\_}factor\nwendquote} function computes $A = PLU$ using LAPACK's %'
+{\Tt{}DGETRF\nwendquote} routine.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NW49APAR-1duChy-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-B}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-A}{NW49APAR-1duChy-C}\nwenddeflinemarkup
+static int lua_matrix_factor(lua_State* L)
+\{
+    extern int dgetrf_(int* m, int* n, double* A, int* ldA,
+                       int* ipiv, int* info);
+
+    lua_matrix_t A = lua_touserdata(L,-1);
+
+    if (A->m != A->n)
+        lua_error(L, "Matrix must be square");
+
+#ifdef HAVE_LAPACK
+    if (A->ipiv == NULL) \{
+        int info;
+        A->ipiv = calloc(A->m, sizeof(int));
+        dgetrf_(&(A->m), &(A->n), A->data, &(A->ld), A->ipiv, &info);    
+        if (info != 0) \{
+            printf("dgetrf failed with error code %d\\n", info);
+            lua_error(L, "Error during factorization");
+        \}
+    \}
+#else
+    lua_error(L, "Dense linear algebra not linked\\n");
+#endif
+
+    lua_settop(L,0);
+    lua_pushusertag(L, A, lua_matrix_tag);
+    return 1;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+
+\subsection{Matrix {\Tt{}solve\nwendquote} method}
+
+The {\Tt{}matrix{\_}solve\nwendquote} function computes $x := A^{-1} x$ given a factored
+matrix $A$.  If the matrix has not already been factored, we will factor
+it.
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NW49APAR-1duChy-C}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-C}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-B}{NW49APAR-1duChy-D}\nwenddeflinemarkup
+static int lua_matrix_solve(lua_State* L)
+\{
+    extern int dgetrs_(char* trans, int* n, int* nrhs, double* A, int* ldA,
+                       int* ipiv, double* B, int* ldB, int* info);
+
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_matrix_t B;
+
+#ifdef HAVE_LAPACK
+    int info;
+#endif
+
+    if (lua_gettop(L) != 2)
+        lua_error(L, "Wrong number of arguments");
+
+    if (lua_tag(L,1) != lua_matrix_tag)
+        lua_error(L, "Argument must be a matrix");
+    B = lua_touserdata(L,1);
+
+    if (A->ipiv == NULL) \{
+        lua_matrix_factor(L);
+    \}
+
+    if (A->n != B->m)
+        lua_error(L, "Dimension mismatch");
+
+#ifdef HAVE_LAPACK
+    dgetrs_("N", &(A->n), &(B->n), A->data, &(A->ld), A->ipiv, 
+            B->data, &(B->ld), &info);    
+    if (info != 0)
+        printf("Solve failed with error code %d\\n", info);
+
+#else
+    lua_error(L, "Dense linear algebra libraries not linked\\n");
+#endif
+
+    lua_settop(L,0);
+    lua_pushusertag(L, B, lua_matrix_tag);
+    return 1;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+
+\subsection{Matrix {\Tt{}clone\nwendquote} method}
+
+The {\Tt{}matrix{\_}clone\nwendquote} function ({\Tt{}clone\nwendquote} method) makes a full
+copy of a matrix object.
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NW49APAR-1duChy-D}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-D}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-C}{NW49APAR-1duChy-E}\nwenddeflinemarkup
+static int lua_matrix_clone(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_matrix_t B;
+    int j;
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    B = lua_matrix_create(A->m, A->n);
+    for (j = 1; j <= A->n; ++j)
+        memcpy(&Mij(B,1,j), &Mij(A,1,j), A->m * sizeof(double));
+
+    if (A->ipiv) \{
+        B->ipiv = calloc(A->m, sizeof(int));
+        memcpy(B->ipiv, A->ipiv, A->m * sizeof(int));
+    \}
+
+    lua_settop(L,0);
+    lua_pushusertag(L, B, lua_matrix_tag);
+    return 1;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\subsection{Matrix {\Tt{}slice\nwendquote} method}
+
+The matrix {\Tt{}slice\nwendquote} command returns a copy of a subscripted slice
+of the matrix $A$.
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NW49APAR-1duChy-E}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-E}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-D}{NW49APAR-1duChy-F}\nwenddeflinemarkup
+static int lua_matrix_slice_method(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_matrix_t B;
+    int n = lua_gettop(L);
+    int i1, i2, j1 = 1, j2 = 1;
+
+    \LA{}get slice subscript arguments~{\nwtagstyle{}\subpageref{NW49APAR-1xpjei-1}}\RA{}
+
+    B = lua_matrix_slice(A,i1,i2,j1,j2);
+
+    lua_settop(L,0);
+    lua_pushusertag(L, B, lua_matrix_tag);
+    return 1;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NW49APAR-1xpjei-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1xpjei-1}}}\moddef{get slice subscript arguments~{\nwtagstyle{}\subpageref{NW49APAR-1xpjei-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-1duChy-E}}\nwenddeflinemarkup
+if (n != 3 && n != 5)
+    lua_error(L, "Wrong number of arguments");
+
+if (!lua_isnumber(L,1) || !lua_isnumber(L,2) ||
+    (n == 5 && (!lua_isnumber(L,3) || !lua_isnumber(L,4))))
+    lua_error(L, "Subscripts must be numeric");
+
+i1 = (int) lua_tonumber(L,1);
+i2 = (int) lua_tonumber(L,2);
+if (n == 5) \{
+    j1 = (int) lua_tonumber(L,3);
+    j2 = (int) lua_tonumber(L,4);
+\}
+
+if (i1 <= 0 || i2 < i1 || i2 > A->m ||
+    j1 <= 0 || j2 < j1 || j2 > A->n)
+    lua_error(L, "Bad subscripts");
+
+\nwused{\\{NW49APAR-1duChy-E}}\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+\subsection{Matrix {\Tt{}free\nwendquote} method}
+
+The {\Tt{}matrix{\_}free\nwendquote} function (also known as the {\Tt{}free\nwendquote} method)
+deallocates the object memory.  It should probably be called on
+Lua garbage collection, but it isn't yet.
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NW49APAR-1duChy-F}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-F}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-E}{NW49APAR-1duChy-G}\nwenddeflinemarkup
+static int lua_matrix_free(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+
+    if (lua_gettop(L) != 1)
+        lua_error(L, "Too many arguments");
+
+    lua_matrix_destroy(A);
+
+    lua_settop(L,0);
+    return 0;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+
+\subsection{{\Tt{}m\nwendquote} and {\Tt{}n\nwendquote} fields}
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NW49APAR-1duChy-G}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-G}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-F}{NW49APAR-1duChy-H}\nwenddeflinemarkup
+static int lua_matrix_m(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_settop(L,0);
+    lua_pushnumber(L, A->m);
+    return 1;
+\}
+
+static int lua_matrix_n(lua_State* L)
+\{
+    lua_matrix_t A = lua_touserdata(L,-1);
+    lua_settop(L,0);
+    lua_pushnumber(L, A->n);
+    return 1;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+
+\subsection{Method recall}
+
+When a matrix object is indexed by a method name string,
+we return a Lua closure that implements the method.
+So when the user requests {\Tt{}A.print\nwendquote}, for instance,
+the returned closure object will have {\Tt{}A\nwendquote} as its final
+argument when it is called.
+
+On entry, the Lua stack contains the matrix object
+and the name string.
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NW49APAR-4QyxLE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-4QyxLE-1}}}\moddef{static prototypes~{\nwtagstyle{}\subpageref{NW49APAR-4QyxLE-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwenddeflinemarkup
+static int lua_matrix_getmethod(lua_State* L);
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NW49APAR-1duChy-H}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-1duChy-H}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW49APAR-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-1duChy-G}{\relax}\nwenddeflinemarkup
+static int lua_matrix_getmethod(lua_State* L)
+\{
+    const char* name = lua_tostring(L,2);
+
+    lua_pop(L,1);
+    if (strcmp(name, "print") == 0)
+        lua_pushcclosure(L, lua_matrix_print, 1);
+    else if (strcmp(name, "free") == 0)
+        lua_pushcclosure(L, lua_matrix_free, 1);
+    else if (strcmp(name, "factor") == 0)
+        lua_pushcclosure(L, lua_matrix_factor, 1);
+    else if (strcmp(name, "solve") == 0)
+        lua_pushcclosure(L, lua_matrix_solve, 1);
+    else if (strcmp(name, "clone") == 0)
+        lua_pushcclosure(L, lua_matrix_clone, 1);
+    else if (strcmp(name, "slice") == 0)
+        lua_pushcclosure(L, lua_matrix_slice_method, 1);
+    else if (strcmp(name, "m") == 0)
+        lua_matrix_m(L);
+    else if (strcmp(name, "n") == 0)
+        lua_matrix_n(L);
+    else
+        lua_error(L, "Invalid method name");
+
+    return 1;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+
+\subsection{Public matrix manipulation}
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NW49APAR-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{\relax}{NW49APAR-nRuDO-2}\nwenddeflinemarkup
+lua_matrix_t lua_matrix_create(int m, int n)
+\{
+    lua_matrix_t C;
+
+    C = calloc(1, sizeof(*C));
+    C->owns_data = 1;
+    C->ld = m;
+    C->m  = m;
+    C->n  = n;
+    C->data = calloc(m*n, sizeof(double));
+    return C;
+\}
+
+void lua_matrix_destroy(lua_matrix_t self)
+\{
+    if (self->ipiv)
+        free(self->ipiv);
+
+    if (self->owns_data)
+        free(self->data);
+
+    free(self);
+\}
+
+\nwalsodefined{\\{NW49APAR-nRuDO-2}\\{NW49APAR-nRuDO-3}\\{NW49APAR-nRuDO-4}}\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NW49APAR-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-nRuDO-1}{NW49APAR-nRuDO-3}\nwenddeflinemarkup
+lua_matrix_t lua_matrix_slice(lua_matrix_t A, int i1, int i2, int j1, int j2)
+\{
+    lua_matrix_t C;
+
+    C = calloc(1, sizeof(*C));
+    C->owns_data = 0;
+    C->ld   = A->ld;
+    C->m    = (i2-i1)+1;
+    C->n    = (j2-j1)+1;
+    C->data = &Mij(A,i1,j1);
+    return C;
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+\subsection{Setting and removing vectors}
+
+The {\Tt{}lua{\_}matrix{\_}push\nwendquote} function is a thin wrapper around
+{\Tt{}lua{\_}pushusertag\nwendquote}.  Similarly, {\Tt{}lua{\_}matrix{\_}get\nwendquote} is a
+thin wrapper around {\Tt{}lua{\_}touserdata\nwendquote}.  The only reason we
+don't want the user to directly use the {\Tt{}lua{\_}pushusertag\nwendquote} and 
+{\Tt{}lua{\_}touserdata\nwendquote} functions is that then we would have
+to expose the matrix tag value to the world.  That wouldn't
+be a tragedy, but it would be nice to keep it private.
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NW49APAR-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-nRuDO-2}{NW49APAR-nRuDO-4}\nwenddeflinemarkup
+void lua_matrix_push(lua_State* L, lua_matrix_t matrix)
+\{
+    lua_pushusertag(L, matrix, lua_matrix_tag);
+\}
+
+lua_matrix_t lua_matrix_get(lua_State* L, int index)
+\{
+    if (index > lua_gettop(L))
+        lua_error(L, "Index out of range");
+
+    if (lua_tag(L,index) != lua_matrix_tag)
+        lua_error(L, "Variable is not a matrix");
+
+    return lua_touserdata(L,index);
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+
+\subsection{Registration functions}
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NW49APAR-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW49APAR-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW49APAR-VVNpW-1}}\nwprevnextdefs{NW49APAR-nRuDO-3}{\relax}\nwenddeflinemarkup
+void lua_matrix_register(lua_State* L)
+\{
+    lua_matrix_tag = lua_newtag(L);
+    \LA{}register functions~{\nwtagstyle{}\subpageref{NW49APAR-BzF6M-1}}\RA{}
+\}
+
+\nwused{\\{NW49APAR-VVNpW-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{call Lua print for buffer}{NW49APAR-2e3CeC-1}{\nwixd{NW49APAR-2e3CeC-1}\nwixu{NW49APAR-1duChy-9}}}%
+\nwixlogsorted{c}{{check summand conformality}{NW49APAR-2op4lt-1}{\nwixu{NW49APAR-1duChy-4}\nwixu{NW49APAR-1duChy-5}\nwixd{NW49APAR-2op4lt-1}}}%
+\nwixlogsorted{c}{{functions}{NW49APAR-nRuDO-1}{\nwixu{NW49APAR-VVNpW-1}\nwixd{NW49APAR-nRuDO-1}\nwixd{NW49APAR-nRuDO-2}\nwixd{NW49APAR-nRuDO-3}\nwixd{NW49APAR-nRuDO-4}}}%
+\nwixlogsorted{c}{{get \code{}matrix\edoc{} parameters}{NW49APAR-JzBPi-1}{\nwixu{NW49APAR-1duChy-8}\nwixd{NW49APAR-JzBPi-1}\nwixd{NW49APAR-JzBPi-2}}}%
+\nwixlogsorted{c}{{get binary operands}{NW49APAR-1rgxbt-1}{\nwixu{NW49APAR-1duChy-4}\nwixu{NW49APAR-1duChy-5}\nwixu{NW49APAR-1duChy-7}\nwixd{NW49APAR-1rgxbt-1}}}%
+\nwixlogsorted{c}{{get slice subscript arguments}{NW49APAR-1xpjei-1}{\nwixu{NW49APAR-1duChy-E}\nwixd{NW49APAR-1xpjei-1}}}%
+\nwixlogsorted{c}{{get unary operand}{NW49APAR-2Wr2g8-1}{\nwixu{NW49APAR-1duChy-6}\nwixd{NW49APAR-2Wr2g8-1}}}%
+\nwixlogsorted{c}{{initialize matrix from table}{NW49APAR-3n1EGq-1}{\nwixu{NW49APAR-1duChy-8}\nwixd{NW49APAR-3n1EGq-1}}}%
+\nwixlogsorted{c}{{macros}{NW49APAR-1VvxMr-1}{\nwixu{NW49APAR-VVNpW-1}\nwixd{NW49APAR-1VvxMr-1}}}%
+\nwixlogsorted{c}{{matrix-lua.c}{NW49APAR-VVNpW-1}{\nwixd{NW49APAR-VVNpW-1}}}%
+\nwixlogsorted{c}{{matrix-lua.h}{NW49APAR-2XOU18-1}{\nwixd{NW49APAR-2XOU18-1}}}%
+\nwixlogsorted{c}{{register functions}{NW49APAR-BzF6M-1}{\nwixd{NW49APAR-BzF6M-1}\nwixd{NW49APAR-BzF6M-2}\nwixd{NW49APAR-BzF6M-3}\nwixd{NW49APAR-BzF6M-4}\nwixd{NW49APAR-BzF6M-5}\nwixd{NW49APAR-BzF6M-6}\nwixd{NW49APAR-BzF6M-7}\nwixd{NW49APAR-BzF6M-8}\nwixu{NW49APAR-nRuDO-4}}}%
+\nwixlogsorted{c}{{return \code{}C\edoc{}}{NW49APAR-EyHPB-1}{\nwixu{NW49APAR-1duChy-4}\nwixu{NW49APAR-1duChy-5}\nwixu{NW49APAR-1duChy-6}\nwixu{NW49APAR-1duChy-7}\nwixd{NW49APAR-EyHPB-1}}}%
+\nwixlogsorted{c}{{static data}{NW49APAR-IAwJm-1}{\nwixu{NW49APAR-VVNpW-1}\nwixd{NW49APAR-IAwJm-1}}}%
+\nwixlogsorted{c}{{static functions}{NW49APAR-1duChy-1}{\nwixu{NW49APAR-VVNpW-1}\nwixd{NW49APAR-1duChy-1}\nwixd{NW49APAR-1duChy-2}\nwixd{NW49APAR-1duChy-3}\nwixd{NW49APAR-1duChy-4}\nwixd{NW49APAR-1duChy-5}\nwixd{NW49APAR-1duChy-6}\nwixd{NW49APAR-1duChy-7}\nwixd{NW49APAR-1duChy-8}\nwixd{NW49APAR-1duChy-9}\nwixd{NW49APAR-1duChy-A}\nwixd{NW49APAR-1duChy-B}\nwixd{NW49APAR-1duChy-C}\nwixd{NW49APAR-1duChy-D}\nwixd{NW49APAR-1duChy-E}\nwixd{NW49APAR-1duChy-F}\nwixd{NW49APAR-1duChy-G}\nwixd{NW49APAR-1duChy-H}}}%
+\nwixlogsorted{c}{{static prototypes}{NW49APAR-4QyxLE-1}{\nwixu{NW49APAR-VVNpW-1}\nwixd{NW49APAR-4QyxLE-1}}}%
+\nwbegindocs{86}\nwdocspar
+\nwenddocs{}

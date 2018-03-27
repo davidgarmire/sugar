@@ -1,0 +1,46 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{MUMPS}
+
+The Multi-User MEMS Process (MUMPS) is one common surface
+micromachining process.  We provide information about
+the POLY1 ({\Tt{}p1\nwendquote}) and POLY2 ({\Tt{}p2\nwendquote}) layers.
+
+This file still needs work.
+
+\nwfilename{process-net.nw}\nwbegincode{1}\sublabel{NW2HMNbn-dXG0u-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2HMNbn-dXG0u-1}}}\moddef{mumps.net~{\nwtagstyle{}\subpageref{NW2HMNbn-dXG0u-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+-- Simplified MUMPS process information file --
+
+polysi =
+material \{
+  Poisson = 0.3,            -- Poisson ratio = 0.3
+  thermcond = 2.33,         -- Thermal conductivity Si = 2.33e-6/C
+  viscosity = 1.78e-5,      -- Viscosity (of air) = 1,78e-5
+  fluid = 2e-6,             -- Between the device and the substrate.
+  density = 2300,           -- Material density = 2300 kg/m^3
+  Youngsmodulus = 165e9,    -- Young modulus = 1.65e11 N/m^2
+  permittivity = 8.854e-12, -- permittivity: C^2/(uN.um^2)=(C.s)^2/kg.um^3;
+  sheetresistance = 20,     -- Poly-Si sheet resistance [ohm/square]
+  stress = 0,
+  straingradient=0,
+  thermalexpansion=0,
+  ambienttemperature=0
+\}
+
+p1 = 
+material \{
+  parent = polysi,
+  h = 2u
+\}
+
+p2 =
+material \{
+  parent = polysi,
+  h = 1.5u
+\}
+
+\nwnotused{mumps.net}\nwendcode{}
+
+\nwixlogsorted{c}{{mumps.net}{NW2HMNbn-dXG0u-1}{\nwixd{NW2HMNbn-dXG0u-1}}}%
+\nwbegindocs{2}\nwdocspar
+
+\nwenddocs{}

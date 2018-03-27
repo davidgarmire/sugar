@@ -1,0 +1,84 @@
+use("std2cvt.net")
+
+pi = 3.1415926535897932385
+poly = material {
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p1 = material {
+  parent = poly,
+  h = 2e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p2 = material {
+  parent = poly,
+  h = 1.5e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+d2 = material {
+  parent = poly,
+  fluid = 0.75e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+mfanchor {_n("b"); material = p1, l = 10u, w = 10u, oz = (pi)/(2), h = 8u}
+mfbeam3d {_n("b"), _n("c"); material = p1, l = 80u, w = 2u, oz = (-(pi))/(2), h = 2u}
+mfbeam3d {_n("d"), _n("e"); material = p1, l = 80u, w = 2u, oz = (-(pi))/(2), h = 2u}
+mfanchor {_n("e"); material = p1, l = 10u, w = 10u, oz = (-(pi))/(2), h = 8u}
+mfbeam3d {_n("c"), _n("f"); material = p1, l = 100u, w = 20u, oz = (-(pi))/(2), h = 4u}
+mfbeam3d {_n("f"), _n("d"); material = p1, l = 100u, w = 20u, oz = (-(pi))/(2), h = 4u}
+mfbeam3d {_n("c1"), _n("f1"); material = p1, l = 100u, w = 20u, oz = (-(pi))/(2), h = 4u}
+mfbeam3d {_n("f1"), _n("d1"); material = p1, l = 100u, w = 20u, oz = (-(pi))/(2), h = 4u}
+mfbeam3d {_n("c"), _n("c1"); material = p1, l = 200u, w = 20u, h = 4u}
+mfbeam3d {_n("d"), _n("d1"); material = p1, l = 200u, w = 20u, h = 4u}
+mfbeam3d {_n("g3"), _n("f1"); material = p1, l = 40u, w = 2u, h = 2u}
+mfbeam3d {_n("f"), _n("g6"); material = p1, l = 40u, w = 2u, h = 2u}
+mfbeam3d {_n("g6"), _n("g3"); material = p1, l = 120u, w = 140u, h = 4u}
+mfbeam3d {_n("h"), _n("f"); material = p1, l = 75u, w = 80u, h = 4u}
+relpos_treewalk()

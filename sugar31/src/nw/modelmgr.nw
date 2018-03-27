@@ -1,0 +1,636 @@
+
+\section{Introduction}
+
+The model manager module defines the interfaces for element and
+material model functions.  It also defines the \emph{model manager},
+which manages a registry of available model functions.
+
+
+\section{Interface}
+
+<<modelmgr.h>>=
+#ifndef MODELMGR_H
+#define MODELMGR_H
+
+#include <stdio.h>
+
+struct mesh_struct;
+struct mesh_param_t;
+struct vars_mgr_struct;
+struct assembler_struct;
+struct assemble_matrix_t;
+struct netdraw_gc_t;
+struct netout_t;
+typedef struct model_mgr_struct* model_mgr_t;
+
+<<exported types>>
+<<exported functions>>
+
+#endif /* MODELMGR_H */
+@ 
+
+
+\subsection{The element interface}
+
+The table of functions that implement a particular element are organized
+in an object of type [[model_element_t]].  Not all the functions in the
+table need to be defined; if one of the function pointers is NULL, some
+default behavior will be assumed.
+
+<<exported types>>=
+typedef struct model_element_t {
+    <<element functions>>
+} model_element_t;
+
+typedef struct element_t {
+    model_element_t* model;
+    void* data;
+} element_t;
+
+@ 
+
+The element [[init]] function constructs the data structures
+for a particular element.  The function can use the pool
+associated with a mesh to allocate space; what it does with that
+space is up to the element writer.  Typically, the init function
+will initialize a structure to store the indices of the attached
+nodes, whatever material models are used, parameters like beam
+width, etc.
+
+The initializer function gets a pointer to the current mesh,
+which it can use to access the mesh memory pool, to access
+the node and material tables, and to access the parameter lists.
+
+<<element functions>>=
+struct element_t* (*init)(struct mesh_struct* mesh, const char* model,
+                                  struct model_element_t* modelfunc);
+@ 
+
+<<exported functions>>=
+element_t* element_init(model_mgr_t model_mgr, 
+                                struct mesh_struct* mesh, const char* model);
+@ 
+
+
+If the model function performs any allocations outside the mesh
+pool, it may need to perform deallocation on shutdown.
+
+<<element functions>>=
+void (*destroy)(void* self);
+@ 
+
+<<exported functions>>=
+void element_destroy(element_t* self);
+@ 
+
+The [[set_position]] method can be used to compute or update any 
+quantities that rely on undisplaced node positions.
+
+<<element functions>>=
+void (*set_position)(void* self, struct mesh_struct* mesh);
+@ 
+
+<<exported functions>>=
+void element_set_position(element_t* self, struct mesh_struct* mesh);
+@ 
+
+The [[vars]] function is responsible for assigning variable indices.
+It may be called multiple times, so it probably should not be doing
+new allocations every time.
+
+<<element functions>>=
+void (*vars)(void* self, struct vars_mgr_struct* vars);
+@ 
+
+<<exported functions>>=
+void element_vars(element_t* self, struct vars_mgr_struct* vars);
+@ 
+
+
+The [[displace]] function is responsible for assigning displacement
+boundary conditions, if there are any such to be assigned.
+
+<<element functions>>=
+void (*displace)(void* self, struct assemble_matrix_t* assembler);
+@ 
+
+<<exported functions>>=
+void element_displace(element_t* self, 
+                              struct assemble_matrix_t* assembler);
+@ 
+
+
+The [[R]] and [[dR]] routines contribute the local contributions
+to the residual function and the tangent matrix, respectively.
+
+<<element functions>>=
+void (*R) (void* self, struct assemble_matrix_t* R, 
+           struct assemble_matrix_t* x,
+           struct assemble_matrix_t* v,
+           struct assemble_matrix_t* a);
+void (*dR)(void* self, struct assemble_matrix_t* dR,
+           double cx, struct assemble_matrix_t* x,
+           double cv, struct assemble_matrix_t* v,
+           double ca, struct assemble_matrix_t* a);
+@ 
+
+<<exported functions>>=
+void element_R (element_t* self, struct assemble_matrix_t* R,
+                struct assemble_matrix_t* x,
+                struct assemble_matrix_t* v,
+                struct assemble_matrix_t* a);
+void element_dR(element_t* self, struct assemble_matrix_t* dR,
+                double cx, struct assemble_matrix_t* x,
+                double cv, struct assemble_matrix_t* v,
+                double ca, struct assemble_matrix_t* a);
+@ 
+
+
+The [[output]] function for an element is currently solely
+responsible for dumping out a text representation of whatever
+the element data structure might be.
+
+<<element functions>>=
+void (*output)(void* self, struct netout_t* netout);
+@ 
+
+<<exported functions>>=
+void element_output(element_t* self, struct netout_t* netout);
+@ 
+
+
+The [[display]] function is responsible for drawing the element
+to a [[netdraw]] context.
+
+<<element functions>>=
+void (*display)(void* self, struct netdraw_gc_t* gc);
+@ 
+
+<<exported functions>>=
+void element_display(element_t* self, struct netdraw_gc_t* gc);
+@ 
+
+
+\subsection{The material interface}
+
+The table of functions to implement a material model are stored in
+a [[model_material_t]] structure.
+
+<<exported types>>=
+typedef struct model_material_t {
+    <<material functions>>
+} model_material_t;
+
+typedef struct material_t {
+    model_material_t* model;
+    void* data;
+} material_t;
+
+@ 
+
+Like the element initializer function, the model initializer function
+constructs the data structures used by the model and does basic
+checking on the model parameters.
+
+The [[mesh]] argument provides a handle by which the initializer can
+access most of the information it will need: the parameter list,
+any other materials, etc.  The model name is useful since it may
+be the case that a single model may go by multiple aliases,
+or that a default model that calls through to Matlab (for instance)
+might need the model name.
+
+<<material functions>>=
+struct material_t* (*init)(struct mesh_struct* mesh, const char* model,
+                                   struct model_material_t* modelfunc);
+@ 
+
+<<exported functions>>=
+struct material_t* material_init(model_mgr_t model_mgr, 
+                                 struct mesh_struct* mesh, const char* model);
+@ 
+
+If the material allocated anything outside the mesh pool,
+we may need to do some cleanup.
+
+<<material functions>>=
+void (*destroy)(void* self);
+@ 
+
+<<exported functions>>=
+void material_destroy(material_t* self);
+@ 
+
+
+One of the roles of the material objects is to keep track of any
+parameters to be passed forward to the individual elements.
+The [[param]] function is a query method to get those parameters
+by name.
+
+<<material functions>>=
+struct mesh_param_t* (*param)(void* self, const char* name);
+@ 
+
+<<exported functions>>=
+struct mesh_param_t* material_param(material_t* self, const char* name);
+@ 
+
+The [[output]] function for a material is responsible for printing
+a text representation of the material data structure.
+
+<<material functions>>=
+void (*output)(void* self, struct netout_t* netout);
+@ 
+
+<<exported functions>>=
+void material_output(material_t* self, struct netout_t* netout);
+@ 
+
+
+\subsection{Manager interface}
+
+The [[model_mgr_t]] type is an opaque pointer to a model manager
+object.  Since the model manager object maintains its own memory
+pool, it has a nontrivial destructor function associated with it.
+
+<<exported functions>>=
+model_mgr_t model_mgr_init();
+void        model_mgr_destroy(model_mgr_t self);
+
+@ 
+
+To add a set of standard model functions, call the [[standard_register]].
+
+<<exported functions>>=
+void        model_mgr_standard_register(model_mgr_t self);
+@ 
+
+The [[add_element]] and [[add_material]] functions add function
+tables to the registry.  Though the function table is passed in
+by reference, the model manager makes its own copy for safe
+keeping rather than just storing the pointer.  If the [[name]]
+argument is NULL, the model will be registered as the default model.
+
+<<exported functions>>=
+void model_mgr_add_element (model_mgr_t self, const char* name, 
+                                    model_element_t*  funcs);
+void model_mgr_add_material(model_mgr_t self, const char* name, 
+                                    model_material_t* funcs);
+
+@ 
+
+The [[element]] and [[material]] functions retrieve function
+tables from the registry.  If the table does not contain any models
+matching the requested name, these functions will return NULL.
+
+<<exported functions>>=
+model_element_t*  model_mgr_element (model_mgr_t self, 
+                                             const char* name);
+model_material_t* model_mgr_material(model_mgr_t self, 
+                                             const char* name);
+@ 
+
+
+\section{Implementation}
+
+<<modelmgr.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <mempool.h>
+#include <hash.h>
+#include <mesh.h>
+#include <modelmgr.h>
+
+<<model headers>>
+
+<<types>>
+<<static functions>>
+<<functions>>
+@ 
+
+\subsection{Material and element interface wrappers}
+
+<<functions>>=
+element_t* element_init(model_mgr_t model_mgr,
+                                mesh_t mesh, const char* model)
+{
+    model_element_t* modelfunc = model_mgr_element(model_mgr, model);
+    if (modelfunc == NULL) {
+        mesh_error(mesh, "Unknown model");
+        return NULL;
+    }
+
+    return modelfunc->init(mesh, model, modelfunc);
+}
+
+void element_destroy(element_t* self)
+{
+    if (self->model->destroy)
+        self->model->destroy(self->data);
+}
+
+@ 
+
+<<functions>>=
+void element_set_position(element_t* self, struct mesh_struct* mesh)
+{
+    if (self->model->set_position)
+        self->model->set_position(self->data, mesh);
+}
+
+@ 
+
+<<functions>>=
+void element_vars(element_t* self, struct vars_mgr_struct* vars)
+{
+    if (self->model->vars)
+        self->model->vars(self->data, vars);
+}
+
+@ 
+
+<<functions>>=
+void element_displace(element_t* self, 
+                              struct assemble_matrix_t* assembler)
+{
+    if (self->model->displace)
+        self->model->displace(self->data, assembler);
+}
+
+void element_R(element_t* self, struct assemble_matrix_t* R,
+               struct assemble_matrix_t* x,
+               struct assemble_matrix_t* v,
+               struct assemble_matrix_t* a)
+{
+    if (self->model->R)
+        self->model->R(self->data, R, x, v, a);
+}
+
+void element_dR(element_t* self, struct assemble_matrix_t* dR,
+                double cx, struct assemble_matrix_t* x,
+                double cv, struct assemble_matrix_t* v,
+                double ca, struct assemble_matrix_t* a)
+{
+    if (self->model->dR)
+        self->model->dR(self->data, dR, cx, x, cv, v, ca, a);
+}
+
+@ 
+
+<<functions>>=
+void element_output(element_t* self, struct netout_t* netout)
+{
+    if (self->model->output)
+        self->model->output(self->data, netout);
+}
+
+void element_display(element_t* self, struct netdraw_gc_t* gc)
+{
+    if (self->model->display)
+        self->model->display(self->data, gc);
+}
+
+@ 
+
+<<functions>>=
+material_t* material_init(model_mgr_t model_mgr,
+                                  mesh_t mesh, const char* model)
+{
+    model_material_t* modelfunc = model_mgr_material(model_mgr, model);
+    if (modelfunc == NULL) {
+        mesh_error(mesh, "Unknown model");
+        return NULL;
+    }
+
+    return modelfunc->init(mesh, model, modelfunc);
+}
+
+void material_destroy(material_t* self)
+{
+    if (self->model->destroy)
+        self->model->destroy(self->data);
+}
+
+@
+
+<<functions>>=
+struct mesh_param_t* material_param(material_t* self, const char* name)
+{
+    if (self->model->param)
+        return self->model->param(self->data, name);
+    return NULL;
+}
+
+@ 
+
+<<functions>>=
+void material_output(material_t* self, struct netout_t* netout)
+{
+    if (self->model->output)
+        self->model->output(self->data, netout);
+}
+
+@ 
+
+\subsection{Model manager}
+
+A model manager has an associated pool and two hash tables: one for
+storing element function tables, and the other for material function
+tables.
+
+<<types>>=
+struct model_mgr_struct {
+    mempool_t pool;
+    hash_t element_table;
+    hash_t material_table;
+    model_element_t*  default_element;
+    model_material_t* default_material;
+};
+
+@ 
+
+The entries in the hash tables are just (name, function table) pairs.
+
+<<types>>=
+typedef struct element_entry_t {
+    const char* name;
+    model_element_t element;
+} element_entry_t;
+
+typedef struct material_entry_t {
+    const char* name;
+    model_material_t material;
+} material_entry_t;
+
+@ 
+
+
+We allocate everything (including the model manager object) on
+a locally allocated pool.  Note that, lacking a better size estimate,
+I assume a ``small'' number of different element and material types 
+(on the order of 100).  There is no [[copy]] function defined;
+all the copying is done by the wrapper functions in this module.
+
+<<functions>>=
+model_mgr_t model_mgr_init()
+{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr_t self = 
+        (model_mgr_t) mempool_cget(pool, sizeof(struct model_mgr_struct));
+
+    self->pool = pool;
+
+    self->element_table = hash_pcreate(pool, 100, 
+                                       (hash_compare_fun_t) element_compare,
+                                       (hash_hash_fun_t)    element_hash,
+                                       NULL);
+
+    self->material_table = hash_pcreate(pool, 100,
+                                        (hash_compare_fun_t) material_compare,
+                                        (hash_hash_fun_t)    material_hash,
+                                        NULL);
+
+    self->default_element = NULL;
+    self->default_material = NULL;
+
+    return self;
+}
+
+@ 
+
+<<functions>>=
+void model_mgr_destroy(model_mgr_t self)
+{
+    mempool_destroy(self->pool);
+}
+
+@ 
+
+When we add a new element or material, we just copy everything
+(including the name) onto the pool and then insert the pointer
+into the hash.  Note that we make no special check to see if a
+model with the requested name already exists; if there is a conflict,
+the old model just goes away.
+
+<<functions>>=
+void model_mgr_add_element(model_mgr_t self, const char* name,
+                                   model_element_t* element)
+{
+    element_entry_t* entry = 
+        (element_entry_t*) mempool_get(self->pool, sizeof(*entry));
+    
+    entry->name = mempool_strdup(self->pool, name);
+    memcpy(&(entry->element), element, sizeof(*element));
+    if (entry->name == NULL)
+        self->default_element = &(entry->element);
+    else
+        hash_insert(self->element_table, entry);
+}
+
+@ 
+
+<<functions>>=
+void model_mgr_add_material(model_mgr_t self, const char* name,
+                                    model_material_t* material)
+{
+    material_entry_t* entry = 
+        (material_entry_t*) mempool_get(self->pool, sizeof(*entry));
+    
+    entry->name = mempool_strdup(self->pool, name);
+    memcpy(&(entry->material), material, sizeof(*material));
+    if (entry->name == NULL)
+        self->default_material = &(entry->material);
+    else
+        hash_insert(self->material_table, entry);
+}
+
+@ 
+
+When we retrieve an element or material, we first check to make
+sure that it exists in the table.  If it does exist, we return
+a pointer to the function table (not to the entire entry pair);
+if it does not exist, we return the default.
+
+<<functions>>=
+model_element_t* model_mgr_element(model_mgr_t self, const char* name)
+{
+    element_entry_t key;
+    element_entry_t* entry = NULL;
+    key.name = name;
+    if (name != NULL)
+        entry = hash_retrieve(self->element_table, &key);
+    return (entry == NULL) ? self->default_element : &(entry->element);
+}
+
+@ 
+
+<<functions>>=
+model_material_t* model_mgr_material(model_mgr_t self, const char* name)
+{
+    material_entry_t key;
+    material_entry_t* entry = NULL;
+    key.name = name;
+    if (name != NULL)
+        entry = hash_retrieve(self->material_table, &key);
+    return (entry == NULL) ? self->default_material : &(entry->material);
+}
+
+@ 
+
+The hash table helper functions are just wrappers around
+the standard string hash and comparison functions.
+
+<<static functions>>=
+static unsigned element_hash(element_entry_t* entry)
+{
+    return hash_strhash(entry->name);
+}
+
+static unsigned material_hash(material_entry_t* entry)
+{
+    return hash_strhash(entry->name);
+}
+
+@ 
+
+<<static functions>>=
+static int element_compare(element_entry_t* a, element_entry_t* b)
+{
+    return strcmp(a->name, b->name);
+}
+
+static int material_compare(material_entry_t* a, material_entry_t* b)
+{
+    return strcmp(a->name, b->name);
+}
+
+@ 
+
+\subsection{Registering standard models}
+
+<<model headers>>=
+/* Standard model headers */
+#include <model_anchor.h>
+#include <model_force.h>
+#include <model_beam2d.h>
+#include <model_beam3d.h>
+#include <model_rigid.h>
+#include <model_gap.h>
+
+@ 
+
+<<functions>>=
+void model_mgr_standard_register(model_mgr_t self)
+{
+    model_anchor_register (self);
+    model_force_register  (self);
+    model_beam2d_register (self);
+    model_beam3d_register (self);
+    model_rigid_register  (self);
+    model_gap_register    (self);
+}
+
+@ 

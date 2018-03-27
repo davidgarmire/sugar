@@ -1,0 +1,495 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+\subsection{Interface}
+
+The two-dimensional beam model {\Tt{}beam2d\nwendquote} is a small-deflection 
+Euler-Bernoulli beam model with damping from the fluid layer between
+the fabrication layer and the substrate.
+
+The model is characterized by
+\begin{itemize}
+ \item {\Tt{}w\nwendquote} = beam width (in-plane)
+ \item {\Tt{}h\nwendquote} = beam height (out-of-plane)
+ \item {\Tt{}density\nwendquote} = mass density of the fabrication layer
+ \item {\Tt{}Youngsmodulus\nwendquote} = Young's modulus of the material %'
+\end{itemize}
+
+The parameters {\Tt{}h\nwendquote}, {\Tt{}density\nwendquote}, 
+and {\Tt{}Youngsmodulus\nwendquote} are typically specified by the material.
+
+The nodal variables are displacements in the $x$ and $y$ directions
+and rotation about the $z$ axis.
+
+
+\subsection{Model description}
+
+The derivation of the Euler-Bernoulli beam model is described in 
+Reddy~\cite{Redd93}, section 4, or in various other finite element 
+or civil/mechanical engineering structures books.  
+The axial and transverse deflections
+are decoupled (which is part of why this is appropriate only for
+small deflections).  The displacement field is approximated using
+a standard Galerkin approximation.  The only place our model deviates
+from the standard description is in the inclusion of a damping term
+from the fluid film between the beam and the substrate.
+
+The axial part is modeled as a simple spring system:
+\[
+  \rho A u_{,tt} - (E A u_{,x})_{,x} = F_{a}
+\]
+and the transverse deflection is governed by a fourth order
+equation
+\[
+  \rho A v_{,tt} + (E I v_{,xx})_{,xx} = F_{t}
+\]
+where $\rho$ is the density, $A$ is the cross-section area,
+$w$ is the beam width, 
+and $E$ and $I$ are the
+Young's modulus and moment of inertia for the beam, respectively. %'
+
+
+\section{Interface}
+
+\nwfilename{model-beam2d.nw}\nwbegincode{1}\sublabel{NW2WpvaO-27Qmxg-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-27Qmxg-1}}}\moddef{model-beam2d.h~{\nwtagstyle{}\subpageref{NW2WpvaO-27Qmxg-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MODEL_BEAM2D_H
+#define MODEL_BEAM2D_H
+
+#include <modelmgr.h>
+
+void model_beam2d_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_BEAM2D_H */
+\nwnotused{model-beam2d.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW2WpvaO-49bUHM-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-49bUHM-1}}}\moddef{model-beam2d.c~{\nwtagstyle{}\subpageref{NW2WpvaO-49bUHM-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <math.h>
+#include <assert.h>
+
+#include <model_beam2d.h>
+#include <affine.h>
+#include <mesh.h>
+#include <vars.h>
+#include <assemble.h>
+#include <netdraw.h>
+#include <netout.h>
+
+\LA{}types~{\nwtagstyle{}\subpageref{NW2WpvaO-4H4VOG-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW2WpvaO-1duChy-1}}\RA{}
+\LA{}model functions~{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}\RA{}
+\LA{}registration function~{\nwtagstyle{}\subpageref{NW2WpvaO-CkEIP-1}}\RA{}
+\nwnotused{model-beam2d.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+For the moment, the beam model keeps track of the density per unit length,
+the axial stiffness, the product $EI$, the beam length, and a transformation
+from the local to global coordinates for the beam.  It also tracks the
+identifiers for the end nodes, of course.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW2WpvaO-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NW2WpvaO-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwenddeflinemarkup
+typedef struct beam2d_t \{
+    element_t element;
+    int node[2];
+    int vars[6];
+    double density;
+    double Kaxial;
+    double EI, EA;
+    double l, w, h;
+    double transform[12];
+\} beam2d_t;
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+It might be smart to save the actual parameters instead of just the
+derived quantities, so that we can later see what they are.  Right now,
+though, we discard the parameters after we are finished computing
+derived quantities.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW2WpvaO-3N4EZB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{\relax}{NW2WpvaO-3N4EZB-2}\nwenddeflinemarkup
+static element_t* beam2d_init(mesh_t mesh, const char* model,
+                                      model_element_t* modelfunc)
+\{
+    beam2d_t* self = (beam2d_t*) 
+        mempool_cget(mesh_pool(mesh), sizeof(beam2d_t));
+
+    double rho, A, E;
+    material_t* material;
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    mesh_param_get_nodes(mesh, self->node, 2);
+    material = mesh_param_get_material(mesh, "material");
+
+    rho     = mesh_param_get_number(mesh, material, "density");
+    E       = mesh_param_get_number(mesh, material, "Youngsmodulus");
+    self->w = mesh_param_get_number(mesh, material, "w");
+    self->h = mesh_param_get_number(mesh, material, "h");
+
+    A = self->w * self->h;
+    self->EA      = E*A;
+    self->EI      = E*A* self->w * self->w /12;
+    self->density = rho;
+
+    return &(self->element);
+\}
+
+\nwalsodefined{\\{NW2WpvaO-3N4EZB-2}\\{NW2WpvaO-3N4EZB-3}\\{NW2WpvaO-3N4EZB-4}\\{NW2WpvaO-3N4EZB-5}\\{NW2WpvaO-3N4EZB-6}\\{NW2WpvaO-3N4EZB-7}}\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+Once we have the nodes, we can get the node positions and (ta-da!)
+the lengths.  We cross our fingers and hope that the third coordinate
+of both nodes is the same -- perhaps it should be a checked error if
+that is not the case?
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW2WpvaO-3N4EZB-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-2}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{NW2WpvaO-3N4EZB-1}{NW2WpvaO-3N4EZB-3}\nwenddeflinemarkup
+static void beam2d_set_position(void* pself, mesh_t mesh)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+    double* x1 = mesh_node(mesh, self->node[0])->x;
+    double* x2 = mesh_node(mesh, self->node[1])->x;
+
+    self->l  = (x2[0]-x1[0])*(x2[0]-x1[0]);
+    self->l += (x2[1]-x1[1])*(x2[1]-x1[1]);
+    self->l  = sqrt(self->l);
+    self->Kaxial  = self->EA / self->l;
+    compute_transformation(self->transform, x1, x2, self->l);
+\}
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+Since this model is strictly in-plane, computing the desired
+rotation is simple.  Note that the {\Tt{}transform\nwendquote} matrix from
+local to global coordinates is a 3-by-4 matrix.  The last
+column represents a translation.  We are using
+what the graphics folks would call ``homogeneous coordinates.''
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW2WpvaO-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW2WpvaO-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{\relax}{NW2WpvaO-1duChy-2}\nwenddeflinemarkup
+static void compute_transformation(double *transform,
+                                           double* x1, double* x2, double l)
+\{
+    double c = (x2[0] - x1[0])/l;
+    double s = (x2[1] - x1[1])/l;
+    memset(transform, 0, 12*sizeof(double));
+
+    #define T(i,j) (transform[((j)-1)*3+((i)-1)])
+
+    T(1,1) =  c;
+    T(1,2) = -s;
+    T(2,1) =  s;
+    T(2,2) =  c;
+    T(3,3) =  1;
+
+    T(1,4) = x1[0];
+    T(2,4) = x1[1];
+    T(3,4) = x1[2];
+
+    #undef T
+\}
+
+\nwalsodefined{\\{NW2WpvaO-1duChy-2}}\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+We associate {\Tt{}x\nwendquote}, {\Tt{}y\nwendquote}, and {\Tt{}rz\nwendquote} variables with each coordinate.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW2WpvaO-3N4EZB-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-3}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{NW2WpvaO-3N4EZB-2}{NW2WpvaO-3N4EZB-4}\nwenddeflinemarkup
+static void beam2d_vars(void* pself, vars_mgr_t vars)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+
+    self->vars[0] = vars_node(vars, self->node[0], "x");
+    self->vars[1] = vars_node(vars, self->node[0], "y");
+    self->vars[2] = vars_node(vars, self->node[0], "rz");
+
+    self->vars[3] = vars_node(vars, self->node[1], "x");
+    self->vars[4] = vars_node(vars, self->node[1], "y");
+    self->vars[5] = vars_node(vars, self->node[1], "rz");
+\}
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW2WpvaO-3N4EZB-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-4}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{NW2WpvaO-3N4EZB-3}{NW2WpvaO-3N4EZB-5}\nwenddeflinemarkup
+static void beam2d_R(void* pself, assemble_matrix_t *R, 
+                             assemble_matrix_t* x,
+                             assemble_matrix_t* v,
+                             assemble_matrix_t* a)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+    \LA{}get parameters from \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NW2WpvaO-3lfAZP-1}}\RA{}
+
+    double Rlocal[6];
+    memset(Rlocal, 0, 6 * sizeof(double));
+
+    if (x) \{
+
+        double xlocal[6];
+        memset(xlocal, 0, 6 * sizeof(double));
+
+        assemble_matrix_add(x, self->vars, 6, xlocal);
+        affine_apply_AT(self->transform, xlocal + 0);
+        affine_apply_AT(self->transform, xlocal + 3);
+
+        Rlocal[0] += Kaxial * (xlocal[0] - xlocal[3]);
+        
+        Rlocal[1] += c * (12 * ( xlocal[1] - xlocal[4] ) + 
+                          6*l* ( xlocal[2] + xlocal[5] ));
+
+        Rlocal[2] += c * (6*l* ( xlocal[1] - xlocal[4] ) +
+                          l*l*(4*xlocal[2] + 2*xlocal[5] ));
+
+
+        Rlocal[3] += Kaxial * (xlocal[3] - xlocal[0]);
+
+        Rlocal[4] += c * (12 *  (-xlocal[1] + xlocal[4] ) + 
+                          -6*l* ( xlocal[2] + xlocal[5] ));
+
+        Rlocal[5] += c * (6*l* ( xlocal[1] - xlocal[4] ) +
+                          l*l*(2*xlocal[2] + 4*xlocal[5] ));
+    \}
+
+    if (a) \{
+        double alocal[6];
+        double c = crhoA * l / 420;
+
+printf("In mass contribution to R\\n");
+        memset(alocal, 0, 6 * sizeof(double));
+
+        assemble_matrix_add(a, self->vars, 6, alocal);
+        affine_apply_AT(self->transform, alocal + 0);
+        affine_apply_AT(self->transform, alocal + 3);
+
+
+        Rlocal[0] += c*( 140 *alocal[0] + 70  *alocal[3] );
+
+        Rlocal[1] += c*( 156 *alocal[1] + 22*l*alocal[2] +
+                         54  *alocal[4] - 13*l*alocal[5] );
+
+        Rlocal[2] += c*( 22*l*alocal[1] + 4*l2*alocal[2] +
+                         13*l*alocal[4] - 3*l2*alocal[5] );
+
+        Rlocal[3] += c*( 70  *alocal[0] + 140 *alocal[3] );
+
+        Rlocal[4] += c*( 54  *alocal[1] + 13*l*alocal[2] +
+                         156 *alocal[4] - 22*l*alocal[5] );
+
+        Rlocal[5] += c*(-13*l*alocal[1] - 3*l2*alocal[2] +
+                        -22*l*alocal[4] + 4*l2*alocal[5] );
+
+    \}
+
+    affine_apply_A(self->transform, Rlocal + 0);
+    affine_apply_A(self->transform, Rlocal + 3);
+    assemble_matrix_add(R, self->vars, 6, Rlocal);
+\}
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW2WpvaO-3N4EZB-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-5}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{NW2WpvaO-3N4EZB-4}{NW2WpvaO-3N4EZB-6}\nwenddeflinemarkup
+static void beam2d_dR(void* pself, assemble_matrix_t* dR, 
+                              double cx, assemble_matrix_t* x,
+                              double cv, assemble_matrix_t* v,
+                              double ca, assemble_matrix_t* a)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+    \LA{}get parameters from \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NW2WpvaO-3lfAZP-1}}\RA{}
+
+    if (cx) \{
+        double Klocal[36];
+        memset(Klocal, 0, 36*sizeof(double));
+        c *= cx;
+
+        #define K(i,j) (Klocal[(j)*6+(i)-7])
+        \LA{}compute axial stiffness~{\nwtagstyle{}\subpageref{NW2WpvaO-l9bho-1}}\RA{}
+        \LA{}compute transverse stiffness~{\nwtagstyle{}\subpageref{NW2WpvaO-4JmLjq-1}}\RA{}
+        #undef K
+
+        beam2d_transform(self->transform, Klocal);
+        assemble_matrix_add(dR, self->vars, 6, Klocal);
+    \}
+
+    if (ca) \{
+        double Mlocal[36];
+        memset(Mlocal, 0, 36*sizeof(double));
+        crhoA *= ca;
+
+        #define M(i,j) (Mlocal[(j)*6+(i)-7])
+        \LA{}compute axial mass~{\nwtagstyle{}\subpageref{NW2WpvaO-1bo07R-1}}\RA{}
+        \LA{}compute transverse mass~{\nwtagstyle{}\subpageref{NW2WpvaO-Ib8WP-1}}\RA{}
+        #undef M
+
+        beam2d_transform(self->transform, Mlocal);
+        assemble_matrix_add(dR, self->vars, 6, Mlocal);
+    \}
+
+\}
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW2WpvaO-3lfAZP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3lfAZP-1}}}\moddef{get parameters from \code{}self\edoc{}~{\nwtagstyle{}\subpageref{NW2WpvaO-3lfAZP-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-3N4EZB-4}\\{NW2WpvaO-3N4EZB-5}}\nwenddeflinemarkup
+double Kaxial = self->Kaxial;
+double EI     = self->EI;
+double l      = self->l, l2 = l*l, l3 = l2*l;
+double crhoA  = self->w * self->h * self->density;
+double c      = EI/(l*l*l);
+\nwused{\\{NW2WpvaO-3N4EZB-4}\\{NW2WpvaO-3N4EZB-5}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW2WpvaO-l9bho-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-l9bho-1}}}\moddef{compute axial stiffness~{\nwtagstyle{}\subpageref{NW2WpvaO-l9bho-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-3N4EZB-5}}\nwenddeflinemarkup
+K(1,1) = K(4,4) =  cx * Kaxial;
+K(4,1) = K(1,4) = -cx * Kaxial;
+
+\nwused{\\{NW2WpvaO-3N4EZB-5}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW2WpvaO-1bo07R-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-1bo07R-1}}}\moddef{compute axial mass~{\nwtagstyle{}\subpageref{NW2WpvaO-1bo07R-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-3N4EZB-5}}\nwenddeflinemarkup
+M(1,1) = M(4,4) =  crhoA * l / 3;
+M(4,1) = M(1,4) =  crhoA * l / 6;
+
+\nwused{\\{NW2WpvaO-3N4EZB-5}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW2WpvaO-4JmLjq-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-4JmLjq-1}}}\moddef{compute transverse stiffness~{\nwtagstyle{}\subpageref{NW2WpvaO-4JmLjq-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-3N4EZB-5}}\nwenddeflinemarkup
+/* Fill in the 11 block, first */
+K(2,2) =           12*c;
+K(3,3) =            4*c*l2;
+K(2,3) = K(3,2) =   6*c*l;
+
+/* Now fill in the 22 block */
+K(5,5) =           12*c;
+K(6,6) =            4*c*l2;
+K(5,6) = K(6,5) =  -6*c*l;
+
+/* Now the off-diagonal blocks */
+K(5,2) = K(2,5) = -12*c;
+K(6,3) = K(3,6) =   2*c*l2;
+K(6,2) = K(2,6) =   6*c*l;
+K(5,3) = K(3,5) =  -6*c*l;
+
+\nwused{\\{NW2WpvaO-3N4EZB-5}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW2WpvaO-Ib8WP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-Ib8WP-1}}}\moddef{compute transverse mass~{\nwtagstyle{}\subpageref{NW2WpvaO-Ib8WP-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-3N4EZB-5}}\nwenddeflinemarkup
+/* Fill in the 11 block, first */
+M(2,2) =           crhoA * 156 * l  / 420;
+M(3,3) =           crhoA * 4   * l3 / 420;
+M(2,3) = M(3,2) =  crhoA * 22  * l2 / 420;
+
+/* Now fill in the 22 block */
+M(5,5) =           crhoA * 156 * l  / 420;
+M(6,6) =           crhoA * 4   * l3 / 420;
+M(5,6) = M(6,5) = -crhoA * 22  * l2 / 420;
+
+/* Now the off-diagonal blocks */
+M(5,2) = M(2,5) =  crhoA * 54 * l  / 420;
+M(5,3) = M(3,5) =  crhoA * 13 * l2 / 420;
+M(6,2) = M(2,6) = -crhoA * 13 * l2 / 420;
+M(6,3) = M(3,6) = -crhoA * 3  * l3 / 420;
+
+\nwused{\\{NW2WpvaO-3N4EZB-5}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+The {\Tt{}beam2d{\_}transform\nwendquote} function transforms a matrix from
+the local coordinate frame to the global coordinate system.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW2WpvaO-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW2WpvaO-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{NW2WpvaO-1duChy-1}{\relax}\nwenddeflinemarkup
+static void beam2d_transform(double* transform, double* Klocal)
+\{
+    int i;
+
+    \LA{}transform to local coordinates on right~{\nwtagstyle{}\subpageref{NW2WpvaO-43UFl9-1}}\RA{}
+    \LA{}transform from local coordinates on left~{\nwtagstyle{}\subpageref{NW2WpvaO-3XA4Po-1}}\RA{}
+\}
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW2WpvaO-43UFl9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-43UFl9-1}}}\moddef{transform to local coordinates on right~{\nwtagstyle{}\subpageref{NW2WpvaO-43UFl9-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-1duChy-2}}\nwenddeflinemarkup
+for (i = 0; i < 6; ++i)
+    affine_apply_A_stride(transform, Klocal + i,      6);
+for (i = 0; i < 6; ++i)
+    affine_apply_A_stride(transform, Klocal + i + 18, 6);
+\nwused{\\{NW2WpvaO-1duChy-2}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW2WpvaO-3XA4Po-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3XA4Po-1}}}\moddef{transform from local coordinates on left~{\nwtagstyle{}\subpageref{NW2WpvaO-3XA4Po-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-1duChy-2}}\nwenddeflinemarkup
+for (i = 0; i < 6; ++i)
+    affine_apply_A_stride(transform, Klocal + i*6,     1);
+for (i = 0; i < 6; ++i)
+    affine_apply_A_stride(transform, Klocal + i*6 + 3, 1);
+\nwused{\\{NW2WpvaO-1duChy-2}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW2WpvaO-3N4EZB-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-6}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{NW2WpvaO-3N4EZB-5}{NW2WpvaO-3N4EZB-7}\nwenddeflinemarkup
+static void beam2d_output(void* pself, netout_t* netout)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+
+    netout_string        (netout, "model",     "beam2d");
+    netout_int_matrix    (netout, "node",      self->node, 1, 2);
+    netout_double        (netout, "density",   self->density);
+    netout_double        (netout, "Kaxial",    self->Kaxial);
+    netout_double        (netout, "EI",        self->EI);
+    netout_double        (netout, "l",         self->l);
+    netout_double        (netout, "w",         self->w);
+    netout_double        (netout, "h",         self->h);
+    netout_double_matrix (netout, "transform", self->transform, 3, 4);
+    netout_int_matrix    (netout, "vars",      self->vars, 1, 6);
+\}
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW2WpvaO-3N4EZB-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-7}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NW2WpvaO-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwprevnextdefs{NW2WpvaO-3N4EZB-6}{\relax}\nwenddeflinemarkup
+static void beam2d_display(void* pself, netdraw_gc_t* gc)
+\{
+    beam2d_t* self = (beam2d_t*) pself;
+    int vars[12];
+    int i;
+
+    for (i = 0; i < 12; ++i)
+        vars[i] = -1;
+
+    vars[0]  = self->vars[0];
+    vars[1]  = self->vars[1];
+    vars[5]  = self->vars[2];
+    vars[6]  = self->vars[3];
+    vars[7]  = self->vars[4];
+    vars[11] = self->vars[5];
+
+    netdraw_beam(gc, self->transform, self->l, self->w, self->h, vars);
+\}
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW2WpvaO-CkEIP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW2WpvaO-CkEIP-1}}}\moddef{registration function~{\nwtagstyle{}\subpageref{NW2WpvaO-CkEIP-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW2WpvaO-49bUHM-1}}\nwenddeflinemarkup
+void model_beam2d_register(model_mgr_t model_mgr)
+\{
+    model_element_t model;
+    memset(&model, 0, sizeof(model));
+
+    model.init         = beam2d_init;
+    model.set_position = beam2d_set_position;
+    model.vars         = beam2d_vars;
+    model.R            = beam2d_R;
+    model.dR           = beam2d_dR;
+    model.output       = beam2d_output;
+    model.display      = beam2d_display;
+
+    model_mgr_add_element(model_mgr, "beam2d", &model);
+\}
+
+\nwused{\\{NW2WpvaO-49bUHM-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{compute axial mass}{NW2WpvaO-1bo07R-1}{\nwixu{NW2WpvaO-3N4EZB-5}\nwixd{NW2WpvaO-1bo07R-1}}}%
+\nwixlogsorted{c}{{compute axial stiffness}{NW2WpvaO-l9bho-1}{\nwixu{NW2WpvaO-3N4EZB-5}\nwixd{NW2WpvaO-l9bho-1}}}%
+\nwixlogsorted{c}{{compute transverse mass}{NW2WpvaO-Ib8WP-1}{\nwixu{NW2WpvaO-3N4EZB-5}\nwixd{NW2WpvaO-Ib8WP-1}}}%
+\nwixlogsorted{c}{{compute transverse stiffness}{NW2WpvaO-4JmLjq-1}{\nwixu{NW2WpvaO-3N4EZB-5}\nwixd{NW2WpvaO-4JmLjq-1}}}%
+\nwixlogsorted{c}{{get parameters from \code{}self\edoc{}}{NW2WpvaO-3lfAZP-1}{\nwixu{NW2WpvaO-3N4EZB-4}\nwixu{NW2WpvaO-3N4EZB-5}\nwixd{NW2WpvaO-3lfAZP-1}}}%
+\nwixlogsorted{c}{{model functions}{NW2WpvaO-3N4EZB-1}{\nwixu{NW2WpvaO-49bUHM-1}\nwixd{NW2WpvaO-3N4EZB-1}\nwixd{NW2WpvaO-3N4EZB-2}\nwixd{NW2WpvaO-3N4EZB-3}\nwixd{NW2WpvaO-3N4EZB-4}\nwixd{NW2WpvaO-3N4EZB-5}\nwixd{NW2WpvaO-3N4EZB-6}\nwixd{NW2WpvaO-3N4EZB-7}}}%
+\nwixlogsorted{c}{{model-beam2d.c}{NW2WpvaO-49bUHM-1}{\nwixd{NW2WpvaO-49bUHM-1}}}%
+\nwixlogsorted{c}{{model-beam2d.h}{NW2WpvaO-27Qmxg-1}{\nwixd{NW2WpvaO-27Qmxg-1}}}%
+\nwixlogsorted{c}{{registration function}{NW2WpvaO-CkEIP-1}{\nwixu{NW2WpvaO-49bUHM-1}\nwixd{NW2WpvaO-CkEIP-1}}}%
+\nwixlogsorted{c}{{static functions}{NW2WpvaO-1duChy-1}{\nwixu{NW2WpvaO-49bUHM-1}\nwixd{NW2WpvaO-1duChy-1}\nwixd{NW2WpvaO-1duChy-2}}}%
+\nwixlogsorted{c}{{transform from local coordinates on left}{NW2WpvaO-3XA4Po-1}{\nwixu{NW2WpvaO-1duChy-2}\nwixd{NW2WpvaO-3XA4Po-1}}}%
+\nwixlogsorted{c}{{transform to local coordinates on right}{NW2WpvaO-43UFl9-1}{\nwixu{NW2WpvaO-1duChy-2}\nwixd{NW2WpvaO-43UFl9-1}}}%
+\nwixlogsorted{c}{{types}{NW2WpvaO-4H4VOG-1}{\nwixu{NW2WpvaO-49bUHM-1}\nwixd{NW2WpvaO-4H4VOG-1}}}%
+\nwbegindocs{40}\nwdocspar
+\nwenddocs{}

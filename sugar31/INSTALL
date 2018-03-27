@@ -1,0 +1,47 @@
+
+If you have downloaded a *pre-compiled* package, you need to do almost
+nothing.  To set up your Matlab paths correctly, type
+
+  >> run c:/sugar30/sugar_init.m
+
+at the Matlab path; if you see a banner displaying the version information,
+everything is set.  Otherwise, you should get a diagnostic message that
+tells you that you need to compile for your platform.
+
+
+For Unix users:
+
+ - Make sure the system MEX script is in your path (this script comes
+   with Matlab)
+ - Cross your fingers 
+ - Type ./configure
+ - Type make
+
+SUGAR can take advantage of several different packages you might have
+installed.  To learn more about the configuration options, type
+
+  ./configure --help
+
+in the SUGAR root directory.
+
+
+For Windows users:
+
+ - Before you start, be forewarned -- compiling under Windows is more
+   complicated than it is under Unix.  If you're uncertain about what
+   you're doing, please check to see if there is a pre-compiled version
+   that meets your needs.  The version on the web page should work
+   for Matlab 6.x.  While SUGAR should work with Matlab 5 in principle,
+   it is no longer tested against Matlab 5.
+
+ - SUGAR can be compiled with the Cygwin system and gnumex.  The files
+   and setup instructions for gnumex are available at:
+
+     http://www.mrc-cbu.cam.ac.uk/Imaging/gnumex20.html
+
+   I use the Cygwin shell and the mingw compiler to build the system.
+
+ - Once you have set up the gnumex system, make sure that the mex.bat file
+   is in your path and follow the Unix directions (./configure; make)
+
+

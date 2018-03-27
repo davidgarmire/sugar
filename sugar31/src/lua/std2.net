@@ -1,0 +1,161 @@
+
+-- Header file for wrappers around SUGAR 2.0 models
+
+
+subnet mfanchor(A, material, l, w, h)
+  element {A; model="mf2wrap", wrapmf="MF_anchor", l=l, w=w, h=h,
+           rot = xform_stack[xform_stack.n] }
+end
+
+
+subnet mfeground(A)
+  element {A; model="mf2wrap", wrapmf="MF_eground",
+           rot = xform_stack[xform_stack.n] }
+end
+
+
+subnet mfbeam2d(A, B, material, l, w, h, 
+                density, fluid, viscosity, Youngsmodulus)
+  element {A, B; model="mf2wrap", wrapmf="MF_beam2d", l=l, w=w, h=h,
+           density=density,     fluid=fluid,
+           viscosity=viscosity, Youngsmodulus=Youngsmodulus,
+           rot = xform_stack[xform_stack.n] }
+  if l then
+    relpos_add(A, B, top_xform({l,0,0}))
+  end
+end
+
+
+subnet mfbeam3d(A, B, material, l, w, h, 
+              density, fluid, viscosity, Poisson, Youngsmodulus,
+              stress, straingradient, thermalexpansion, ambienttemperature)
+  element {A, B; model="mf2wrap", wrapmf="MF_beam3d",
+           l=l, w=w, h=h,
+           density       = density,     
+           fluid         = fluid,
+           viscosity     = viscosity, 
+           Youngsmodulus = Youngsmodulus,
+           Poisson       = Poisson,     
+           stress        = stress,
+           straingradient     = straingradient,
+           thermalexpansion   = thermalexpansion,
+           ambienttemperature = ambienttemperature,
+           rot = xform_stack[xform_stack.n] }
+  if l then
+    relpos_add(A, B, top_xform({l,0,0}))
+  end
+end
+
+
+subnet mfgap2dforce(A, B, C, D, material, l, w1, w2, gap, h,
+                  density, fluid, viscosity, Youngsmodulus, permittivity)
+  element {A, B, C, D; model="mf2wrap", wrapmf="MF_gap2dforce",
+           l   = l,
+           w1  = w1,
+           w2  = w2,
+           h   = h,
+           gap = gap,
+          density       = density,
+          fluid         = fluid,
+          viscosity     = viscosity,
+          Youngsmodulus = Youngsmodulus,
+          permittivity  = permittivity,
+          rot = xform_stack[xform_stack.n] }
+
+  relpos_add(A, B, top_xform({l,0,0}))
+  relpos_add(C, D, top_xform({l,0,0}))
+  relpos_add(A, C, top_xform({0,-gap-(w1+w2)/2,0}))
+end
+
+
+subnet mfgap3dforce(A, B, C, D, material, l, w1, w2, gap, h,
+                  density, fluid, viscosity, Youngsmodulus, permittivity)
+  element {A, B, C, D; model="mf2wrap", wrapmf="MF_gap3dforce",
+           l   = l,
+           w1  = w1,
+           w2  = w2,
+           h   = h,
+           gap = gap,
+           density       = density,
+           fluid         = fluid,
+           viscosity     = viscosity,
+           Youngsmodulus = Youngsmodulus,
+           permittivity  = permittivity,
+           rot = xform_stack[xform_stack.n] }
+
+  relpos_add(A, B, top_xform({l,0,0}))
+  relpos_add(A, B, top_xform({l,0,0}))
+  relpos_add(C, D, top_xform({l,0,0}))
+  relpos_add(A, C, top_xform({0,-gap-(w1+w2)/2,0}))
+end
+
+
+subnet mfcomb2d(A, B, material, l, w, h, L, gap, N, 
+              density, fluid, viscosity, Youngsmodulus, permittivity)
+  element {A, B; model="mf2wrap", wrapmf="MF_comb2d",
+           l = l,
+           w = w,
+           h = h,
+           L = L,
+           N = N,
+           gap = gap,
+           density = density,
+           fluid   = fluid,
+           viscosity     = viscosity,
+           Youngsmodulus = Youngsmodulus,
+           permittivity  = permittivity,
+           rot = xform_stack[xform_stack.n] }
+
+  relpos_add(A, B, top_xform({2*L-l,0,0}))
+end
+
+
+subnet mfC(A, B, material, C)
+  element {A, B; model="mf2wrap", wrapmf="MF_C",
+           C = C,
+           rot = xform_stack[xform_stack.n] }
+end
+
+
+subnet mfR(A, B, material, R, G)
+  element {A, B; model="mf2wrap", wrapmf="MF_R",
+           R = R,
+           G = G,
+           rot = xform_stack[xform_stack.n] }
+end
+
+
+subnet mfL(A, B, material, L)
+  element {A, B; model="mf2wrap", wrapmf="MF_L",
+           L = L,
+           rot = xform_stack[xform_stack.n] }
+end
+
+
+subnet mfIsrc(A, B, I)
+  element {A, B; model="mf2wrap", wrapmf="MF_Isrc",
+           I = I,
+           rot = xform_stack[xform_stack.n] }
+end
+
+
+subnet mfVsrc(A, B, V)
+  element {A, B; model="mf2wrap", wrapmf="MF_Vsrc",
+           V = V,
+           rot = xform_stack[xform_stack.n] }
+end
+
+
+subnet mff2d(A, M, F)
+  element {A; model="mf2wrap", wrapmf="MF_f2d", 
+           M = M, F = F,
+           rot = xform_stack[xform_stack.n] }
+end
+
+
+subnet mff3d(A, M, F)
+  element {A; model="mf2wrap", wrapmf="MF_f3d", 
+           M = M, F = F,
+           rot = xform_stack[xform_stack.n] }
+end
+

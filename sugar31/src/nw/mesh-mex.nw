@@ -1,0 +1,890 @@
+
+\section{Introduction}
+
+The [[mesh_mex]] module provides the Matlab interface to the 
+mesh routines.
+
+
+\section{Interface}
+
+<<mesh-mex.h>>=
+#ifndef MESH_MEX_H
+#define MESH_MEX_H
+
+#include <mex.h>
+#include <mesh.h>
+
+void mesh_mex_register();
+void mesh_mex_shutdown();
+int  mesh_mex_handle_tag();
+
+mesh_t       mx_to_mesh    (const mxArray* array);
+mesh_node_t* mx_to_node    (mesh_t mesh, const mxArray* array);
+material_t*  mx_to_material(mesh_t mesh, const mxArray* array);
+mxArray*     mx_from_param (mesh_param_t* param);
+mxArray*     mx_from_params(mesh_t mesh);
+
+#endif /* MESH_MEX_H */
+@ 
+
+The [[mesh_mex_register]] command registers [[addpath]],
+[[use]], [[freemesh]], and [[printmesh]] commands with
+the main MEX routine.
+
+The [[mesh_mex_shutdown]] command frees the local memory
+associated with the [[mesh_mex]] routines.
+
+
+\section{Implementation}
+
+<<mesh-mex.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lua.h>
+#include <lualib.h>
+
+#include <modelmgr.h>
+#include <model_test.h>
+#include <model_matlab.h>
+#include <model_mf2wrap.h>
+#include <uses_manager.h>
+#include <netout.h>
+#include <netout_file.h>
+#include <netout_mlab.h>
+
+#include <mex_handle.h>
+#include <sugarmex.h>
+#include <mesh_mex.h>
+
+#include <uses_manager_lua.h>
+#include <meshgen_lua.h>
+
+<<static data>>
+<<static functions>>
+<<mex functions>>
+<<functions>>
+@ 
+
+
+\subsection{Mesh reader data structures}
+
+The [[pool]], [[model_mgr]], and [[uses_mgr]] are the main memory
+pool, model manager, and path manager, respectively.  It makes sense
+for each of those objects to have global lifetime, so this is not
+a terrible place for them.
+
+The handle tag type for a mesh handle is [[mesh_handle_tag]].
+
+<<static data>>=
+static mempool_t       pool;
+static model_mgr_t     model_mgr;
+static uses_manager_t  uses_mgr;
+static int             mesh_handle_tag;
+
+@ 
+
+<<functions>>=
+void mesh_mex_register()
+{
+    pool      = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr = model_mgr_init();
+    uses_mgr  = uses_manager_create(pool);
+
+    uses_manager_envpath(uses_mgr, "SUGAR_LUA_PATH");
+    uses_manager_addfunc(uses_mgr, path_via_matlab, NULL);
+
+    model_test_register         (model_mgr);
+    model_matlab_register       (model_mgr);
+    model_mf2wrap_register      (model_mgr);
+    model_mgr_standard_register (model_mgr);
+
+    mesh_handle_tag = mex_handle_new_tag();
+    <<register mex functions>>
+}
+
+@ 
+
+<<functions>>=
+void mesh_mex_shutdown()
+{
+    mempool_destroy   (pool);
+    model_mgr_destroy (model_mgr);
+}
+
+@ 
+
+<<functions>>=
+int mesh_mex_handle_tag()
+{
+    return mesh_handle_tag;
+}
+
+@ 
+
+\subsection{Conversion functions}
+
+<<functions>>=
+mesh_t mx_to_mesh(const mxArray* array)
+{
+    return mx_to_handle(array, mesh_handle_tag, "Invalid mesh handle");
+}
+
+@ 
+
+<<functions>>=
+mesh_node_t* mx_to_node(mesh_t mesh, const mxArray* array)
+{
+    int node_id;
+    mesh_node_t* node;
+
+    if (!mxIsNumeric(array))
+        mexErrMsgTxt("Invalid node identifier");
+
+    node_id = (int) mx_to_double(array);
+    node = mesh_node(mesh, node_id);
+    if (node == NULL)
+        mexErrMsgTxt("Invalid node identifier");
+
+    return node;
+}
+
+@ 
+
+<<functions>>=
+material_t* mx_to_material(mesh_t mesh, const mxArray* array)
+{
+    int material_id;
+    material_t* material;
+
+    if (!mxIsNumeric(array))
+        mexErrMsgTxt("Invalid material identifier");
+
+    material_id = (int) mx_to_double(array);
+    material = mesh_material(mesh, material_id);
+    if (material == NULL)
+        mexErrMsgTxt("Invalid node identifier");
+
+    return material;
+}
+
+@ 
+
+<<functions>>=
+mxArray* mx_from_param(mesh_param_t* param)
+{
+    mxArray* value;
+
+    if (param == NULL) {
+        value = mxCreateDoubleMatrix(0, 0, mxREAL);
+    } else if (param->tag == MESH_PARAM_NUMBER) {
+        value = mx_from_double(param->val.d);
+    } else if (param->tag == MESH_PARAM_STRING) {
+        value = mxCreateString(param->val.s);
+    } else if (param->tag == MESH_PARAM_MATRIX) {
+        value = mxCreateDoubleMatrix(param->val.m.m, param->val.m.n, mxREAL);
+        memcpy(mxGetPr(value), param->val.m.data,
+               param->val.m.m * param->val.m.n * sizeof(double));
+    } else
+        mxAssert(0, "Invalid SUGAR parameter type");
+    
+    return value;
+}
+
+@ 
+
+<<functions>>=
+mxArray* mx_from_params(mesh_t mesh)
+{
+    int i, n;
+    const char** names;
+    mxArray* result;
+
+    n     = mesh_num_params(mesh);
+    names = mxCalloc(n, sizeof(char*));
+    for (i = 0; i < n; ++i)
+        names[i] = mesh_param(mesh, i)->name;
+
+    result = mxCreateStructMatrix(1,1,n,names);
+    mxFree(names);
+
+    for (i = 0; i < n; ++i)
+        mxSetFieldByNumber(result, 0, i, mx_from_param(mesh_param(mesh, i)));
+
+    return result;
+}
+
+@
+
+
+\subsection{Looking up files in the Matlab path}
+
+The Matlab command [[which]] searches Matlab's path for an instance
+of a specified filename.  When we are within the Matlab environment,
+we want to search for all files (including Lua files) in the Matlab
+path, assuming we don't find them with the standard uses manager
+paths first.  The alternative, to have different paths for different
+types of files, seems to confuse Windows users who may not have
+had the benefit of learning about distinct [[LD_LIBRARY_PATH]],
+[[PATH]], and related variables.
+
+<<static functions>>=
+static char* path_via_matlab(void* data, char* namebuf, unsigned buflen)
+{
+    mxArray* prhs;
+    mxArray* plhs;
+    int status;
+    char* path;
+
+    prhs = mxCreateString(namebuf);
+    status = mexCallMATLAB(1, &plhs, 1, &prhs, "which");
+    mxDestroyArray(prhs);
+
+    if (status != 0) {
+        return NULL;
+    }
+
+    path = mx_to_string(plhs);
+    if (*path != 0 && strlen(path) + 1 <= buflen) {
+        strcpy(namebuf, path);
+        mxFree(path);
+        return namebuf;
+    } else {
+        mxFree(path);
+        return NULL;
+    }
+}
+
+@ 
+
+
+\subsection{[[addpath]] command}
+
+The [[addpath(path)]] function adds [[path]] to the 
+[[uses]] manager search path.
+
+<<cho-addpath.m>>=
+% Adds to the netlist search path.
+%
+% When netlists are accessed via cho_load or via a 'use' command inside
+% another netlist, SUGAR searches in the current directory and then in
+% the directories on the netlist search path.  cho_addpath adds a new
+% directory to the netlist search path.
+%
+% Inputs:
+%   path -- name of the file system path to be added.
+
+function cho_addpath(path)
+sugarmex('addpath', path);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("addpath", mex_addpath);
+@ 
+
+<<mex functions>>=
+static void mex_addpath(int nlhs, mxArray* plhs[],
+                        int nrhs, const mxArray* prhs[])
+{
+    int i;
+    for (i = 0; i < nrhs; ++i) {
+        char* name = mx_to_string(prhs[i]);
+        uses_manager_addpath(uses_mgr, name);
+        mxFree(name);
+    }
+}
+
+@ 
+
+
+\subsection{[[load]] command}
+
+The [[load(file)]] function finds the (Lua) netlist [[file]] and
+executes it.  The function returns a handle to the generated mesh.
+
+<<cho-load.m>>=
+% Load a netlist description into the SUGAR internal format.
+%
+% Inputs: 
+%   netname - netlist file name
+%   param   - (Optional) parameter settings
+%
+% Outputs:
+%   net - pointer to netlist structure
+
+function [handle] = cho_load(file, params)
+if nargin == 1
+  handle = sugarmex('use', file);
+else
+  handle = sugarmex('use', file, params);
+end
+@ 
+
+<<register mex functions>>=
+mexmgr_add("use", mex_use);
+@ 
+
+<<mex functions>>=
+static void mex_use(int nlhs, mxArray* plhs[],
+                    int nrhs, const mxArray* prhs[])
+{
+    char        name[256];
+    mesh_t      mesh;
+    lua_State*  L;
+
+    if (nrhs < 1 || !mxIsChar(prhs[0]))
+        mexErrMsgTxt("Syntax: sugarmex('use', filename, [params])");
+
+    mxGetString(prhs[0], name, sizeof(name));
+    if (uses_manager_search(uses_mgr, name, sizeof(name)) == NULL) {
+        mexPrintf("Could not find %s\n", name);
+        mexErrMsgTxt("Error loading file");
+    }
+    
+    L = lua_open(0);
+
+    lua_usesmgrlib(L);
+    lua_set_usesmgr(L, uses_mgr);
+    lua_baselibopen(L);
+    lua_iolibopen(L);
+    lua_mathlibopen(L);
+    lua_register(L, "_ALERT", lua_alert);
+
+    if (nrhs >= 2) {
+        if (mxIsStruct(prhs[1])) {
+            <<transfer parameters to Lua environment>>
+        } else {
+            lua_close(L);
+            mexErrMsgTxt("Parameters must be passed via structure");
+        }
+    }
+
+    mesh = mesh_lua_load(L, uses_mgr, name, model_mgr, lua_mesh_error_handler);
+    lua_close(L);
+
+    if (mesh == NULL)
+        mexErrMsgTxt("Error while interpreting net file");
+
+    if (nlhs == 0) {
+        mesh_destroy(mesh);
+    } else {
+        mesh_set_handlers(mesh, matlab_mesh_error_handler, 
+                          matlab_mesh_warning_handler, NULL);
+        plhs[0] = mx_from_double(mex_handle_add(mesh, mesh_handle_tag));
+    }
+}
+
+@ 
+
+<<transfer parameters to Lua environment>>=
+const mxArray* params = prhs[1];
+int nfields = mxGetNumberOfFields(params);
+int ifield;
+
+for (ifield = 0; ifield < nfields; ++ifield) {
+    const char* name = mxGetFieldNameByNumber(params, ifield);
+    mxArray* field = mxGetFieldByNumber(params, 0, ifield);
+    if (mxIsChar(field)) {
+        lua_pushstring(L, mx_to_string(field));
+    } else if (mxIsDouble(field)) {
+        lua_pushnumber(L, *mxGetPr(field));
+    } else {
+        lua_close(L);
+        mexErrMsgTxt("Only real scalars and strings allowed");
+    }
+    lua_setglobal(L, name);
+}
+
+@ 
+
+After the initial phase where we use Lua, we want any mesh errors
+to be reported via the standard Matlab reporting functions.
+
+<<static functions>>=
+static void matlab_mesh_error_handler(void* arg, const char* msg)
+{
+    mexErrMsgTxt(msg);
+}
+
+static void matlab_mesh_warning_handler(void* arg, const char* msg)
+{
+    mexPrintf("Warning: %s\n", msg);
+}
+
+@ 
+
+When we are inside Lua, we make mesh errors generate Lua errors.
+The Lua errors in turn generate calls to [[_ALERT]], which prints
+using the MEX version of [[printf]].
+
+<<static functions>>=
+static void lua_mesh_error_handler(void* arg, const char* msg)
+{
+    lua_State* L = (lua_State*) arg;
+    lua_error(L, msg);
+}
+
+@ 
+
+<<static functions>>=
+static int lua_alert(lua_State* L)
+{
+    int n = lua_gettop(L);  /* number of arguments */
+    const char* s;
+
+    lua_getglobal(L, "tostring");
+    lua_pushvalue(L, 1);
+    lua_rawcall(L, 1, 1);
+
+    s = lua_tostring(L, -1);
+    if (s != NULL)
+        mexPrintf("%s", s);
+
+    lua_settop(L, 0);
+    return 0;
+}
+
+@ 
+
+
+\subsection{[[freemesh]] command}
+
+The [[mesh_free(handle)]] function frees the mesh indicated by [[handle]].
+
+<<cho-mesh-free.m>>=
+% Deallocates a netlist structure.
+%
+% Note that using the Matlab 'clear' command does not deallocate the
+% internal data structures used by SUGAR.  Use cho_mesh_free to deallocate
+% such structures.  In particular, it is a good idea to use cho_mesh_free
+% if you are doing a parameter sweep and creating lots of new netlist
+% data structures.
+%
+% Inputs:
+%   net -- a pointer to the netlist structure to be deallocated
+
+function cho_mesh_free(handle)
+sugarmex('mesh_free', handle);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_free", mex_mesh_free);
+@ 
+
+<<mex functions>>=
+static void mex_mesh_free(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+{
+    mex_check_num_args(nrhs, 1);
+    mesh_destroy(mx_to_mesh(prhs[0]));
+}
+
+@ 
+
+
+\subsection{[[printmesh]] command}
+
+The [[cho_mesh_print(handle)]] function prints a text representation of the
+mesh indicated by [[handle]].
+
+<<cho-mesh-print.m>>=
+% Print a text representation of a netlist to the standard output.
+%
+% Inputs:
+%   net -- a pointer to the netlist structure
+
+function cho_mesh_print(handle)
+sugarmex('mesh_print', handle);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_print", mex_printmesh);
+@ 
+
+<<mex functions>>=
+static void mex_printmesh(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+{
+    mex_check_num_args(nrhs, 1);
+    netout_file(stdout, mx_to_mesh(prhs[0]));
+}
+
+@ 
+
+
+\subsection{[[mesh_to_matlab]] command}
+
+The [[mesh_to_matlab(mesh)]] command generates a Matlab data structure
+representing the mesh.  The generated structure has the same entries
+as the output from a [[mesh_print]] command.
+
+<<cho-mesh-to-matlab.m>>=
+% Create a Matlab representation of a netlist data structure maintained
+% internally by SUGAR.
+%
+% Inputs:
+%   net   -- a pointer to the netlist data structure
+%
+% Outputs:
+%   meshm -- a Matlab representation of the netlist data structure
+
+function [meshm] = cho_mesh_to_matlab(handle)
+meshm = sugarmex('mesh_to_matlab', handle);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_to_matlab", mex_mesh_to_matlab);
+@ 
+
+<<mex functions>>=
+static void mex_mesh_to_matlab(int nlhs, mxArray* plhs[],
+                               int nrhs, const mxArray* prhs[])
+{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = netout_mlab(mx_to_mesh(prhs[0]));
+}
+
+@
+
+
+\subsection{[[mesh_nelements]], [[mesh_nnodes]], 
+             and [[mesh_nmaterials]] commands}
+
+The commands [[mesh_nelements(mesh_handle)]], [[mesh_nnodes(mesh_handle)]],
+and [[mesh_nmaterials(mesh_handle)]] get the number of elements, nodes,
+and materials in the mesh.
+
+<<cho-mesh-nelements.m>>=
+% Return the number of elements in a netlist.
+%
+% Inputs:
+%   net -- pointer to the netlist structure
+%
+% Outputs:
+%   count -- count of the number of elements in the netlist
+
+function [count] = cho_mesh_nelements(handle)
+count = sugarmex('mesh_nelements', handle);
+@ 
+
+<<cho-mesh-nmaterials.m>>=
+% Return the number of materials in a netlist.
+%
+% Inputs:
+%   net -- pointer to the netlist structure
+%
+% Outputs:
+%   count -- count of the number of materials in the netlist
+
+function [count] = cho_mesh_nmaterials(handle)
+count = sugarmex('mesh_nmaterials', handle);
+@ 
+
+<<cho-mesh-nnodes.m>>=
+% Return the number of materials in a netlist.
+%
+% Inputs:
+%   net -- pointer to the netlist structure
+%
+% Outputs:
+%   count -- count of the number of materials in the netlist
+
+function [count] = cho_mesh_nnodes(handle)
+count = sugarmex('mesh_nnodes', handle)
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_nelements",  mex_num_elements );
+mexmgr_add("mesh_nmaterials", mex_num_materials);
+mexmgr_add("mesh_nnodes",     mex_num_nodes    );
+@ 
+
+<<mex functions>>=
+static void mex_num_elements(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_elements(mx_to_mesh(prhs[0])));
+}
+
+static void mex_num_materials(int nlhs, mxArray* plhs[],
+                              int nrhs, const mxArray* prhs[])
+{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_materials(mx_to_mesh(prhs[0])));
+}
+
+static void mex_num_nodes(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+{
+    mex_check_num_args(nrhs, 1);
+    plhs[0] = mx_from_double(mesh_num_nodes(mx_to_mesh(prhs[0])));
+}
+
+@
+
+
+\subsection{[[mesh_node_pos]] and [[mesh_node_name]] commands}
+
+The [[mesh_node_pos(mesh_handle, node_id)]] and 
+[[mesh_node_name(mesh_handle, node_id)]] commands find the name
+and position of an indicated node.
+
+<<cho-mesh-node.m>>=
+% Return a description (name and position) of a netlist node.
+%
+% Inputs:
+%   net     -- netlist handle
+%   node_id -- node number
+%
+% Outputs:
+%   node.name -- name of the node
+%       .x    -- position of the node
+
+function [node] = cho_mesh_node(handle, node_id)
+
+node.name = sugarmex('mesh_node_name', handle, node_id);
+node.x    = sugarmex('mesh_node_pos',  handle, node_id);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_node_pos", mex_get_node_pos);
+mexmgr_add("mesh_node_name", mex_get_node_name);
+@ 
+
+<<mex functions>>=
+static void mex_get_node_name(int nlhs, mxArray* plhs[],
+                              int nrhs, const mxArray* prhs[])
+{
+    mesh_t       mesh;
+    mesh_node_t* node;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+    node = mx_to_node(mesh, prhs[1]);
+
+    plhs[0] = mxCreateString((node->name != NULL) ? node->name : "");
+}
+
+static void mex_get_node_pos(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+{
+    mesh_t       mesh;
+    mesh_node_t* node;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+    node = mx_to_node(mesh, prhs[1]);
+
+    plhs[0] = mxCreateDoubleMatrix(3,1,mxREAL);
+    memcpy(mxGetPr(plhs[0]), node->x, 3 * sizeof(double));
+}
+
+@ 
+
+
+\subsection{[[mesh_node_lookup]] command}
+
+The [[mesh_node_lookup(mesh_handle, node_name)]] command
+finds the index of a node with a particular name.
+
+<<cho-mesh-node-lookup.m>>=
+% Find the index of a netlist node with a particular name.
+%
+% Inputs:
+%   net      -- pointer to a netlist structure
+%   nodename -- name of a node in the netlist
+%
+% Outputs:
+%   node_id  -- node number.  If no match is found, node_id = [].
+
+function [node] = cho_mesh_node_lookup(handle, nodename)
+node = sugarmex('mesh_node_lookup', handle, nodename);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_node_lookup", mex_mesh_node_lookup);
+@ 
+
+<<mex functions>>=
+static void mex_mesh_node_lookup(int nlhs, mxArray* plhs[],
+                                 int nrhs, const mxArray* prhs[])
+{
+    mesh_t       mesh;
+    mesh_node_t* node;
+    const char*  name;
+    int          nnodes;
+    int          i;
+
+    mex_check_num_args(nrhs, 2);
+    mesh = mx_to_mesh(prhs[0]);
+    name = mx_to_string(prhs[1]);
+    nnodes = mesh_num_nodes(mesh);
+
+    for (i = 1; i <= nnodes; ++i) {
+        if (strcmp(name, mesh_node(mesh, i)->name) == 0) {
+            plhs[0] = mx_from_double(i);
+            return;
+        }
+    }
+
+    plhs[0] = mx_from_nil();
+}
+
+@ 
+
+
+
+\subsection{[[mesh_material_param]] command}
+
+The [[mesh_material_param(mesh, material_id, name)]] command gets a
+parameter from a specified material.
+
+<<cho-mesh-material-param.m>>=
+% Return a parameter retrieved from a mesh material.
+%
+% Inputs:
+%   net         -- pointer to netlist structure
+%   material_id -- material number
+%   name        -- parameter name
+%
+% Outputs:
+%   param       -- material parameter value
+
+function [param] = cho_mesh_material_param(handle, material, name)
+param = sugarmex('mesh_material_param', handle, material, name);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_material_param", mex_material_param);
+@ 
+
+<<mex functions>>=
+static void mex_material_param(int nlhs, mxArray* plhs[],
+                               int nrhs, const mxArray* prhs[])
+{
+    mesh_t        mesh;
+    material_t*   material;
+    char*         name;
+    mesh_param_t* param;
+
+    mex_check_num_args(nrhs, 3);
+    mesh     = mx_to_mesh(prhs[0]);
+    material = mx_to_material(mesh, prhs[1]);
+    name     = mx_to_string(prhs[2]);
+
+    if (material->model->param)
+        param = (material->model->param)(material->data, name);
+
+    mxFree(name);
+    plhs[0] = mx_from_param(param);
+}
+
+@ 
+
+
+\subsection{[[mesh_param]]}
+
+The [[mesh_param(mesh, id)]] function gets a parameter by name or
+numeric identifier.  The [[mesh_params(mesh)]] function gets all
+the parameters in a structure.  The Matlab interface function
+can be called as [[cho_mesh_param(mesh)]] to get all parameters
+in a structure, [[cho_mesh_param(mesh, name)]] to get a named
+parameter, or [[cho_mesh_param(mesh, material, name)]] to get a named
+parameter from material or mesh.
+
+<<cho-mesh-param.m>>=
+function [param] = cho_mesh_param(mesh, arg1, arg2)
+
+if nargin == 1
+    param = sugarmex('mesh_params', mesh);
+elseif nargin == 2
+    param = sugarmex('mesh_param', mesh, arg1);
+elseif nargin == 3
+    param = sugarmex('mesh_param', mesh, arg2);
+    if (isempty(param))
+        param = sugarmex('mesh_material_param', mesh, arg1, arg2)
+    end
+end
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_param",  mex_mesh_param );
+mexmgr_add("mesh_params", mex_mesh_params);
+@ 
+
+<<mex functions>>=
+static void mex_mesh_params(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+{
+    mesh_t mesh;
+    int i, n;
+    const char** names;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+
+    plhs[0] = mx_from_params(mesh);
+}
+
+@ 
+
+<<mex functions>>=
+static void mex_mesh_param(int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[])
+{
+    mesh_t mesh;
+
+    mex_check_num_args(nrhs, 2);
+    mesh = mx_to_mesh(prhs[0]);
+
+    if (mxIsChar(prhs[1])) {
+        char* name = mx_to_string(prhs[1]);
+        plhs[0] = mx_from_param(mesh_param_byname(mesh, NULL, name));
+    } else {
+        int i = (int) mx_to_double(prhs[1]);
+        plhs[0] = mx_from_param(mesh_param(mesh, i));
+    }
+}
+
+@ 
+
+
+\subsection{[[mesh_nodes]]}
+
+The [[mesh_nodes(mesh)]] function returns the current vector of node
+identifiers.
+
+<<cho-mesh-param-nodes.m>>=
+function [nodes] = cho_mesh_param_nodes(mesh)
+nodes = sugarmex('mesh_param_nodes', mesh);
+@ 
+
+<<register mex functions>>=
+mexmgr_add("mesh_param_nodes", mex_mesh_param_nodes);
+@ 
+
+<<mex functions>>=
+static void mex_mesh_param_nodes(int nhls, mxArray* plhs[],
+                                 int nrhs, const mxArray* prhs[])
+{
+    mesh_t mesh;
+    int i, n;
+    double* data;
+
+    mex_check_num_args(nrhs, 1);    
+    mesh = mx_to_mesh(prhs[0]);
+
+    n = mesh_num_param_nodes(mesh);
+    plhs[0] = mxCreateDoubleMatrix(n,1,mxREAL);
+
+    data = mxGetPr(plhs[0]);
+    for (i = 0; i < n; ++i)
+        data[i] = mesh_param_node(mesh, i);
+}
+
+@ 
+

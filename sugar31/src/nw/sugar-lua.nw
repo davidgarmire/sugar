@@ -1,0 +1,226 @@
+
+\section{Introduction}
+
+This module provides an interactive command interface to SUGAR
+using the Lua language.  It defines little functionality on its
+own.
+
+Commands to the interface include
+\begin{itemize}
+  \item [[cho_load]]: Load a netlist file and return a mesh object
+\end{itemize}
+Besides these commands, the basic Lua library, the math library,
+and the uses manager library are included.
+All of the standard Lua syntax is, of course, available.
+
+
+\section{Implementation}
+
+<<sugar-lua.c>>=
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lua.h>
+#include <lualib.h>
+#include <luadebug.h>
+
+#ifdef HAVE_READLINE
+#  if defined HAVE_READLINE_H
+#    include <readline.h>
+#  elif defined HAVE_READLINE_READLINE_H
+#    include <readline/readline.h>
+#  else
+     extern char* readline(char* prompt);
+#  endif
+#endif
+
+#if defined (HAVE_READLINE_HISTORY) && defined (HAVE_READLINE_HISTORY_H)
+#  include <readline/history.h>
+#else
+#  define read_history(file)  /* read_history  */
+#  define write_history(file) /* write_history */
+#  define add_history(file)   /* add_history   */
+#endif
+
+#include <modelmgr.h>
+#include <model_test.h>
+#include <vars.h>
+#include <assemble.h>
+#include <uses_manager.h>
+
+#include <uses_manager_lua.h>
+#include <meshgen_lua.h>
+#include <mesh_lua.h>
+#include <matrix_lua.h>
+#include <superlu_lua.h>
+
+static uses_manager_t uses_manager;
+static model_mgr_t    model_mgr;
+
+<<static functions>>
+<<main function>>
+
+@ 
+
+
+\subsection{Error handling}
+
+When a model wants to report an error, we want to use the
+[[lua_error]] command rather than the default handler
+(which calls [[exit]]).
+
+<<static functions>>=
+static void error_handler(void* arg, const char* msg)
+{
+    lua_State* L = (lua_State*) arg;
+    lua_error(L, msg);
+}
+
+@ 
+
+
+\subsection{[[cho_load]] command}
+
+<<register functions>>=
+lua_register(L, "cho_load", lua_netload);
+@ 
+
+<<static functions>>=
+static int lua_netload(lua_State* L)
+{
+    int n = lua_gettop(L);
+    mesh_t mesh;
+
+    if (n != 1 || !lua_isstring(L,-1))
+        lua_error(L, "Invalid argument to 'cho_load'");
+
+    mesh = mesh_lua_load(L, uses_manager, lua_tostring(L,-1),
+                         model_mgr, error_handler);
+
+    if (mesh == NULL)
+        lua_error(L, "Error opening file");
+
+    lua_settop(L,0);
+    lua_mesh_create(L, mesh);
+    return 1;
+}
+
+@ 
+
+
+\subsection{Main}
+
+The main function registers the additional commands with the
+Lua interpreter object, and then executes any scripts specified
+on the command line and any commands executed from [[stdin]].
+
+<<main function>>=
+int main(int argc, char** argv)
+{
+    lua_State* L = lua_open(0);
+    char* line;
+
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr    = model_mgr_init();
+    uses_manager = uses_manager_create(pool);
+
+    printf(SUGAR_MESSAGE);
+
+#ifdef HAVE_X11
+    xtnetdraw_init(argc, argv);
+#endif
+
+    model_test_register(model_mgr);
+    model_mgr_standard_register(model_mgr);
+
+    <<register functions>>
+    <<get [[SUGAR_LUA_PATH]] entries>>
+    <<process files from argv>>
+    <<process commands from stdio>>
+
+    lua_close(L);
+
+    model_mgr_destroy(model_mgr);
+    mempool_destroy(pool);
+
+    return 0;
+}
+
+@ 
+
+We want the uses manager functions, but that's about it at the moment.
+The rest of the functions should appear as methods.
+
+<<register functions>>=
+lua_matrix_register(L);
+lua_superlu_register(L);
+lua_mesh_register(L);
+lua_usesmgrlib(L);
+lua_set_usesmgr(L, uses_manager);
+@
+
+In addition to our extensions, we want to include the functions
+from the base library and the math library.
+
+<<register functions>>=
+lua_baselibopen(L);
+lua_mathlibopen(L);
+lua_iolibopen(L);
+@ 
+
+The [[SUGAR_LUA_PATH]] environment variable adds to the search path.
+
+<<get [[SUGAR_LUA_PATH]] entries>>=
+uses_manager_envpath(uses_manager, "SUGAR_LUA_PATH");
+@
+
+We cross our fingers and hope that there are no errors in executing
+the files listed on the command line.
+
+<<process files from argv>>=
+--argc, ++argv;
+while (argc != 0) {
+    lua_dofile(L, *argv);
+    --argc, ++argv;
+}
+@ 
+
+If it is available, we use the GNU readline package for
+our command line.  The readline and history packages provide
+emacs-style line editing, and also history (obviously).
+Unfortunately, it isn't widely portable away from systems
+where the GNU libraries are supported, so we provide an
+alternative using fgets.  Either way, input ends on end of file
+(control-D in Unix).
+
+<<process commands from stdio>>=
+#ifdef HAVE_READLINE
+
+read_history(".sugar-lua");
+while ((line = readline("sugar> ")) != NULL) {
+    lua_dostring(L, line);
+    add_history(line);
+    free(line);
+}
+write_history(".sugar-lua");
+printf("\n");
+
+#else /* ! HAVE_READLINE */
+
+line = malloc(256);
+printf("sugar> ");
+while (fgets(line, 256, stdin)) {
+    lua_dostring(L, line);
+    printf("sugar> ");
+}
+printf("\n");
+free(line);
+
+#endif /* HAVE_READLINE */
+
+@ 
+
+

@@ -1,0 +1,23 @@
+uses mumps.net
+
+a1 anchor p1 [n2]  [l=5e-6   oz=0     w=10e-6  R=100]
+b1 beam2d  p1 [n2  n5]  [l=150e-6 oz=deg(180)   w=2e-6   R=1000]
+a2 anchor p1 [n3]  [l=5e-6   oz=0     w=10e-6  R=100]
+b2 beam2d  p1 [n3  n6]  [l=150e-6 oz=deg(180)   w=2e-6   R=1000]
+
+b1v beam2d p1 [n5  n7]  [l=50e-6  oz=deg(90)    w=5e-6  R=500]
+b2v beam2d p1 [n5  n6]  [l=50e-6  oz=-deg(90)   w=5e-6  R=500]
+b3v beam2d p1 [n6  n8]  [l=50e-6  oz=-deg(90)   w=5e-6  R=500]
+
+b3 beam2d  p1 [n7  n9]  [l=150e-6 oz=0     w=2e-6  R=1000]
+b4 beam2d  p1 [n8  n13] [l=150e-6 oz=0     w=2e-6  R=1000]
+
+b1m beam2d  p1 [n9  n10] [l=50e-6  oz=0     w=20e-6 R=100]
+b2m beam2d   p1 [n10 n16] [l=50e-6  oz=0     w=20e-6 R=100]
+b3m beam2d   p1 [n10 n11] [l=75e-6  oz=-deg(90)   w=20e-6 R=100]
+b4m beam2d   p1 [n11 n12] [l=75e-6  oz=-deg(90)   w=20e-6 R=100]
+b5m beam2d   p1 [n13 n12] [l=50e-6  oz=0     w=20e-6 R=100]
+b6m beam2d   p1 [n12 n17] [l=50e-6  oz=0     w=20e-6 R=100]
+
+bh  beam2d   p1 [n11 n14] [l=300e-6 oz=0     w=2e-6  R=1500]
+bm  beam2d   p1 [n14 n15] [l=196e-6 oz=0     w=116e-6 R=100]

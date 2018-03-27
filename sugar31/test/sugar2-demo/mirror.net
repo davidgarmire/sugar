@@ -1,0 +1,32 @@
+uses mumps.net
+
+%anchors and their torsion hinges:
+
+anchor  p1 [ b ] [ l=10u w=10u oz=pi/2 h=8u] 
+
+beam3d  p1 [ b  c ] [ l=80u w=2u  oz=-pi/2 h=2u] 
+beam3d  p1 [ d  e ] [ l=80u w=2u  oz=-pi/2 h=2u] 
+
+anchor  p1 [ e   ] [ l=10u w=10u oz=-pi/2 h=8u] 
+
+%outer frame:
+beam3d  p1 [ c  f  ] [ l=100u w=20u oz=-pi/2 h=4u]
+beam3d  p1 [ f  d  ] [ l=100u w=20u oz=-pi/2 h=4u]
+beam3d  p1 [ c1 f1 ] [ l=100u w=20u oz=-pi/2 h=4u] 
+beam3d  p1 [ f1 d1 ] [ l=100u w=20u oz=-pi/2 h=4u] 
+beam3d  p1 [ c  c1 ] [ l=200u w=20u h=4u] 
+beam3d  p1 [ d  d1 ] [ l=200u w=20u h=4u] 
+
+%inner torsion hinges:
+beam3d  p1 [ g3 f1 ] [ l=40u w=2u h=2u] 
+beam3d  p1 [ f  g6 ] [ l=40u w=2u h=2u] 
+
+%inner solid "plate":
+beam3d  p1 [ g6 g3 ] [ l=120u w=140u h=4u] 
+
+%rear lever:
+beam3d  p1 [ h  f  ] [ l=75u w=80u h=4u] 
+
+%forces
+%f3dc2 * [ h a1 ] [ F = -30u oy=-pi/2 ]
+%f3dc2 * [ g6 a1] [ M = -5e-9  oy= 0    ]

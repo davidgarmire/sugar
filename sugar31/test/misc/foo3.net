@@ -1,0 +1,17 @@
+use("mumps.net")
+
+A = node {name = "A"; 0,    0,    0}
+b = node {name = "b"; 100u, 0,    0}
+c = node {name = "c"; 100u, 100u, 0}
+
+element{ A   ; model="anchor", material=p1, w=10u }
+element{ A, b; model="beam2d", material=p1, w=2u  }
+
+-- element{ c, b; model="beam2d", material=p1, w=10u  }
+element{ c, b; model="constraint" }
+
+element{ c   ; model="force", x = 10u }
+
+-- element{ c   ; model="force",  x=30u, y=30u }
+-- element{ c   ; model="displace",  x=10u, y=10u }
+

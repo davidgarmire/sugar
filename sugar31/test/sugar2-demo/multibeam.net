@@ -1,0 +1,21 @@
+% This demonstration netlist describes an oddly-shaped
+% structure consisting of 
+%
+%  - An anchor at node 'substrate' in the first polySi layer
+%  - A 100 micron beam from 'substrate' to 'A' in the same layer
+%  - Two 50 micron beams extending from 'A' at 45 degree angles to
+%    the default orientation, where the rotation is about the z axis.
+%    In the default orientation, the direction from the first to second
+%    node is the positive x direction.
+%  - An arm sticking up at an angle out of the x-y plane, extending
+%    from the end of one of the arms of the Y-shaped structure.
+%  - A one nano-Newton-meter moment applied at D
+
+uses mumps.net
+
+anchor p1 [substrate]   [l=10u w=10u]
+beam3d p1 [substrate A] [l=100u w=2u oz=0]
+beam3d p1 [A B]         [l=50u w=4u oz=pi/4]
+beam3d p1 [A C]         [l=50u w=4u oz=-pi/4]
+beam3d p1 [C D]         [l=50u w=4u oy=-pi/4]
+f3d    *  [D]           [M=5n oy=-pi/2]

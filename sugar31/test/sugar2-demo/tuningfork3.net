@@ -1,0 +1,78 @@
+use("std2cvt.net")
+
+pi = 3.1415926535897932385
+poly = material {
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p1 = material {
+  parent = poly,
+  h = 2e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p2 = material {
+  parent = poly,
+  h = 1.5e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+d2 = material {
+  parent = poly,
+  fluid = 0.75e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+mfanchor {_n("substrate"); material = p1, l = 10u, w = 10u, oz = deg(180)}
+mfbeam3d {_n("substrate"), _n("A"); material = p1, l = 50u, w = 2u, oz = 0}
+mfbeam3d {_n("A"), _n("B"); material = p1, l = 50u, w = 2u, oz = 0}
+mfbeam3d {_n("B"), _n("C"); material = p1, l = 25u, w = 2u, oz = deg(30)}
+mfbeam3d {_n("B"), _n("D"); material = p1, l = 25u, w = 2u, oz = -(deg(30))}
+mfbeam3d {_n("C"), _n("C2"); material = p1, l = 100u, w = 10u, oz = 0}
+mfbeam3d {_n("D"), _n("D2"); material = p1, l = 100u, w = 10u, oy = 0}
+mff3d {_n("D2"); M = 5n, oz = 0}
+relpos_treewalk()

@@ -1,0 +1,705 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}mempool\nwendquote} module manages a region-based allocator,
+or memory pool.  A user can create a region associated with
+some task or data structure and allocate from it freely;
+when the time comes to finish the program task or destroy
+the data structure, the region can be deallocated.
+See Dave Hanson's book ``C Interfaces and Implementations'' %'
+for some further information on region-based allocators.
+
+This particular allocator is not very fancy.  It \emph{does}
+allow us to mark entire data structures as persistent across
+MeX files in Matlab, which is convenient.  It also has special
+support for stack-order allocation / deallocation patterns.
+
+
+\section{Interface}
+
+\nwfilename{mempool.nw}\nwbegincode{1}\sublabel{NW3uBxcY-17XSV0-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-17XSV0-1}}}\moddef{mempool.h~{\nwtagstyle{}\subpageref{NW3uBxcY-17XSV0-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MEMPOOL_H
+#define MEMPOOL_H
+
+typedef struct mempool_struct* mempool_t;
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NW3uBxcY-4aCyDR-1}}\RA{}
+\LA{}exported macros~{\nwtagstyle{}\subpageref{NW3uBxcY-2VJxV5-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-1}}\RA{}
+
+#endif /* MEMPOOL_H */
+\nwnotused{mempool.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\Tt{}mempool{\_}create\nwendquote} and {\Tt{}mempool{\_}destroy\nwendquote}
+functions create and destroy regions.  When creating a new
+region, you must specify the typical size of a \emph{span},
+or chunk of memory to be allocated contiguously.  New spans
+are allocated as needed, and requests to allocate a contiguous
+chunk of memory larger than the ordinary span size are accomodated
+by special extra-large spans.  The default span size,
+{\Tt{}MEMPOOL{\_}DEFAULT{\_}SPAN\nwendquote} is 4K.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3uBxcY-2gXoUc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-17XSV0-1}}\nwprevnextdefs{\relax}{NW3uBxcY-2gXoUc-2}\nwenddeflinemarkup
+mempool_t mempool_create (int span_size);
+void      mempool_destroy(mempool_t pool);
+
+\nwalsodefined{\\{NW3uBxcY-2gXoUc-2}\\{NW3uBxcY-2gXoUc-3}\\{NW3uBxcY-2gXoUc-4}\\{NW3uBxcY-2gXoUc-5}}\nwused{\\{NW3uBxcY-17XSV0-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3uBxcY-2VJxV5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-2VJxV5-1}}}\moddef{exported macros~{\nwtagstyle{}\subpageref{NW3uBxcY-2VJxV5-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-17XSV0-1}}\nwenddeflinemarkup
+#define MEMPOOL_DEFAULT_SPAN (4096)
+
+\nwused{\\{NW3uBxcY-17XSV0-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The basic operation on a memory pool is (obviously enough)
+getting memory.  The {\Tt{}mempool{\_}get\nwendquote} function gets a chunk
+of memory from the pool; the {\Tt{}mempool{\_}cget\nwendquote} function gets
+a zero-filled chunk of memory.
+
+It is sometimes convenient to access memory pools using a
+\emph{stack discipline}.  That is, allocation and deletion
+requests can be interlaced in stack order.  The beginning
+of a ``stack frame'' in our memory pool module is marked
+by a \emph{handle}.  The functions {\Tt{}mempool{\_}geth\nwendquote} and
+{\Tt{}mempool{\_}cgeth\nwendquote} are much like {\Tt{}mempool{\_}get\nwendquote} and
+{\Tt{}mempool{\_}cget\nwendquote}, except that the memory returned is associated
+with a handle in the memory pool.  If {\Tt{}mempool{\_}freeh\nwendquote} is
+called on a pointer returned from {\Tt{}mempool{\_}geth\nwendquote}, the memory
+pool is rolled back to the state it was in immediately before
+the corresponding {\Tt{}mempool{\_}geth\nwendquote} call.  This means that not
+only is the memory allocated in that {\Tt{}mempool{\_}geth\nwendquote} call
+freed, but so also is all the memory allocated from the pool
+\emph{after} the call.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3uBxcY-2gXoUc-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-17XSV0-1}}\nwprevnextdefs{NW3uBxcY-2gXoUc-1}{NW3uBxcY-2gXoUc-3}\nwenddeflinemarkup
+void* mempool_get  (mempool_t pool, int size);
+void* mempool_cget (mempool_t pool, int size);
+void* mempool_geth (mempool_t pool, int size);
+void* mempool_cgeth(mempool_t pool, int size);
+void  mempool_freeh(void* mem);
+
+\nwused{\\{NW3uBxcY-17XSV0-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+The standard function {\Tt{}strdup\nwendquote} mallocs a buffer and copies
+into it an argument string.  It's a convenient function. %'
+It's also often convenient to copy some more general object %'
+from a temporary buffer into dynamically allocated memory.
+The mempool module supports this functionality with
+{\Tt{}mempool{\_}strdup\nwendquote} and {\Tt{}mempool{\_}memdup\nwendquote}.
+
+Note that if a NULL argument is passed to {\Tt{}mempool{\_}strdup\nwendquote}
+or {\Tt{}mempool{\_}memdup\nwendquote}, the return value will be NULL.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3uBxcY-2gXoUc-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-17XSV0-1}}\nwprevnextdefs{NW3uBxcY-2gXoUc-2}{NW3uBxcY-2gXoUc-4}\nwenddeflinemarkup
+void* mempool_memdup(mempool_t pool, const void* src, int size);
+void* mempool_strdup(mempool_t pool, const char* src);
+
+\nwused{\\{NW3uBxcY-17XSV0-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+For debugging purposes, the mempool class supports logging.
+The mempool log file is a global object, not associated with
+any particular pool instance.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3uBxcY-2gXoUc-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-17XSV0-1}}\nwprevnextdefs{NW3uBxcY-2gXoUc-3}{NW3uBxcY-2gXoUc-5}\nwenddeflinemarkup
+void mempool_start_log(char* filename);
+void mempool_end_log  ();
+void mempool_flush_log();
+
+\nwused{\\{NW3uBxcY-17XSV0-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+In the Matlab environment, by default, memory allocated during an
+invocation of a MEX file is automatically freed after
+the call finishes.  It is possible to override this default
+by explicitly requesting that Matlab make the allocated memory
+persistent across calls.  The {\Tt{}mempool{\_}persist\nwendquote} function
+causes Matlab to mark all memory in a pool as persistent.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW3uBxcY-2gXoUc-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-5}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3uBxcY-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-17XSV0-1}}\nwprevnextdefs{NW3uBxcY-2gXoUc-4}{\relax}\nwenddeflinemarkup
+void mempool_persist(mempool_t pool);
+
+\nwused{\\{NW3uBxcY-17XSV0-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+Memory pool allocations must be properly \emph{aligned} on most
+systems.  There are some other modules that also care about
+alignment.  See the implementation section for details.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW3uBxcY-4aCyDR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-4aCyDR-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NW3uBxcY-4aCyDR-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-17XSV0-1}}\nwenddeflinemarkup
+\LA{}alignment definitions~{\nwtagstyle{}\subpageref{NW3uBxcY-3daSYg-1}}\RA{}
+\nwused{\\{NW3uBxcY-17XSV0-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\section{Implementation}
+
+Besides standard library and memory manipulation routines,
+we will include the SUGAR main header file, which defines
+macros to alias {\Tt{}malloc\nwendquote} and {\Tt{}free\nwendquote} to the Matlab
+functions {\Tt{}mxMalloc\nwendquote} and {\Tt{}mxFree\nwendquote}.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW3uBxcY-39QYgc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-39QYgc-1}}}\moddef{mempool.c~{\nwtagstyle{}\subpageref{NW3uBxcY-39QYgc-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include <mempool.h>
+
+\LA{}types~{\nwtagstyle{}\subpageref{NW3uBxcY-4H4VOG-1}}\RA{}
+\LA{}static data~{\nwtagstyle{}\subpageref{NW3uBxcY-IAwJm-1}}\RA{}
+
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW3uBxcY-1duChy-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}\RA{}
+\nwnotused{mempool.c}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{Alignment}
+
+In order to accomodate arbitrary objects, the memory returned
+by allocation requests to a mempool must be properly aligned.
+The {\Tt{}align{\_}t\nwendquote} union contains the possible basic types;
+the size of an {\Tt{}align{\_}t\nwendquote} structure, indicated by the macro
+{\Tt{}align{\_}size\nwendquote}, determines exactly how little memory can be
+allocated.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW3uBxcY-3daSYg-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-3daSYg-1}}}\moddef{alignment definitions~{\nwtagstyle{}\subpageref{NW3uBxcY-3daSYg-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-4aCyDR-1}}\nwenddeflinemarkup
+typedef union \{
+    int i;
+    long l;
+    long* lp;
+    void* p;
+    void (*fp)();
+    float f;
+    double d;
+    long double ld;
+\} align_t;
+
+#define align_size (sizeof(align_t))
+
+\nwused{\\{NW3uBxcY-4aCyDR-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+
+\subsection{Creating and destroying pools}
+
+As mentioned in the interface section, a memory pool's space %'
+consists of a linked list of \emph{spans}.  Spans are further
+subdivided into \emph{blocks}, which are the smallest units
+guaranteed to start at, and end just before, alignment boundaries.
+The first block in each span is reserved for a link to
+the next span.
+
+The mempool structure tracks the typical number of blocks
+to be allocated in ordinary new spans, the number of blocks
+used in the current span, and the locations of the first and
+current span.  In addition, the first field of the mempool
+structure is a ``magic number'' used for debugging purposes.
+The magic number is used for debugging purposes;
+functions expecting a pool argument can use it to check that
+the user did not accidentally pass in a bogus pointer.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NW3uBxcY-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NW3uBxcY-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{\relax}{NW3uBxcY-4H4VOG-2}\nwenddeflinemarkup
+#define MEMPOOL_MAGIC_NUMBER 0x1234
+#define ASSERT_VALID_POOL \\
+    assert(pool != NULL && pool->magic_number == MEMPOOL_MAGIC_NUMBER)
+
+struct mempool_struct \{
+    int magic_number;
+    int blocks_per_span;
+    int blocks_used;
+    align_t* first_span;
+    align_t* current_span;
+\};
+
+\nwalsodefined{\\{NW3uBxcY-4H4VOG-2}}\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+The local {\Tt{}allocate{\_}span\nwendquote} function allocates and initializes new
+spans to go into pools list.  The {\Tt{}blocks{\_}in{\_}span\nwendquote} argument
+gives the number of blocks required to accomodate an incoming
+request (recall that requests larger than the typical span size
+sometimes happen)
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW3uBxcY-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW3uBxcY-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwenddeflinemarkup
+static align_t* allocate_span(mempool_t pool, int blocks_in_span)
+\{
+    align_t* span;
+
+    \LA{}allocate memory for the new span~{\nwtagstyle{}\subpageref{NW3uBxcY-C1nKX-1}}\RA{}
+    \LA{}optionally clear the new span~{\nwtagstyle{}\subpageref{NW3uBxcY-40ja8o-1}}\RA{}
+    \LA{}initialize the span~{\nwtagstyle{}\subpageref{NW3uBxcY-38KI0a-1}}\RA{}
+
+    \LA{}log span allocation~{\nwtagstyle{}\subpageref{NW3uBxcY-gt8mI-1}}\RA{}
+
+    return span;
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+When we allocate the memory for the new span, we want to make
+sure that it is sufficient to accomodate extra-large requests.
+For smaller requests, we default to the standard {\Tt{}blocks{\_}per{\_}span\nwendquote}.
+Note that there will be one extra block in each span to keep
+the ``next'' pointer.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW3uBxcY-C1nKX-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-C1nKX-1}}}\moddef{allocate memory for the new span~{\nwtagstyle{}\subpageref{NW3uBxcY-C1nKX-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-1duChy-1}}\nwenddeflinemarkup
+if (blocks_in_span < pool->blocks_per_span)
+    blocks_in_span = pool->blocks_per_span;
+span = (align_t*) malloc((1+blocks_in_span) * align_size);
+\nwused{\\{NW3uBxcY-1duChy-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+If the {\Tt{}MEMPOOL{\_}CLEAR{\_}DEBUG\nwendquote} macro is defined, then we zero out
+the new span before proceeding.
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW3uBxcY-40ja8o-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-40ja8o-1}}}\moddef{optionally clear the new span~{\nwtagstyle{}\subpageref{NW3uBxcY-40ja8o-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-1duChy-1}}\nwenddeflinemarkup
+#ifdef MEMPOOL_CLEAR
+memset(span, 0, (1+blocks_in_span) * align_size);
+#endif
+\nwused{\\{NW3uBxcY-1duChy-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+Finally, we check to make sure that the allocation request succeeded,
+and then we initialize block 0 (the next pointer) to {\Tt{}NULL\nwendquote}.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW3uBxcY-38KI0a-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-38KI0a-1}}}\moddef{initialize the span~{\nwtagstyle{}\subpageref{NW3uBxcY-38KI0a-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-1duChy-1}}\nwenddeflinemarkup
+assert(span != NULL);
+span[0].p = NULL;
+\nwused{\\{NW3uBxcY-1duChy-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+{\Tt{}mempool{\_}create\nwendquote} allocates and initializes a new pool
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW3uBxcY-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{\relax}{NW3uBxcY-nRuDO-2}\nwenddeflinemarkup
+mempool_t mempool_create(int span_size)
+\{
+    mempool_t pool;
+
+    assert( span_size > 0 );
+    assert( pool = (mempool_t) malloc(sizeof(struct mempool_struct)) );
+
+    \LA{}initialize new pool~{\nwtagstyle{}\subpageref{NW3uBxcY-jBczj-1}}\RA{}
+    \LA{}log pool creation~{\nwtagstyle{}\subpageref{NW3uBxcY-2f4U8R-1}}\RA{}
+
+    return pool;
+\}
+
+\nwalsodefined{\\{NW3uBxcY-nRuDO-2}\\{NW3uBxcY-nRuDO-3}\\{NW3uBxcY-nRuDO-4}\\{NW3uBxcY-nRuDO-5}\\{NW3uBxcY-nRuDO-6}\\{NW3uBxcY-nRuDO-7}\\{NW3uBxcY-nRuDO-8}\\{NW3uBxcY-nRuDO-9}\\{NW3uBxcY-nRuDO-A}\\{NW3uBxcY-nRuDO-B}\\{NW3uBxcY-nRuDO-C}}\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+Note that we start off by allocating an initial span, rather than
+allocating a new span on the first memory request.  That makes it
+so that our list logic doesn't have to deal with the ``add to an %'
+empty list'' case.  Note that the allocation of the new span
+\emph{must} occur after the {\Tt{}blocks{\_}per{\_}span\nwendquote} field has been set.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW3uBxcY-jBczj-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-jBczj-1}}}\moddef{initialize new pool~{\nwtagstyle{}\subpageref{NW3uBxcY-jBczj-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-1}}\nwenddeflinemarkup
+pool->magic_number = MEMPOOL_MAGIC_NUMBER;
+pool->blocks_per_span = (span_size + align_size-1)/align_size;
+pool->first_span = allocate_span(pool, 0);
+pool->current_span = pool->first_span;
+pool->blocks_used = 0;
+\nwused{\\{NW3uBxcY-nRuDO-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+The {\Tt{}mempool{\_}destroy\nwendquote} function frees the pool structure and all spans.
+It also clears the magic number field, so that future (invalid)
+references to this pool will be caught.
+Additionally, if the {\Tt{}MEMPOOL{\_}CLEAR{\_}DEBUG\nwendquote} macro is defined, 
+{\Tt{}mempool{\_}destroy\nwendquote} also overwrites all the spans with zeros 
+before deleting them.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW3uBxcY-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-1}{NW3uBxcY-nRuDO-3}\nwenddeflinemarkup
+void mempool_destroy(mempool_t pool)
+\{
+    align_t* next_span;
+
+    ASSERT_VALID_POOL;
+    \LA{}delete all spans in the pool~{\nwtagstyle{}\subpageref{NW3uBxcY-2EA6d-1}}\RA{}
+    pool->magic_number = 0;
+    free(pool);
+
+    \LA{}log pool deletion~{\nwtagstyle{}\subpageref{NW3uBxcY-oBr7m-1}}\RA{}
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW3uBxcY-2EA6d-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-2EA6d-1}}}\moddef{delete all spans in the pool~{\nwtagstyle{}\subpageref{NW3uBxcY-2EA6d-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-2}}\nwenddeflinemarkup
+next_span = pool->first_span;
+while (next_span != NULL) \{
+    align_t* dead_span = next_span;
+    next_span = (align_t*) next_span[0].p;
+    \LA{}optionally clear dead span~{\nwtagstyle{}\subpageref{NW3uBxcY-4IspBn-1}}\RA{}
+    free(dead_span);
+\}
+\nwused{\\{NW3uBxcY-nRuDO-2}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+Recall that there may be spans longer than the standard size of
+{\Tt{}1\ +\ pool->blocks{\_}per{\_}span\nwendquote}.  In such cases, only the leading
+blocks are cleared.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW3uBxcY-4IspBn-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-4IspBn-1}}}\moddef{optionally clear dead span~{\nwtagstyle{}\subpageref{NW3uBxcY-4IspBn-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-2EA6d-1}\\{NW3uBxcY-4HZM19-1}}\nwenddeflinemarkup
+#ifdef MEMPOOL_CLEAR_DEBUG
+memset(dead_span, 0, (1 + pool->blocks_per_span)*align_size);
+#endif
+\nwused{\\{NW3uBxcY-2EA6d-1}\\{NW3uBxcY-4HZM19-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+
+\subsubsection{Basic allocation from the pool}
+
+The most basic allocation function is {\Tt{}mempool{\_}get\nwendquote}.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW3uBxcY-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-2}{NW3uBxcY-nRuDO-4}\nwenddeflinemarkup
+void* mempool_get(mempool_t pool, int size)
+\{
+    int blocks_requested = (size + align_size-1) / align_size;
+    void* mem;
+
+    ASSERT_VALID_POOL;
+    assert(blocks_requested >= 0);
+
+    \LA{}allocate a new span if necessary~{\nwtagstyle{}\subpageref{NW3uBxcY-j8n7E-1}}\RA{}
+    \LA{}allocate blocks from the current span~{\nwtagstyle{}\subpageref{NW3uBxcY-1kh8mR-1}}\RA{}
+
+    \LA{}log allocation from span~{\nwtagstyle{}\subpageref{NW3uBxcY-CAEvl-1}}\RA{}
+
+    return mem;
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+The {\Tt{}mempool{\_}cget\nwendquote} function is just a convenience function
+that allocates using {\Tt{}mempool{\_}get\nwendquote} and then clears the
+returned space.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NW3uBxcY-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-3}{NW3uBxcY-nRuDO-5}\nwenddeflinemarkup
+void* mempool_cget(mempool_t pool, int size)
+\{
+    void* mem = mempool_get(pool, size);
+    memset(mem, 0, size);
+    return mem;
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+The first free block in a span is always at {\Tt{}1\ +\ pool->blocks{\_}used\nwendquote}.
+The extra 1 is to accomodate the initial block containing the link
+to the next span.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NW3uBxcY-1kh8mR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-1kh8mR-1}}}\moddef{allocate blocks from the current span~{\nwtagstyle{}\subpageref{NW3uBxcY-1kh8mR-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-3}}\nwenddeflinemarkup
+mem = &(pool->current_span[1 + pool->blocks_used]);
+pool->blocks_used += blocks_requested;
+\nwused{\\{NW3uBxcY-nRuDO-3}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+We allocate a new span only if the request is too big
+to fit into the remaining blocks in our current span.
+Note that if the last span allocated was extra large to accomodate
+a big allocation request, then {\Tt{}pool->blocks{\_}used\ >\ pool->blocks{\_}per{\_}span\nwendquote},
+and we automatically end up allocating a new span.
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NW3uBxcY-j8n7E-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-j8n7E-1}}}\moddef{allocate a new span if necessary~{\nwtagstyle{}\subpageref{NW3uBxcY-j8n7E-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-3}}\nwenddeflinemarkup
+if (pool->blocks_used + blocks_requested > pool->blocks_per_span) \{
+    align_t* new_span = allocate_span(pool, blocks_requested);
+    \LA{}link in new span~{\nwtagstyle{}\subpageref{NW3uBxcY-29KkzI-1}}\RA{}
+\}
+\nwused{\\{NW3uBxcY-nRuDO-3}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NW3uBxcY-29KkzI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-29KkzI-1}}}\moddef{link in new span~{\nwtagstyle{}\subpageref{NW3uBxcY-29KkzI-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-j8n7E-1}}\nwenddeflinemarkup
+pool->current_span[0].p = new_span;
+pool->current_span = new_span;
+pool->blocks_used = 0;
+\nwused{\\{NW3uBxcY-j8n7E-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+
+\subsection{Allocating with handles}
+
+A memory pool handle contains the fields needed to save the state
+of a memory pool (the {\Tt{}current{\_}span\nwendquote} and current {\Tt{}blocks{\_}used\nwendquote}),
+and also a pointer to the pool with which it is associated.
+The memory pool handle structure also contains a magic number field.
+During a handle allocation, the handle goes in the blocks
+immediately \emph{preceding} the returned pointer.
+The {\Tt{}MEMPOOL{\_}HANDLE{\_}SIZE\nwendquote} macro gives the size of the handle
+rounded up to the nearest multiple of the alignment block size.
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NW3uBxcY-4H4VOG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-4H4VOG-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NW3uBxcY-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-4H4VOG-1}{\relax}\nwenddeflinemarkup
+#define MEMPOOL_HANDLE_MAGIC_NUMBER 0xA911
+
+#define MEMPOOL_HANDLE_SIZE \\
+   (((sizeof(mempool_handle_t) + align_size-1) / align_size) * align_size)
+
+typedef struct mempool_handle_t \{
+    int magic_number;
+    int blocks_used;
+    align_t* current_span;
+    mempool_t pool;
+\} mempool_handle_t;
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NW3uBxcY-3rAnbd-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-3rAnbd-1}}}\moddef{initialize new handle from current pool state~{\nwtagstyle{}\subpageref{NW3uBxcY-3rAnbd-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-5}}\nwenddeflinemarkup
+new_handle.magic_number = MEMPOOL_HANDLE_MAGIC_NUMBER;
+new_handle.blocks_used  = pool->blocks_used;
+new_handle.current_span = pool->current_span;
+new_handle.pool         = pool;
+\nwused{\\{NW3uBxcY-nRuDO-5}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+The basic function to allocate with a handle simply allocates
+a somewhat larger chunk of memory than requested using
+{\Tt{}mempool{\_}get\nwendquote}, puts a handle in the leading blocks of
+that memory, and returns a pointer to the remainder
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NW3uBxcY-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-4}{NW3uBxcY-nRuDO-6}\nwenddeflinemarkup
+void* mempool_geth(mempool_t pool, int size)
+\{
+    mempool_handle_t new_handle;
+    char* mem;
+
+    ASSERT_VALID_POOL;
+
+    \LA{}initialize new handle from current pool state~{\nwtagstyle{}\subpageref{NW3uBxcY-3rAnbd-1}}\RA{}
+    \LA{}allocate memory and tuck handle into leading blocks~{\nwtagstyle{}\subpageref{NW3uBxcY-11dNGm-1}}\RA{}
+
+    \LA{}log handle allocation~{\nwtagstyle{}\subpageref{NW3uBxcY-3yyAbC-1}}\RA{}
+
+    return mem;
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NW3uBxcY-11dNGm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-11dNGm-1}}}\moddef{allocate memory and tuck handle into leading blocks~{\nwtagstyle{}\subpageref{NW3uBxcY-11dNGm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-5}}\nwenddeflinemarkup
+mem = (char*) mempool_get(pool, size + MEMPOOL_HANDLE_SIZE);
+*((mempool_handle_t*) mem) = new_handle;
+mem += MEMPOOL_HANDLE_SIZE;
+\nwused{\\{NW3uBxcY-nRuDO-5}}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+As in the basic allocation case, {\Tt{}mempool{\_}cgeth\nwendquote} is
+a small convenience wrapper around {\Tt{}mempool{\_}geth\nwendquote}.
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NW3uBxcY-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-5}{NW3uBxcY-nRuDO-7}\nwenddeflinemarkup
+void* mempool_cgeth(mempool_t pool, int size)
+\{
+    void* mem = mempool_geth(pool, size);
+    memset(mem, 0, size);
+    return mem;
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+The whole point of allocating with a handle is that you
+should be able to roll back the pool to the state recorded
+in the handle.  The {\Tt{}mempool{\_}freeh\nwendquote} function performs
+this rollback.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NW3uBxcY-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-6}{NW3uBxcY-nRuDO-8}\nwenddeflinemarkup
+void mempool_freeh(void* mem)
+\{
+    mempool_handle_t handle;
+    mempool_t pool;
+    align_t* next_span;
+
+    \LA{}extract and validate handle~{\nwtagstyle{}\subpageref{NW3uBxcY-LyytA-1}}\RA{}
+    \LA{}free spans from handle onward~{\nwtagstyle{}\subpageref{NW3uBxcY-4HZM19-1}}\RA{}
+    \LA{}restore pool state~{\nwtagstyle{}\subpageref{NW3uBxcY-14DB4g-1}}\RA{}
+
+    \LA{}optionally clear freed space~{\nwtagstyle{}\subpageref{NW3uBxcY-1qgote-1}}\RA{}
+
+    \LA{}log handle deallocation~{\nwtagstyle{}\subpageref{NW3uBxcY-1Tzc2J-1}}\RA{}
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+Remember that the handle is stored at {\Tt{}mem\ -\ MEMPOOL{\_}HANDLE{\_}SIZE\nwendquote}.
+We want a copy of the handle, rather than just a pointer to it,
+since it may live in a span that will be freed during the rollback
+process.
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NW3uBxcY-LyytA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-LyytA-1}}}\moddef{extract and validate handle~{\nwtagstyle{}\subpageref{NW3uBxcY-LyytA-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-7}}\nwenddeflinemarkup
+assert(mem != NULL);
+handle = *(mempool_handle_t*) ((char*) mem - MEMPOOL_HANDLE_SIZE);
+pool = handle.pool;
+assert(handle.magic_number == MEMPOOL_HANDLE_MAGIC_NUMBER);
+ASSERT_VALID_POOL;
+\nwused{\\{NW3uBxcY-nRuDO-7}}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NW3uBxcY-4HZM19-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-4HZM19-1}}}\moddef{free spans from handle onward~{\nwtagstyle{}\subpageref{NW3uBxcY-4HZM19-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-7}}\nwenddeflinemarkup
+next_span = handle.current_span[0].p;
+while (next_span != NULL) \{
+    align_t* dead_span = next_span;
+    next_span = next_span[0].p;
+    \LA{}optionally clear dead span~{\nwtagstyle{}\subpageref{NW3uBxcY-4IspBn-1}}\RA{}
+    free(dead_span);
+\}
+\nwused{\\{NW3uBxcY-nRuDO-7}}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NW3uBxcY-14DB4g-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-14DB4g-1}}}\moddef{restore pool state~{\nwtagstyle{}\subpageref{NW3uBxcY-14DB4g-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-7}}\nwenddeflinemarkup
+pool->blocks_used  = handle.blocks_used;
+pool->current_span = handle.current_span;
+pool->current_span[0].p = NULL;
+\nwused{\\{NW3uBxcY-nRuDO-7}}\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+In addition to all the spans we might have freed,
+there is probably space just freed at the end of the current
+span after rollback.  If the {\Tt{}MEMPOOL{\_}CLEAR{\_}DEBUG\nwendquote} flag is
+set, we want to clear that, too.
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NW3uBxcY-1qgote-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-1qgote-1}}}\moddef{optionally clear freed space~{\nwtagstyle{}\subpageref{NW3uBxcY-1qgote-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-7}}\nwenddeflinemarkup
+#ifdef MEMPOOL_CLEAR_DEBUG
+memset(&(pool->current_span[1 + pool->blocks_used]), 0,
+       (pool->blocks_per_span - pool->blocks_used) * align_size);
+#endif
+\nwused{\\{NW3uBxcY-nRuDO-7}}\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+
+\subsection{String and buffer duplication}
+
+The {\Tt{}mempool{\_}memdup\nwendquote} function consists only of a {\Tt{}mempool{\_}get\nwendquote}
+and a {\Tt{}memcpy\nwendquote}.
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NW3uBxcY-nRuDO-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-7}{NW3uBxcY-nRuDO-9}\nwenddeflinemarkup
+void* mempool_memdup(mempool_t pool, const void* src, int size)
+\{
+    if (src == NULL)
+        return NULL;
+    else \{
+        void* dest = mempool_get(pool, size);
+        memcpy(dest, src, size);
+        return dest;
+    \}
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+The {\Tt{}mempool{\_}strdup\nwendquote} function is a wrapper around {\Tt{}mempool{\_}memdup\nwendquote}.
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NW3uBxcY-nRuDO-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-8}{NW3uBxcY-nRuDO-A}\nwenddeflinemarkup
+void* mempool_strdup(mempool_t pool, const char* src)
+\{
+    if (src == NULL)
+        return NULL;
+    return mempool_memdup(pool, src, strlen(src) + 1);
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+
+\subsection{Logging}
+
+The {\Tt{}mempool{\_}log{\_}fp\nwendquote} pointer tracks the current log file.  By default,
+logging is turned off, and {\Tt{}mempool{\_}log{\_}fp\nwendquote} is {\Tt{}NULL\nwendquote}.
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NW3uBxcY-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NW3uBxcY-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwenddeflinemarkup
+static FILE* mempool_log_fp = NULL;
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+We are only allowed to start a log if one is not already open,
+and we can only end a log if there is a log to end.  Killing
+the program with an assertion when the log can't be opened %'
+may seem harsh, but remember that mempool logging will probably
+only be used when debugging.
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NW3uBxcY-nRuDO-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-9}{NW3uBxcY-nRuDO-B}\nwenddeflinemarkup
+void mempool_start_log(char* filename)
+\{
+    assert(mempool_log_fp == NULL);
+    mempool_log_fp = fopen(filename, "a");
+    assert(mempool_log_fp != NULL);
+    fprintf(mempool_log_fp, "Memory log started (%s)\\n", filename);
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NW3uBxcY-nRuDO-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-A}{NW3uBxcY-nRuDO-C}\nwenddeflinemarkup
+void mempool_end_log()
+\{
+    assert(mempool_log_fp != NULL);
+    fprintf(mempool_log_fp, "Closing memory log\\n");
+    fclose(mempool_log_fp);
+    mempool_log_fp = NULL;
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+We may periodically want to ensure the mempool log has been flushed
+to disk, particularly since we're most likely to use logging when %'
+the program is crashing (and so not getting to the {\Tt{}mempool{\_}end{\_}log\nwendquote}
+call.
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NW3uBxcY-nRuDO-C}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3uBxcY-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-39QYgc-1}}\nwprevnextdefs{NW3uBxcY-nRuDO-B}{\relax}\nwenddeflinemarkup
+void mempool_flush_log()
+\{
+    assert(mempool_log_fp != NULL);
+    fflush(mempool_log_fp);
+\}
+
+\nwused{\\{NW3uBxcY-39QYgc-1}}\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+Part of the reason that we don't associate logging with a particular %'
+pool is that we would also like to log the creation and destruction
+of pool objects.
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NW3uBxcY-2f4U8R-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-2f4U8R-1}}}\moddef{log pool creation~{\nwtagstyle{}\subpageref{NW3uBxcY-2f4U8R-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-1}}\nwenddeflinemarkup
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "Allocated new mempool (%p), span size %d\\n",
+            (void*) pool, span_size);
+\nwused{\\{NW3uBxcY-nRuDO-1}}\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NW3uBxcY-oBr7m-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-oBr7m-1}}}\moddef{log pool deletion~{\nwtagstyle{}\subpageref{NW3uBxcY-oBr7m-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-2}}\nwenddeflinemarkup
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "Destroyed mempool (%p)\\n", (void*) pool);
+\nwused{\\{NW3uBxcY-nRuDO-2}}\nwendcode{}\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}\nwbegincode{87}\sublabel{NW3uBxcY-gt8mI-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-gt8mI-1}}}\moddef{log span allocation~{\nwtagstyle{}\subpageref{NW3uBxcY-gt8mI-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-1duChy-1}}\nwenddeflinemarkup
+if (mempool_log_fp)
+    fprintf(mempool_log_fp, "%p: Created new span at %p\\n",
+            (void*) pool, (void*) span);
+\nwused{\\{NW3uBxcY-1duChy-1}}\nwendcode{}\nwbegindocs{88}\nwdocspar
+
+\nwenddocs{}\nwbegincode{89}\sublabel{NW3uBxcY-CAEvl-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-CAEvl-1}}}\moddef{log allocation from span~{\nwtagstyle{}\subpageref{NW3uBxcY-CAEvl-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-3}}\nwenddeflinemarkup
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Allocated %d bytes / %d blocks at %p\\n",
+            (void*) pool, size, blocks_requested * align_size,
+            mem);
+\nwused{\\{NW3uBxcY-nRuDO-3}}\nwendcode{}\nwbegindocs{90}\nwdocspar
+
+\nwenddocs{}\nwbegincode{91}\sublabel{NW3uBxcY-3yyAbC-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-3yyAbC-1}}}\moddef{log handle allocation~{\nwtagstyle{}\subpageref{NW3uBxcY-3yyAbC-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-5}}\nwenddeflinemarkup
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Handle at %p, memory at %p\\n",
+            (void*) pool, (void*) (mem - MEMPOOL_HANDLE_SIZE), (void*) mem);
+\nwused{\\{NW3uBxcY-nRuDO-5}}\nwendcode{}\nwbegindocs{92}\nwdocspar
+
+\nwenddocs{}\nwbegincode{93}\sublabel{NW3uBxcY-1Tzc2J-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3uBxcY-1Tzc2J-1}}}\moddef{log handle deallocation~{\nwtagstyle{}\subpageref{NW3uBxcY-1Tzc2J-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3uBxcY-nRuDO-7}}\nwenddeflinemarkup
+if (mempool_log_fp)
+    fprintf(mempool_log_fp,
+            "%p: Rollback to handle at %p\\n", (void*) pool,
+            (void*) ((char*) mem - MEMPOOL_HANDLE_SIZE));
+\nwused{\\{NW3uBxcY-nRuDO-7}}\nwendcode{}
+
+\nwixlogsorted{c}{{alignment definitions}{NW3uBxcY-3daSYg-1}{\nwixu{NW3uBxcY-4aCyDR-1}\nwixd{NW3uBxcY-3daSYg-1}}}%
+\nwixlogsorted{c}{{allocate a new span if necessary}{NW3uBxcY-j8n7E-1}{\nwixu{NW3uBxcY-nRuDO-3}\nwixd{NW3uBxcY-j8n7E-1}}}%
+\nwixlogsorted{c}{{allocate blocks from the current span}{NW3uBxcY-1kh8mR-1}{\nwixu{NW3uBxcY-nRuDO-3}\nwixd{NW3uBxcY-1kh8mR-1}}}%
+\nwixlogsorted{c}{{allocate memory and tuck handle into leading blocks}{NW3uBxcY-11dNGm-1}{\nwixu{NW3uBxcY-nRuDO-5}\nwixd{NW3uBxcY-11dNGm-1}}}%
+\nwixlogsorted{c}{{allocate memory for the new span}{NW3uBxcY-C1nKX-1}{\nwixu{NW3uBxcY-1duChy-1}\nwixd{NW3uBxcY-C1nKX-1}}}%
+\nwixlogsorted{c}{{delete all spans in the pool}{NW3uBxcY-2EA6d-1}{\nwixu{NW3uBxcY-nRuDO-2}\nwixd{NW3uBxcY-2EA6d-1}}}%
+\nwixlogsorted{c}{{exported functions}{NW3uBxcY-2gXoUc-1}{\nwixu{NW3uBxcY-17XSV0-1}\nwixd{NW3uBxcY-2gXoUc-1}\nwixd{NW3uBxcY-2gXoUc-2}\nwixd{NW3uBxcY-2gXoUc-3}\nwixd{NW3uBxcY-2gXoUc-4}\nwixd{NW3uBxcY-2gXoUc-5}}}%
+\nwixlogsorted{c}{{exported macros}{NW3uBxcY-2VJxV5-1}{\nwixu{NW3uBxcY-17XSV0-1}\nwixd{NW3uBxcY-2VJxV5-1}}}%
+\nwixlogsorted{c}{{exported types}{NW3uBxcY-4aCyDR-1}{\nwixu{NW3uBxcY-17XSV0-1}\nwixd{NW3uBxcY-4aCyDR-1}}}%
+\nwixlogsorted{c}{{extract and validate handle}{NW3uBxcY-LyytA-1}{\nwixu{NW3uBxcY-nRuDO-7}\nwixd{NW3uBxcY-LyytA-1}}}%
+\nwixlogsorted{c}{{free spans from handle onward}{NW3uBxcY-4HZM19-1}{\nwixu{NW3uBxcY-nRuDO-7}\nwixd{NW3uBxcY-4HZM19-1}}}%
+\nwixlogsorted{c}{{functions}{NW3uBxcY-nRuDO-1}{\nwixu{NW3uBxcY-39QYgc-1}\nwixd{NW3uBxcY-nRuDO-1}\nwixd{NW3uBxcY-nRuDO-2}\nwixd{NW3uBxcY-nRuDO-3}\nwixd{NW3uBxcY-nRuDO-4}\nwixd{NW3uBxcY-nRuDO-5}\nwixd{NW3uBxcY-nRuDO-6}\nwixd{NW3uBxcY-nRuDO-7}\nwixd{NW3uBxcY-nRuDO-8}\nwixd{NW3uBxcY-nRuDO-9}\nwixd{NW3uBxcY-nRuDO-A}\nwixd{NW3uBxcY-nRuDO-B}\nwixd{NW3uBxcY-nRuDO-C}}}%
+\nwixlogsorted{c}{{initialize new handle from current pool state}{NW3uBxcY-3rAnbd-1}{\nwixd{NW3uBxcY-3rAnbd-1}\nwixu{NW3uBxcY-nRuDO-5}}}%
+\nwixlogsorted{c}{{initialize new pool}{NW3uBxcY-jBczj-1}{\nwixu{NW3uBxcY-nRuDO-1}\nwixd{NW3uBxcY-jBczj-1}}}%
+\nwixlogsorted{c}{{initialize the span}{NW3uBxcY-38KI0a-1}{\nwixu{NW3uBxcY-1duChy-1}\nwixd{NW3uBxcY-38KI0a-1}}}%
+\nwixlogsorted{c}{{link in new span}{NW3uBxcY-29KkzI-1}{\nwixu{NW3uBxcY-j8n7E-1}\nwixd{NW3uBxcY-29KkzI-1}}}%
+\nwixlogsorted{c}{{log allocation from span}{NW3uBxcY-CAEvl-1}{\nwixu{NW3uBxcY-nRuDO-3}\nwixd{NW3uBxcY-CAEvl-1}}}%
+\nwixlogsorted{c}{{log handle allocation}{NW3uBxcY-3yyAbC-1}{\nwixu{NW3uBxcY-nRuDO-5}\nwixd{NW3uBxcY-3yyAbC-1}}}%
+\nwixlogsorted{c}{{log handle deallocation}{NW3uBxcY-1Tzc2J-1}{\nwixu{NW3uBxcY-nRuDO-7}\nwixd{NW3uBxcY-1Tzc2J-1}}}%
+\nwixlogsorted{c}{{log pool creation}{NW3uBxcY-2f4U8R-1}{\nwixu{NW3uBxcY-nRuDO-1}\nwixd{NW3uBxcY-2f4U8R-1}}}%
+\nwixlogsorted{c}{{log pool deletion}{NW3uBxcY-oBr7m-1}{\nwixu{NW3uBxcY-nRuDO-2}\nwixd{NW3uBxcY-oBr7m-1}}}%
+\nwixlogsorted{c}{{log span allocation}{NW3uBxcY-gt8mI-1}{\nwixu{NW3uBxcY-1duChy-1}\nwixd{NW3uBxcY-gt8mI-1}}}%
+\nwixlogsorted{c}{{mempool.c}{NW3uBxcY-39QYgc-1}{\nwixd{NW3uBxcY-39QYgc-1}}}%
+\nwixlogsorted{c}{{mempool.h}{NW3uBxcY-17XSV0-1}{\nwixd{NW3uBxcY-17XSV0-1}}}%
+\nwixlogsorted{c}{{optionally clear dead span}{NW3uBxcY-4IspBn-1}{\nwixu{NW3uBxcY-2EA6d-1}\nwixd{NW3uBxcY-4IspBn-1}\nwixu{NW3uBxcY-4HZM19-1}}}%
+\nwixlogsorted{c}{{optionally clear freed space}{NW3uBxcY-1qgote-1}{\nwixu{NW3uBxcY-nRuDO-7}\nwixd{NW3uBxcY-1qgote-1}}}%
+\nwixlogsorted{c}{{optionally clear the new span}{NW3uBxcY-40ja8o-1}{\nwixu{NW3uBxcY-1duChy-1}\nwixd{NW3uBxcY-40ja8o-1}}}%
+\nwixlogsorted{c}{{restore pool state}{NW3uBxcY-14DB4g-1}{\nwixu{NW3uBxcY-nRuDO-7}\nwixd{NW3uBxcY-14DB4g-1}}}%
+\nwixlogsorted{c}{{static data}{NW3uBxcY-IAwJm-1}{\nwixu{NW3uBxcY-39QYgc-1}\nwixd{NW3uBxcY-IAwJm-1}}}%
+\nwixlogsorted{c}{{static functions}{NW3uBxcY-1duChy-1}{\nwixu{NW3uBxcY-39QYgc-1}\nwixd{NW3uBxcY-1duChy-1}}}%
+\nwixlogsorted{c}{{types}{NW3uBxcY-4H4VOG-1}{\nwixu{NW3uBxcY-39QYgc-1}\nwixd{NW3uBxcY-4H4VOG-1}\nwixd{NW3uBxcY-4H4VOG-2}}}%
+\nwbegindocs{94}\nwdocspar
+
+\nwenddocs{}

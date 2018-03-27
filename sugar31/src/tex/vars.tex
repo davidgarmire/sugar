@@ -1,0 +1,495 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}vars\nwendquote} module manages variable global index assignment.
+
+
+\section{Interface}
+
+\nwfilename{vars.nw}\nwbegincode{1}\sublabel{NWqGiTS-3X3XIp-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-3X3XIp-1}}}\moddef{vars.h~{\nwtagstyle{}\subpageref{NWqGiTS-3X3XIp-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef VARS_H
+#define VARS_H
+
+struct mesh_struct;
+typedef struct vars_mgr_struct* vars_mgr_t;
+
+typedef struct vars_desc_t \{
+    const char*  name;
+    int          offset;
+    int          parent;
+    char         type;
+\} vars_desc_t;
+
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-1}}\RA{}
+
+#endif /* VARS_H */
+\nwnotused{vars.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\Tt{}vars{\_}create\nwendquote} and {\Tt{}vars{\_}destroy\nwendquote} construct and destroy
+{\Tt{}vars{\_}mgr{\_}t\nwendquote} objects.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWqGiTS-2gXoUc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-3X3XIp-1}}\nwprevnextdefs{\relax}{NWqGiTS-2gXoUc-2}\nwenddeflinemarkup
+vars_mgr_t vars_create (struct mesh_struct* mesh);
+void       vars_destroy(vars_mgr_t self);
+
+\nwalsodefined{\\{NWqGiTS-2gXoUc-2}\\{NWqGiTS-2gXoUc-3}\\{NWqGiTS-2gXoUc-4}\\{NWqGiTS-2gXoUc-5}\\{NWqGiTS-2gXoUc-6}}\nwused{\\{NWqGiTS-3X3XIp-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The {\Tt{}vars{\_}add{\_}vartype\nwendquote} function adds a new type of nodal variable
+(if it has not already been added) and returns its identifier.
+The {\Tt{}vars{\_}vartype\nwendquote} function looks up the identifier of a nodal
+variable which has already been declared with {\Tt{}vars{\_}add{\_}vartype\nwendquote};
+if the variable type has not been declared, {\Tt{}vars{\_}vartype\nwendquote} returns
+a negative value.
+
+The {\Tt{}vars{\_}get{\_}vartypes\nwendquote} function runs through all the model functions
+and queries them for the variable types that they wish to export.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWqGiTS-2gXoUc-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-3X3XIp-1}}\nwprevnextdefs{NWqGiTS-2gXoUc-1}{NWqGiTS-2gXoUc-3}\nwenddeflinemarkup
+int  vars_add_vartype (vars_mgr_t self, const char* name);
+int  vars_vartype     (vars_mgr_t self, const char* name);
+void vars_get_vartypes(vars_mgr_t self);
+
+\nwused{\\{NWqGiTS-3X3XIp-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\Tt{}vars{\_}node\nwendquote} and {\Tt{}vars{\_}branch\nwendquote} functions add new nodal
+and branch variables, respectively.  The arguments identify the
+variables locally, and global identifiers are returned.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWqGiTS-2gXoUc-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-3X3XIp-1}}\nwprevnextdefs{NWqGiTS-2gXoUc-2}{NWqGiTS-2gXoUc-4}\nwenddeflinemarkup
+int vars_node  (vars_mgr_t self, int node_id, const char* name);
+int vars_branch(vars_mgr_t self, const char* name);
+
+\nwused{\\{NWqGiTS-3X3XIp-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+The {\Tt{}vars{\_}assign\nwendquote} function assigns global identifiers to all
+the variables in a mesh.
+Once the variables have been assigned, {\Tt{}vars{\_}count\nwendquote} returns
+the count of how many there were.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWqGiTS-2gXoUc-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-3X3XIp-1}}\nwprevnextdefs{NWqGiTS-2gXoUc-3}{NWqGiTS-2gXoUc-5}\nwenddeflinemarkup
+void vars_assign(vars_mgr_t self);
+int  vars_count (vars_mgr_t self);
+
+\nwused{\\{NWqGiTS-3X3XIp-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+The {\Tt{}vars{\_}permute\nwendquote} function applies a permutation to the
+variables.  This permutation may be to improve the efficiency
+of parallel solvers, or just to move the variables subject
+to displacement boundary conditions to the end of the list.
+The rule is $x_i \rightarrow x_{\pi(i)}$.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWqGiTS-2gXoUc-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-5}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-3X3XIp-1}}\nwprevnextdefs{NWqGiTS-2gXoUc-4}{NWqGiTS-2gXoUc-6}\nwenddeflinemarkup
+void vars_permute(vars_mgr_t self, int* pi);
+
+\nwused{\\{NWqGiTS-3X3XIp-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+The {\Tt{}vars{\_}lookup{\_}node\nwendquote} and {\Tt{}vars{\_}lookup{\_}branch\nwendquote} function
+look up nodal and branch variables.  A negative return code
+means that there is no such entry.
+
+The {\Tt{}vars{\_}lookup\nwendquote} function fills in a table of information
+for each variable.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWqGiTS-2gXoUc-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-6}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NWqGiTS-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-3X3XIp-1}}\nwprevnextdefs{NWqGiTS-2gXoUc-5}{\relax}\nwenddeflinemarkup
+int vars_lookup_node  (vars_mgr_t self, int node_id, const char* name);
+int vars_lookup_branch(vars_mgr_t self, int elt_id,  int var_number);
+void vars_lookup(vars_mgr_t self, vars_desc_t* v);
+
+\nwused{\\{NWqGiTS-3X3XIp-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWqGiTS-1Uspz9-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-1Uspz9-1}}}\moddef{vars.c~{\nwtagstyle{}\subpageref{NWqGiTS-1Uspz9-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include <mempool.h>
+#include <dynarray.h>
+#include <mesh.h>
+#include <vars.h>
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWqGiTS-4H4VOG-1}}\RA{}
+\LA{}macros~{\nwtagstyle{}\subpageref{NWqGiTS-1VvxMr-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWqGiTS-1duChy-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}\RA{}
+\nwnotused{vars.c}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWqGiTS-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWqGiTS-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwenddeflinemarkup
+struct vars_mgr_struct \{
+    \LA{}\code{}vars{\_}mgr{\_}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-1}}\RA{}
+\};
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+The {\Tt{}var{\_}types\nwendquote} array is just a dynamic array of names for allowed
+nodal variable types.  The identifier for a variable is given by its
+index in the array.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWqGiTS-33YIK5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-1}}}\moddef{\code{}vars{\_}mgr{\_}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-4H4VOG-1}}\nwprevnextdefs{\relax}{NWqGiTS-33YIK5-2}\nwenddeflinemarkup
+dynarray_t var_types;
+\nwalsodefined{\\{NWqGiTS-33YIK5-2}\\{NWqGiTS-33YIK5-3}\\{NWqGiTS-33YIK5-4}}\nwused{\\{NWqGiTS-4H4VOG-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+The variable table ({\Tt{}node{\_}vars\nwendquote}) keeps track of the assignment of
+global indices for nodal variables.  For each node there is a row of
+integers, one for each variable type.  The $j$th entry of node $i$
+is the global index of the $j$th variable type for node $i$.  When
+the entry is zero, the variable has not been assigned an index yet.
+
+The table {\Tt{}branch{\_}vars\nwendquote} keeps track of the assignment of indices
+to branch variables.  The $i$th entry (zero-based) is the $i$th
+branch variable assigned from a call to {\Tt{}var{\_}branch\nwendquote}.
+The {\Tt{}branch{\_}var{\_}count\nwendquote} variable tracks the total number of branch
+variables.  The {\Tt{}elt{\_}branch{\_}vars\nwendquote} table stores the offset of the
+first branch variable in {\Tt{}branch{\_}vars\nwendquote} for each element.
+
+The {\Tt{}var{\_}count\nwendquote} field is the total number of variable identifiers that
+have been assigned so far.
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWqGiTS-33YIK5-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-2}}}\moddef{\code{}vars{\_}mgr{\_}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-4H4VOG-1}}\nwprevnextdefs{NWqGiTS-33YIK5-1}{NWqGiTS-33YIK5-3}\nwenddeflinemarkup
+int* node_vars;
+int* branch_vars;
+int* elt_branch_vars;
+int var_count;
+int branch_var_count;
+\nwused{\\{NWqGiTS-4H4VOG-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+We also store a pointer to the mesh and a pointer to a local pool
+for allocating the variable table and for storing the names of variable
+types.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWqGiTS-33YIK5-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-3}}}\moddef{\code{}vars{\_}mgr{\_}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-4H4VOG-1}}\nwprevnextdefs{NWqGiTS-33YIK5-2}{NWqGiTS-33YIK5-4}\nwenddeflinemarkup
+mesh_t mesh;
+mempool_t pool;
+\nwused{\\{NWqGiTS-4H4VOG-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The sizes of the pool and of the initial variable types array are
+pretty ad-hoc.  I'm not sure how much difference an intelligent %'
+choice would make.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWqGiTS-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{\relax}{NWqGiTS-nRuDO-2}\nwenddeflinemarkup
+vars_mgr_t vars_create(mesh_t mesh)
+\{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    vars_mgr_t self = (vars_mgr_t) mempool_cget(pool, sizeof(*self));
+
+    self->pool = pool;
+    self->var_types = dynarray_create(sizeof(const char*), 16);
+    self->mesh = mesh;
+
+    self->node_vars   = NULL;
+    self->branch_vars = NULL;
+    self->elt_branch_vars = NULL;
+
+    return self;
+\}
+
+\nwalsodefined{\\{NWqGiTS-nRuDO-2}\\{NWqGiTS-nRuDO-3}\\{NWqGiTS-nRuDO-4}\\{NWqGiTS-nRuDO-5}\\{NWqGiTS-nRuDO-6}\\{NWqGiTS-nRuDO-7}\\{NWqGiTS-nRuDO-8}\\{NWqGiTS-nRuDO-9}\\{NWqGiTS-nRuDO-A}\\{NWqGiTS-nRuDO-B}\\{NWqGiTS-nRuDO-C}\\{NWqGiTS-nRuDO-D}}\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWqGiTS-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-1}{NWqGiTS-nRuDO-3}\nwenddeflinemarkup
+void vars_destroy(vars_mgr_t self)
+\{
+    dynarray_destroy(self->var_types);
+    mempool_destroy(self->pool);
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+
+A variable type identifier is given by the index of its name
+in the {\Tt{}var{\_}types\nwendquote} array.  If we can't find a match, %'
+we return $-1$.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWqGiTS-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-2}{NWqGiTS-nRuDO-4}\nwenddeflinemarkup
+int vars_vartype(vars_mgr_t self, const char* name)
+\{
+    int i, n;
+
+    n = dynarray_count(self->var_types);
+    for (i = 0; i < n; ++i)
+        if (strcmp(name, *(char**) dynarray_get(self->var_types, i)) == 0)
+            return i;
+    return -1;
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWqGiTS-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-3}{NWqGiTS-nRuDO-5}\nwenddeflinemarkup
+int vars_add_vartype(vars_mgr_t self, const char* name)
+\{
+    int var_id = vars_vartype(self, name);
+    if (var_id < 0) \{
+        \LA{}add new variable type~{\nwtagstyle{}\subpageref{NWqGiTS-1S6a2E-1}}\RA{}
+    \}
+    return var_id;
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+We need to make a copy of the name string when we add
+a new variable type.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWqGiTS-1S6a2E-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-1S6a2E-1}}}\moddef{add new variable type~{\nwtagstyle{}\subpageref{NWqGiTS-1S6a2E-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-nRuDO-4}}\nwenddeflinemarkup
+name = mempool_strdup(self->pool, name);
+dynarray_append(self->var_types, &name);
+var_id = num_types(self)-1;
+\nwused{\\{NWqGiTS-nRuDO-4}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+The {\Tt{}num{\_}types\nwendquote} macro returns the number of variable types
+declared so far.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWqGiTS-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWqGiTS-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwenddeflinemarkup
+#define num_types(self) dynarray_count((self)->var_types)
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+If the current {\Tt{}mode\nwendquote} flag is set to {\Tt{}REGISTER{\_}VARS\nwendquote},
+the {\Tt{}vars{\_}node\nwendquote} and {\Tt{}vars{\_}branch\nwendquote} functions return zero
+and record the names of the variables for this mesh.
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWqGiTS-1VvxMr-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-1VvxMr-1}}}\moddef{macros~{\nwtagstyle{}\subpageref{NWqGiTS-1VvxMr-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwenddeflinemarkup
+#define ASSIGN_VARS 0
+#define REGISTER_VARS 1
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWqGiTS-33YIK5-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-4}}}\moddef{\code{}vars{\_}mgr{\_}t\edoc{} entries~{\nwtagstyle{}\subpageref{NWqGiTS-33YIK5-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-4H4VOG-1}}\nwprevnextdefs{NWqGiTS-33YIK5-3}{\relax}\nwenddeflinemarkup
+int mode;
+\nwused{\\{NWqGiTS-4H4VOG-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+Note that we explicitly use the fact that node indexing is one
+based.  If we change to zero-based indexing for the node identifiers,
+we need to make a corresponding change to this code.
+
+The variable type identifiers are zero-based externally, but are
+internally one-based so that we can use zero to represent
+``unassigned.''
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWqGiTS-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-4}{NWqGiTS-nRuDO-6}\nwenddeflinemarkup
+int vars_node(vars_mgr_t self, int node_id, const char* name)
+\{
+    int var_type  = vars_vartype(self, name);
+    int var_index = (node_id-1)*num_types(self) + var_type;
+
+    if (self->mode == REGISTER_VARS) \{
+        vars_add_vartype(self, name);
+        return 0;
+    \} else \{
+        \LA{}check validity of variable type~{\nwtagstyle{}\subpageref{NWqGiTS-40Ig75-1}}\RA{}
+        \LA{}assign index if not already assigned~{\nwtagstyle{}\subpageref{NWqGiTS-4JtOhw-1}}\RA{}
+        return self->node_vars[var_index]-1;
+    \}
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWqGiTS-40Ig75-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-40Ig75-1}}}\moddef{check validity of variable type~{\nwtagstyle{}\subpageref{NWqGiTS-40Ig75-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-nRuDO-5}}\nwenddeflinemarkup
+if (var_type < 0)
+    mesh_error(self->mesh, "Invalid nodal variable type");
+\nwused{\\{NWqGiTS-nRuDO-5}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWqGiTS-4JtOhw-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-4JtOhw-1}}}\moddef{assign index if not already assigned~{\nwtagstyle{}\subpageref{NWqGiTS-4JtOhw-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-nRuDO-5}}\nwenddeflinemarkup
+if (self->node_vars[var_index] == 0) 
+    self->node_vars[var_index] = ++(self->var_count);
+\nwused{\\{NWqGiTS-nRuDO-5}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWqGiTS-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-5}{NWqGiTS-nRuDO-7}\nwenddeflinemarkup
+int vars_branch(vars_mgr_t self, const char* name)
+\{
+    if (self->mode == REGISTER_VARS) \{
+        (self->branch_var_count)++;
+        return 0;
+    \} else \{
+        if (self->branch_vars[self->branch_var_count] == 0) \{
+            return (self->branch_vars[(self->branch_var_count)++] = 
+                    ++self->var_count)-1;
+        \} else \{
+            return self->branch_vars[(self->branch_var_count)++]-1;
+        \}
+    \}
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+The variable assignment routine does little work on its own.
+All the real work is done by the model functions calling
+{\Tt{}vars{\_}node\nwendquote} and {\Tt{}vars{\_}branch\nwendquote}.
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWqGiTS-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-6}{NWqGiTS-nRuDO-8}\nwenddeflinemarkup
+void vars_assign(vars_mgr_t self)
+\{
+    int i, n;
+
+    \LA{}initialize variable assignment~{\nwtagstyle{}\subpageref{NWqGiTS-268tgu-1}}\RA{}
+
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i) \{
+        self->elt_branch_vars[i-1] = self->branch_var_count;
+        element_vars( mesh_element(self->mesh, i), self );
+    \}
+    self->elt_branch_vars[n] = self->branch_var_count;
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWqGiTS-268tgu-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-268tgu-1}}}\moddef{initialize variable assignment~{\nwtagstyle{}\subpageref{NWqGiTS-268tgu-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-nRuDO-7}}\nwenddeflinemarkup
+if (self->node_vars)
+     mempool_freeh(self->node_vars);
+
+self->node_vars = 
+(int*) mempool_cgeth(self->pool, num_types(self) * 
+                     mesh_num_nodes(self->mesh) * sizeof(int));
+
+self->branch_vars = 
+(int*) mempool_cgeth(self->pool, self->branch_var_count * sizeof(int));
+
+self->elt_branch_vars = 
+(int*) mempool_cgeth(self->pool, (mesh_num_elements(self->mesh) + 1) * 
+                     sizeof(int));
+
+self->mode = ASSIGN_VARS;
+self->var_count = 0;
+self->branch_var_count = 0;
+
+\nwused{\\{NWqGiTS-nRuDO-7}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWqGiTS-nRuDO-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-7}{NWqGiTS-nRuDO-9}\nwenddeflinemarkup
+int vars_count(vars_mgr_t self)
+\{
+    return self->var_count;
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWqGiTS-nRuDO-9}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-8}{NWqGiTS-nRuDO-A}\nwenddeflinemarkup
+void vars_permute(vars_mgr_t self, int* pi)
+\{
+    int ntypes = num_types(self);
+    int nnodes = mesh_num_nodes(self->mesh);
+    int i, n;
+
+    for (i = 0; i < nnodes * ntypes; ++i) \{
+        if (self->node_vars[i] != 0)
+            self->node_vars[i] = pi[self->node_vars[i]-1] + 1;
+    \}
+
+    for (i = 0; i < self->branch_var_count; ++i) \{
+        if (self->branch_vars[i] != 0)
+            self->branch_vars[i] = pi[self->branch_vars[i]-1] + 1;
+    \}
+
+    self->mode = ASSIGN_VARS;
+    self->branch_var_count = 0;
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i) \{
+        element_vars( mesh_element(self->mesh, i), self );
+    \}
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+The {\Tt{}vars{\_}get{\_}vartypes\nwendquote} function is similar to {\Tt{}vars{\_}assign\nwendquote},
+but since it does not actually generate the variable assignments,
+it does not need to keep the same internal arrays.
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWqGiTS-nRuDO-A}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-9}{NWqGiTS-nRuDO-B}\nwenddeflinemarkup
+void vars_get_vartypes(vars_mgr_t self)
+\{
+    int i, n;
+
+    self->mode = REGISTER_VARS;
+    self->branch_var_count = 0;
+
+    self->branch_var_count = 0;
+    n = mesh_num_elements(self->mesh);
+    for (i = 1; i <= n; ++i) \{
+        element_vars( mesh_element(self->mesh, i), self );
+    \}
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NWqGiTS-nRuDO-B}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-A}{NWqGiTS-nRuDO-C}\nwenddeflinemarkup
+int vars_lookup_node(vars_mgr_t self, int node_id, const char* name)
+\{
+    int var_type, var_index;
+
+    assert(self->node_vars);
+    if (node_id <= 0 || node_id > mesh_num_nodes(self->mesh) ||
+        (var_type = vars_vartype(self, name)) < 0) \{
+        return -1;
+    \}
+
+    var_index = (node_id-1)*num_types(self) + var_type;
+    return self->node_vars[var_index]-1;
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NWqGiTS-nRuDO-C}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-B}{NWqGiTS-nRuDO-D}\nwenddeflinemarkup
+int vars_lookup_branch(vars_mgr_t self, int elt_id, int var_number)
+\{
+    int var_index;
+
+    assert(self->elt_branch_vars);
+    if (elt_id <= 0 || elt_id > mesh_num_elements(self->mesh)) \{
+        return -1;
+    \}        
+
+    var_index = self->elt_branch_vars[elt_id-1] + var_number-1;
+    if (var_index >= self->elt_branch_vars[elt_id]) \{
+        return -1;
+    \}
+
+    return self->branch_vars[var_index];
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NWqGiTS-nRuDO-D}\nwmargintag{{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-D}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWqGiTS-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWqGiTS-1Uspz9-1}}\nwprevnextdefs{NWqGiTS-nRuDO-C}{\relax}\nwenddeflinemarkup
+void vars_lookup(vars_mgr_t self, vars_desc_t* v)
+\{
+    int nnodes    = mesh_num_nodes(self->mesh);
+    int nelements = mesh_num_elements(self->mesh);
+    int ntypes    = dynarray_count(self->var_types);
+    int i, j;
+
+    for (i = 0; i < nnodes; ++i) \{
+        for (j = 0; j < ntypes; ++j) \{
+            int vid = self->node_vars[i*ntypes + j]-1;
+            if (vid >= 0) \{
+                v[vid].type   = 'n';
+                v[vid].parent = i+1;
+                v[vid].name   = *(char**) dynarray_get(self->var_types, j);
+            \}
+        \}
+    \}
+
+    for (i = 0; i < nelements; ++i) \{
+        for (j=self->elt_branch_vars[i]; j < self->elt_branch_vars[i+1]; ++j) \{
+            int vid = self->branch_vars[j]-1;
+            v[vid].type   = 'b';
+            v[vid].parent = i+1;
+            v[vid].offset = j - self->elt_branch_vars[i];
+        \}
+    \}
+\}
+
+\nwused{\\{NWqGiTS-1Uspz9-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{\code{}vars{\_}mgr{\_}t\edoc{} entries}{NWqGiTS-33YIK5-1}{\nwixu{NWqGiTS-4H4VOG-1}\nwixd{NWqGiTS-33YIK5-1}\nwixd{NWqGiTS-33YIK5-2}\nwixd{NWqGiTS-33YIK5-3}\nwixd{NWqGiTS-33YIK5-4}}}%
+\nwixlogsorted{c}{{add new variable type}{NWqGiTS-1S6a2E-1}{\nwixu{NWqGiTS-nRuDO-4}\nwixd{NWqGiTS-1S6a2E-1}}}%
+\nwixlogsorted{c}{{assign index if not already assigned}{NWqGiTS-4JtOhw-1}{\nwixu{NWqGiTS-nRuDO-5}\nwixd{NWqGiTS-4JtOhw-1}}}%
+\nwixlogsorted{c}{{check validity of variable type}{NWqGiTS-40Ig75-1}{\nwixu{NWqGiTS-nRuDO-5}\nwixd{NWqGiTS-40Ig75-1}}}%
+\nwixlogsorted{c}{{exported functions}{NWqGiTS-2gXoUc-1}{\nwixu{NWqGiTS-3X3XIp-1}\nwixd{NWqGiTS-2gXoUc-1}\nwixd{NWqGiTS-2gXoUc-2}\nwixd{NWqGiTS-2gXoUc-3}\nwixd{NWqGiTS-2gXoUc-4}\nwixd{NWqGiTS-2gXoUc-5}\nwixd{NWqGiTS-2gXoUc-6}}}%
+\nwixlogsorted{c}{{functions}{NWqGiTS-nRuDO-1}{\nwixu{NWqGiTS-1Uspz9-1}\nwixd{NWqGiTS-nRuDO-1}\nwixd{NWqGiTS-nRuDO-2}\nwixd{NWqGiTS-nRuDO-3}\nwixd{NWqGiTS-nRuDO-4}\nwixd{NWqGiTS-nRuDO-5}\nwixd{NWqGiTS-nRuDO-6}\nwixd{NWqGiTS-nRuDO-7}\nwixd{NWqGiTS-nRuDO-8}\nwixd{NWqGiTS-nRuDO-9}\nwixd{NWqGiTS-nRuDO-A}\nwixd{NWqGiTS-nRuDO-B}\nwixd{NWqGiTS-nRuDO-C}\nwixd{NWqGiTS-nRuDO-D}}}%
+\nwixlogsorted{c}{{initialize variable assignment}{NWqGiTS-268tgu-1}{\nwixu{NWqGiTS-nRuDO-7}\nwixd{NWqGiTS-268tgu-1}}}%
+\nwixlogsorted{c}{{macros}{NWqGiTS-1VvxMr-1}{\nwixu{NWqGiTS-1Uspz9-1}\nwixd{NWqGiTS-1VvxMr-1}}}%
+\nwixlogsorted{c}{{static functions}{NWqGiTS-1duChy-1}{\nwixu{NWqGiTS-1Uspz9-1}\nwixd{NWqGiTS-1duChy-1}}}%
+\nwixlogsorted{c}{{types}{NWqGiTS-4H4VOG-1}{\nwixu{NWqGiTS-1Uspz9-1}\nwixd{NWqGiTS-4H4VOG-1}}}%
+\nwixlogsorted{c}{{vars.c}{NWqGiTS-1Uspz9-1}{\nwixd{NWqGiTS-1Uspz9-1}}}%
+\nwixlogsorted{c}{{vars.h}{NWqGiTS-3X3XIp-1}{\nwixd{NWqGiTS-3X3XIp-1}}}%
+\nwbegindocs{64}\nwdocspar
+\nwenddocs{}

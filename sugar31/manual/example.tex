@@ -1,0 +1,294 @@
+
+% Some examples.
+
+% (From Jason's demo20.pdf -- figures removed.  Need to put them back in,
+% and also add some more sophisticated examples (using parameters, etc))
+ 
+This section describes how to use SUGAR 3.0 by examples. The netlists, commands
+for running analysis, and output are shown. For convenience, all netlist files
+given here are available in the SUGAR demo directory (converted from 2.0). Netlist 
+format is defined in chapter 2.  
+
+\section{Examples with explanations}
+
+\subsection{cantilever example (demo\_dc1)}
+
+This  demo  shows  how  to  simulate  the  deflection  of  a  beam  due  to  an
+external  force, where the beam is fixed at one end. It shows to make the
+netlist, how run static analysis, and obtain graphical output. 
+
+To model the beam a 3D linear beam model called beam3d will be used. If a
+planar beam is desired, simply replace the model b3dm with beam2d in line 2 of
+following netlist. 
+
+\subsubsection*{Netlist}
+
+The following netlist is created by opening a text editor, entering the 3 lines
+of netlist text shown below, and saved as cantilever.net. The 3 text lines
+represent an anchor, beam, and force.  
+\begin{verbatim}
+-- `cantilever.net' 
+use("mumps.net")
+use("stdlib.net")
+
+anchor {node "substrate"; material=p1, l=10u, w=10u, h=10u}
+beam3d {node "substrate", node "tip"; material=p1, l=100u, w=2u, h=2u}
+f3d    {node "tip"; F=2u, oz=90}
+\end{verbatim}
+
+The first line in the netlist includes a process file ``mumps.net''. All process
+information such as layer thickness, Young's modulus etc. are defined in
+``mumps.net''.   The second line includes the standard library file
+``stdlib.net''.
+
+The first line in the netlist represents the anchor element. Anchors are the
+MEMS components that mechanically ground flexible structures to the substrate.
+Without anchors, structures would be statically indeterminate.  
+
+The material properties of the anchor are given in process file "mumps.net".
+The fabrication layer of this process is p1.  
+
+The anchor is attached to the substrate by the node labeled substrate. Notice
+that both the anchor element and beam element (described below) contain the
+node labeled substrate.  The anchor is coupled to the beam through node
+substrate. 
+
+The parameters section of this line of text provides the geometry and
+orientation, where the length, width are 10 microns.  
+
+The second element is a flexible beam. The model used for this beam is called
+beam3d, which is described in appendix. The fabrication layer with which this
+beam is composed of is the p1 layer (i.e. the first layer of polysilicon). It
+is fixed on one end due to its connection to the anchor through the node
+labeled substrate. The opposite end of the beam, labeled tip, is free to move.  
+
+The last section of this line provides geometry and orientation. The beam
+extends to the right, from node substrate to node tip. 
+
+The final line is a force applied at the free end of the beam (node tip). The
+magnitude of the force is given as 2 microNewtons. The orientation of the force
+vector is in the y- direction since it was rotated from its default position
+along the positive x-axis.  
+
+
+\subsubsection*{Command}
+
+Once the netlist text file is created, load it into Matlab with the
+cho\_load command.
+Then static analysis may be
+performed, which finds a final equilibrium state of the system. Running static
+analysis on the above netlist requires 3 commands.   Within the Matlab
+workspace:
+\begin{enumerate}
+ \item load the netlist, 
+ \item perform static analysis on it, and 
+ \item display the results: 
+\end{enumerate}
+
+\begin{verbatim}
+net = cho_load('cantilever.net'); 
+dq = cho_dc(net); 
+cho_display(net,dq); 
+\end{verbatim}
+
+The first command loads the text file called cantilever.net into a variable
+called net. The net variable contains all of the important information in the
+netlist file.
+
+The second line performs the static analysis. The cho\_dc command takes net as
+its input.  Using the parameter values given in the netlist and the
+parameterized element models described in appendix, it calculates the
+deflection of the structure. The displacement vector dq is the output of
+cho\_dc.  
+
+ Incidentally, cho stands for the basic building locks of sugar (i.e. carbon,
+hydrogen, oxygen). 
+
+ Using geometries and orientations from net and node displacements from dq as
+input to cho\_display, SUGAR can graphically display the deflected structure in
+Matlab.
+
+To display original, non-deflected structure, simply type  
+\begin{verbatim}
+ cho_display(net);  
+\end{verbatim}
+After the structure is displayed, left clicking and dragging within the
+display window may adjust the view. The magnification buttons in the display
+window may be used to zoom in and out by first clicking on, say the zoom-in
+(+), followed by pointing and clicking on the display window at the precise
+position that is to be magnified. 
+
+
+\subsection{multiple beam example (demo\_dc2)}
+
+This demo is similar to above demo with the exception that it uses multiple
+beams and it is deflected by a moment. Netlist is as following: 
+
+\subsubsection*{Netlist}
+
+\begin{verbatim}
+-- 'multibeam.net' 
+use("mumps.net")
+use("stdlib.net")
+
+anchor {node "substrate"; material=p1, l=10u, w=10u, oz=180}
+beam3d {node "substrate", node "A"; material=p1, l=100u, w=10u}
+beam3d {node "A", node "B"; material=p1, l=50u, w=4u, oz=45}
+beam3d {node "A", node "C"; material=p1, l=50u, w=4u, oz=-45}
+beam3d {node "C", node "D"; material=p1, l=50u, w=4u, oy=-45}
+f3d    {node "D"; M=1n}
+\end{verbatim}
+
+As before, each element is connected at shared nodes.
+The commands to load the netlist, do the analysis, and 
+display the non-deflected and deflected figures are 
+
+\begin{verbatim}
+net = cho_load('multibeam.net'); 
+dq = cho_dc(net); 
+figure(1); cho_display(net);  
+figure(2); cho_display(net,dq); 
+\end{verbatim} 
+
+ 
+\subsection{Beam gap structure (demo\_beamgap)}
+
+This is a 2D coupled electrical and mechanical domain analysis. It contains
+electrical voltage source, electrical ground, electro-mechanical anchors, beam
+and gap. The netlist and structure of this demo are as following: 
+
+\subsubsection*{Netlist}
+
+\begin{verbatim}
+-- `beamgap2e.net' 
+use "mumps.net"
+use "stdlib.net"
+
+Vsrc    {node "A", node "f"; V = 10}
+eground {node "f"}
+anchor  {node "A", p1; l=5u, w=10u, oz=180}
+beam2de {node "A", node "b", p1; 
+         l=100u, w=2u, h=2u, R=100}
+gap2de  {node "b", node "c", node "D", node "E", p1;
+         l=100u, w1=10u, w2=5u, gap=2u, R1=100, R2=100}
+eground {node "D"}
+eground {node "E"}
+anchor  {node "D", p1; l=5u, w=10u, oz=-90}
+anchor  {node "E", p1; l=5u, w=10u, oz=-90}
+\end{verbatim}
+
+
+Equilibrium displacements have been calculated at an input voltage 10v. The
+deflected structure is shown as following: 
+                                                                                         
+\subsection{Modal analysis (demo\_mirror)}
+
+This is a 3D mechanical modal analysis for a mirror structure. 3D mechanical
+anchors and beams are included. Resonant frequencies have been calculated and
+the first to fourth mode shapes are displayed. Below are the netlist and demo
+pictures  
+
+\subsubsection*{Netlist}
+
+\begin{verbatim}
+-- `mirror.net' 
+use "mumps.net"
+use "stdlib.net"
+
+anchor {node "b";           material=p1, l=10u,  w=10u, oz= 90, h=8u}
+beam3d {node "b", node "c"; material=p1, l=80u,  w=2u,  oz=-90, h=2u}
+beam3d {node "d", node "e"; material=p1, l=80u,  w=2u,  oz=-90, h=2u}
+anchor {node "e";           material=p1, l=10u,  w=10u, oz=-90, h=8u}
+
+-- outer frame:
+beam3d {node "c",  node "f";  material=p1, l=100u, w=20u, oz=-90, h=4u}
+beam3d {node "f",  node "d";  material=p1, l=100u, w=20u, oz=-90, h=4u}
+beam3d {node "c1", node "f1"; material=p1, l=100u, w=20u, oz=-90, h=4u}
+beam3d {node "f1", node "d1"; material=p1, l=100u, w=20u, oz=-90, h=4u}
+beam3d {node "c",  node "c1"; material=p1, l=200u, w=20u, oz=  0, h=4u}
+beam3d {node "d",  node "d1"; material=p1, l=200u, w=20u, oz=  0, h=4u}
+
+-- inner torsion hinges:
+beam3d {node "g3", node "f1"; material=p1, l=40u,  w=2u,   oz=0,  h=2u}
+beam3d {node "f",  node "g6"; material=p1, l=40u,  w=2u,   oz=0,  h=2u}
+
+-- inner solid "plate":
+beam3d {node "g6", node "g3"; material=p1, l=120u, w=140u, oz=0,  h=4u}
+
+-- rear lever:
+beam3d {node "h",  node "f";  material=p1, l=75u,  w=80u,  oz=0,  h=4u}
+\end{verbatim}  
+
+
+\subsection{Steady state analysis (demo\_ss)}
+
+This is a 2D steady state analysis for a resonator as following:  
+
+\subsubsection*{Netlist}
+
+\begin{verbatim}
+-- 'multmode_m.net' 
+use("mumps.net")
+use("stdlib.net")
+
+anchor {node "A";           material=p1, l=5u,   oz=0,   w=10u  }
+beam2d {node "A", node "D"; material=p1, l=150u, oz=180, w=2u   }
+anchor {node "B";           material=p1, l=5u,   oz=0,   w=10u  }
+beam2d {node "B", node "E"; material=p1, l=150u, oz=180, w=2u   }
+beam2d {node "D", node "F"; material=p1, l=50u,  oz=90,  w=5u   }
+beam2d {node "D", node "E"; material=p1, l=50u,  oz=-90, w=5u   }
+beam2d {node "E", node "G"; material=p1, l=50u,  oz=-90, w=5u   }
+beam2d {node "F", node "H"; material=p1, l=50u,  oz=0,   w=2u   }
+beam2d {node "G", node "L"; material=p1, l=150u, oz=0,   w=2u   }
+beam2d {node "H", node "I"; material=p1, l=50u,  oz=0,   w=20u  }
+beam2d {node "I", node "O"; material=p1, l=50u,  oz=0,   w=20u  }
+beam2d {node "I", node "J"; material=p1, l=75u,  oz=-90, w=20u  }
+beam2d {node "J", node "K"; material=p1, l=75u,  oz=-90, w=20u  }
+beam2d {node "L", node "K"; material=p1, l=50u,  oz=0,   w=20u  }
+beam2d {node "K", node "P"; material=p1, l=50u,  oz=0,   w=20u  }
+beam2d {node "J", node "M"; material=p1, l=300u, oz=0,   w=2u   }
+beam2d {node "M", node "N"; material=p1, l=196u, oz=0,   w=116u }
+\end{verbatim}
+
+%An input excitation of sinusoidal force is applied on the resonator as shown as
+%following: 
+
+%The bode plot of the y direction response at the mass is shown below. 
+
+                                                                                            
+\subsection{Transient analysis (demo\_ta1gap)}
+
+\emph{Note: This demo has not yet been converted to SUGAR 3.0}
+
+This is a 3D electromechanical transient analysis for a gap-closing actuator. A
+piecewise linear voltage V(t) is applied across the page. The voltage V(t)
+ramps from 5V at t=10usec to 12V at t=500usec, and then drops to 0V. The
+displacement component of node C in the direction of force is observed below.
+The initial voltage step causes the device to oscillate. At the voltage
+increases at a linear rate, the gap decreases at a nonlinear rate due to the
+electrostatic force increasing proportionally to $1/\mathit{gap}(q)^2$. This
+force also causes the period of oscillation to increase. Once the voltage is
+removed, the actuator exponentially decays back to equilibrium due to viscous
+Couette air damping between the beams and the substrate. 
+
+\subsubsection*{Netlist}
+
+\begin{verbatim}
+use("mumps.net")
+a = node{0, 0, 0; name = "a"}
+b = node{name = "b"}
+c = node{name = "c"}
+d = node{name = "d"}
+e = node{name = "e"}
+
+-- beam and it's anchor: 
+anchor  {a; material=p1, l=5u, w=10u, oz=180, ox=0, oy=0, h=10u}
+beam2de {a, b; material=p1, l=100u, w=4u, oz=0, ox=0, oy=0, h=4u}
+
+-- electrostatic 
+gapV2 {b, c, d, e; material=p1, V1=5, t1=10u,  V2=12, t2=500u, 
+                   l=100u, w1=4u, w2=4u, oz=0, ox=0, oy=0, h=4u, gap=2u}
+-- gap anchors 
+anchor {d; material=p1, l=5u, w=10u, oz=-90, ox=0, oy=0, h=10u}
+anchor {e; material=p1, l=5u, w=10u, oz=-90, ox=0, oy=0, h=10u}
+\end{verbatim}

@@ -1,0 +1,374 @@
+
+\section{Load netlist}
+
+\subsection*{Calling sequence}
+
+\begin{verbatim}
+net = cho_load(name, params)
+\end{verbatim}
+
+Loads and processes a netlist.
+
+\subsection*{Inputs}
+
+\begin{description}
+\item[\texttt{name}]
+  String naming the netlist file to be loaded
+\item[\texttt{params}]
+  (Optional) - a structure whose entries are the values of the parameters
+  to be overridden.
+\end{description}
+
+\subsection*{Example}
+
+\begin{verbatim}
+nfingers = 10;                       % Set the nfingers parameter
+net = cho_load('comb.net', params);  % Load netlist 
+\end{verbatim}
+
+
+
+\section{Device display}
+
+\subsection*{Calling sequence}
+
+\begin{verbatim}
+cho_display(net, q)
+\end{verbatim}
+
+Display the mechanical structure described by a netlist.
+
+\subsection*{Inputs}
+
+\begin{description}
+\item[\texttt{net}]
+  Netlist structure returned from calling cho\_load
+\item[\texttt{q}]
+  (Optional) - the displacement of the original structure,
+  as returned by the static analysis routine or the transient
+  analysis routine.
+  If \texttt{q} is unspecified, the undisplaced structure will
+  be displayed.
+\end{description}
+
+\subsection*{Example}
+
+\begin{verbatim}
+net = cho_load('beamgap.net');  % Load netlist for beam-gap system
+cho_display(net);               % Display undisplaced structure
+\end{verbatim}
+
+\subsection*{Caveats}
+
+There is no display of electrical components.
+
+
+\section{Viewing displacements}
+
+\subsection*{Calling sequence}
+
+\begin{verbatim}
+dqcoord = cho_dq_coord(dq, net, node, coord);
+\end{verbatim}
+
+Extract the displacement corresponding to a particular coordinate
+from a displacement vector q (as output by \texttt{cho\_dc}), or an array 
+of displacement vectors (as output by \texttt{cho\_ta}).
+
+Note that a node ``node'' completely internal to an instance ``foo''
+of some subnet would be named ``node.foo''.
+
+\subsection*{Inputs}
+
+\begin{description}
+\item[\texttt{dq}]:    Displacement vector or array of displacement vectors.
+\item[\texttt{net}]: 
+  Netlist structure returned from calling cho\_load
+\item[\texttt{node}]:  Name of node.
+\item[\texttt{coord}]: Name of coordinate at indicated node.
+\end{description}
+
+\subsection*{Outputs}
+
+\begin{description}
+\item[\texttt{dqcoord}]: Value (or vector of values) from \texttt{dq}
+   associated with the indicated coordinate.
+\end{description}
+
+\subsection*{Example}
+
+\begin{verbatim}
+net = cho_load('beamgap.net');        % Load netlist 
+dq = cho_dc(net);                     % Perform static analysis
+dy = cho_dq_view(dq, net, 'c', 'y');  % Get the y component at c
+\end{verbatim}
+
+
+\section{Static analysis}
+
+\subsection*{Calling sequence}
+
+\begin{verbatim}
+q = cho_dc(net, q0, is_sp);
+\end{verbatim}
+
+Finds a solution of the equilibrium equations
+\[
+  Kx = F(x)
+\]
+using a Newton-Raphson method.
+
+\subsection*{Inputs}
+
+\begin{description}
+\item[\texttt{net}]: 
+  Netlist structure returned from calling cho\_load
+\item[\texttt{q0}]: 
+  (Optional) Starting guess at the displacements from starting position
+  for an equilibrium position.
+  If no \texttt{q0} is provided, or if \texttt{q0 = {}} 
+  the search will start at \texttt{q0} of 0.
+\item[\texttt{is\_sp}]: 
+  (Optional) If true, the code will use sparse solvers.
+  The current default is true (use sparse solvers).
+\end{description}
+
+\subsection*{Outputs}
+
+\begin{description}
+\item[\texttt{q}]: The computed equilibrium state, expressed as
+  displacements from the initial position.
+\end{description}
+
+\subsection*{Example}
+
+\begin{verbatim}
+net = cho_load('beamgap.net');   % Load netlist for beam-gap system
+dq = cho_dc(net);                % Perform static analysis
+cho_display(net, dq);            % Display the deflected structure
+\end{verbatim}
+
+\subsection*{Caveats}
+
+The zero-finder currently used by SUGAR is very simple, and may
+fail to converge for some problems.  If the function fails to converge
+after 40 iterations, it will exit and print a warning diagnostic:
+\begin{verbatim}
+ Warning: DC solution finder did not converge after 40 iterations
+\end{verbatim}
+In this case, the result \texttt{q} returned by the routine is likely
+to be useless.  Failure to find equilibrium occurs in such cases as
+an electrostatically actuated gap operating near pull-in voltage.
+
+When SUGAR finds an equilibrium point, it may not always be the
+equilibrium point desired.  In the case of an electrostatically actuated
+gap, for example, there are two equilibria below pull-in voltage:
+one stable and one unstable.  When the equilibria are close together,
+especially with respect to the distance from the starting point \texttt{q0},
+the solver may move to an unstable equilibrium.
+
+Good initial guesses for an equilibrium point can often be attained
+by finding the equilibrium point for a ``nearby'' problem.  For example,
+in trying to find the equilibrium point for a electrostatically actuated
+gap operating near pull-in, a good initial guess \texttt{q0} would
+be the output of a static analysis for the same device at a lower voltage.
+
+
+\section{Modal analysis}
+
+\subsection*{Analysis routine}
+
+\subsubsection*{Calling sequence}
+
+\begin{verbatim}
+[freq, egv, q0] = cho_mode(net, nmodes, q0, find_dc)
+\end{verbatim}
+
+Find the resonating frequencies and corresponding mode shapes
+(eigenvalues and eigenvectors) for the linearized system about
+an equilibrium point.
+
+\subsubsection*{Inputs}
+
+\begin{description}
+\item[\texttt{net}]: 
+  Netlist structure returned from calling cho\_load.
+\item[\texttt{nmodes}]: 
+  (Optional)  If \texttt{nmodes > 0}, use sparse solvers to get nmodes modes
+  If \texttt{nmodes == 0}, use the usual dense solver to get all the modes
+  If \texttt{nmodes < 0}, solve with \texttt{eig(K $\backslash$ M)} rather than 
+  \texttt{eig(M,K)}.  This last option can potentially cause trouble (for 
+  instance, if $K$ is singular), but it is faster.
+
+\item[\texttt{q0}]: 
+  (Optional) Equilibrium operating point, or initial guess for
+  a search for an equilibrium operating point.  If not supplied,
+  of if \texttt{q0 = {}}, 
+  the routine will search for an equilibrium point near 0.
+\item[\texttt{find\_dc}]: 
+  (Optional)  If true, search for an equilibrium point
+  near the supplied q0.
+\end{description}
+
+\subsubsection*{Outputs}
+
+\begin{description}
+\item[freq]: Vector of resonating frequencies (eigenvalues)
+\item[egv]: Array of corresponding mode shapes (eigenvectors)
+\item[q0]: Equilibrium point about which the system was linearized
+\end{description}
+
+\subsection*{Display routine}
+
+\subsubsection*{Calling sequence}
+
+\begin{verbatim}
+cho_modeshape(net, freq, egv, q0, s, num)
+\end{verbatim}
+
+Display the shape of a resonating mode of the mechanical structure.
+
+\subsubsection*{Inputs}
+
+\begin{description}
+\item[\texttt{net}]: 
+  Netlist structure returned from calling cho\_load.
+\item[\texttt{freq}]: Vector of resonant frequencies from \texttt{cho\_mode}.
+\item[\texttt{egv}]: Array of mode shape vectors from \texttt{cho\_mode}.
+\item[\texttt{q0}]: Equilibrium point from \texttt{cho\_mode}.
+\item[\texttt{s}]: Scale factor.  Eigenvectors from \texttt{cho\_mode}
+  are normalized to be unit length; for eigenvectors with significant
+  components (within a few orders of magnitude of 1) in directions
+  corresponding to components which normally move a few microns,
+  a scale factor of $10^{-4}$ often makes the display of the mode
+  more comprehensible.  The scale factor can be omitted, in which case
+  SUGAR uses a heuristic to determine scaling.
+\item[\texttt{num}]: Number of the mode to display.  Modes are numbered
+  in order of decreasing frequency.
+\end{description}
+
+\subsection*{Example}
+
+\begin{verbatim}
+% Show the first (lowest-frequency) mode shape for the system,
+% scaled by a factor of 0.1
+net = cho_load('beamgap.net');
+[f,e,q] = cho_mode(net);
+cho_modeshape(net, f,e,q, 0.1, 1);
+\end{verbatim}
+
+\subsection*{Caveats}
+
+While SUGAR will attempt to find an appropriate linearization point,
+it is not guaranteed to converge to one.  See the caveats for
+static analysis.
+
+The modal analysis routine neglects damping forces. 
+
+As noted above, using \texttt{cho\_modeshape} with a too-large scaling
+factor often results in the displayed device being stretched to
+incomprehensible proportions.  Currently, trial-and-error guesses at
+an appropriate scale factor seem to work best.
+
+
+\section{Steady state analysis}
+
+\subsection*{Calling sequence}
+
+\begin{verbatim}
+find_ss(net, q0, in_node, in_var, out_node, out_var)
+\end{verbatim}
+
+Make Bode plots of the frequency response of the linearized system about
+an equilibrium point \texttt{q0}. 
+
+\subsection*{Inputs}
+
+\begin{description}
+\item[\texttt{net}]: 
+  Netlist structure returned from calling cho\_load
+\item[\texttt{q0}]: 
+  Equilibrium position for the system, as determined via the
+  static analysis routine \texttt{cho\_dc}
+\item[\texttt{in\_node}]:
+  Name of the node at which an input signal is to be applied.
+\item[\texttt{in\_var}]:
+  Name of the nodal variable to be excited.
+\item[\texttt{out\_node}]:
+  Name of the node where the response is to be observed.
+\item[\texttt{out\_var}]:
+  Name of the nodal variable to be observed.
+\end{description}
+
+\subsection*{Example}
+
+\begin{verbatim}
+net = cho_load('multimode.net'); 
+dq = cho_dc(net);
+find_ss(net, dq, 'node10', 'y', 'node14', 'y');
+\end{verbatim}
+
+\subsection*{Caveats}
+
+Steady-state frequency response analysis currently fails for devices
+involving purely algebraic constraint.  Such devices include electrical
+resistor networks with no inductances or capacitances considered,
+for example.
+
+The steady-state analysis routines currently use functions from Matlab's
+Control Toolbox, which may be unavailable to some Matlab users.
+
+
+\section{Transient analysis}
+
+\emph{Note: Transient analysis has not yet been implemented in SUGAR 3.0}
+
+\subsection*{Calling sequence}
+
+\begin{verbatim}
+res = cho_ta(net,tspan,q0)
+\end{verbatim}
+
+Simulate the behavior of the device over some time period.
+
+\subsection*{Inputs}
+
+\begin{description}
+\item[\texttt{net}]: 
+  Netlist structure returned from calling cho\_load
+\item[\texttt{tspan}]: 
+  Two-element vector \texttt{[tstart tend]} indicating the start
+  and end times for the simulation.
+\item[\texttt{q0}]: 
+  (Optional) Initial state at \texttt{tstart}.
+  If \texttt{q0} is not provided, the default is zero.
+\end{description}
+
+\subsection*{Outputs}
+
+\begin{description}
+\item[\texttt{T}]: Time points where the solution was sampled
+\item[\texttt{Q}]: Array of state vectors sampled at the times in 
+  \texttt{T}
+  (i.e. \texttt{Q(i,:)} is the state vector at time \texttt{T(i)})
+\end{description}
+
+\subsection*{Example}
+
+\begin{verbatim}
+net = cho_load('beamgap.net')        % Load the netlist
+[T,Q[ = cho_ta(net,{0, 1e-3]);       % Simulate 1 ms behavior
+dy = cho_dq_view(Q, net, 'c', 'y');  % Get the y component at c, and
+plot(T, dy);                         %  plot how it moves over time
+\end{verbatim}
+
+\subsection*{Caveats}
+
+The transient analysis routines currently take an impractically long
+time to simulate even some simple examples over modest time spans
+(like a millisecond).  Mixed electrical-mechanical simulations
+are particularly problematic.
+
+Like frequency-response analysis, the transient analysis routine fails
+completely for devices involving purely algebraic constraints.
+

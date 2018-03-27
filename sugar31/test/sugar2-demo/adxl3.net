@@ -1,0 +1,99 @@
+use("std2cvt.net")
+
+pi = 3.1415926535897932385
+poly = material {
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p1 = material {
+  parent = poly,
+  h = 2e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p2 = material {
+  parent = poly,
+  h = 1.5e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+d2 = material {
+  parent = poly,
+  fluid = 0.75e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+subnet mfXSusp (B, material, susp_len)
+  local parent = material
+  _currnodes["B"] = B
+  susp_len = susp_len or (material and material.susp_len)
+  mfanchor {_n("A"); material = parent, l = 10u, w = 10u, h = 6u, oz = deg(90)}
+  mfbeam3d {_n("A"), _n("a1"); material = parent, l = susp_len, w = 2u, h = 6u, oz = deg(0)}
+  mfbeam3d {_n("a1"), _n("a2"); material = parent, l = 10u, w = 2u, h = 6u, oz = -(deg(90))}
+  mfbeam3d {_n("a2"), _n("B"); material = parent, l = susp_len, w = 2u, h = 6u, oz = deg(180)}
+  mfbeam3d {_n("A"), _n("a3"); material = parent, l = susp_len, w = 2u, h = 6u, oz = deg(180)}
+  mfbeam3d {_n("a3"), _n("a4"); material = parent, l = 10u, w = 2u, h = 6u, oz = -(deg(90))}
+  mfbeam3d {_n("a4"), _n("B"); material = parent, l = susp_len, w = 2u, h = 6u, oz = deg(0)}
+end
+
+subnet mfXMass (A, B, material, finger_len)
+  local parent = material
+  _currnodes["A"] = A
+  _currnodes["B"] = B
+  finger_len = finger_len or (material and material.finger_len)
+  mfbeam3d {_n("A"), _n("b1"); material = parent, l = 25u, w = 50u, h = 6u, oz = -(deg(90))}
+  mfbeam3d {_n("b1"), _n("B"); material = parent, l = 25u, w = 50u, h = 6u, oz = -(deg(90))}
+  mfbeam3d {_n("b1"), _n("b2"); material = parent, l = finger_len, w = 2u, h = 6u, oz = deg(0)}
+  mfbeam3d {_n("b1"), _n("b3"); material = parent, l = finger_len, w = 2u, h = 6u, oz = deg(180)}
+end
+
+mfXSusp {_n("c" .. "_" .. (1)); material = p1, susp_len = 200u}
+for k = 1 , 10 do
+    mfXMass {_n("c" .. "_" .. (k)), _n("c" .. "_" .. ((k)+(1))); material = p1, finger_len = 100u}
+end
+mfXSusp {_n("c" .. "_" .. (11)); material = p1, susp_len = 200u, oz = pi}
+relpos_treewalk()

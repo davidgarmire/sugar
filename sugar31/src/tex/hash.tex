@@ -1,0 +1,662 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}hash\nwendquote} module implements a basic fixed-size hash table.
+It is loosely based on the {\Tt{}Table\nwendquote} module from David Hanson's %'
+\emph{C Interfaces and Implementations}~\cite{Hans96} 
+and on the OpenSSL / SSLeay {\Tt{}LHASH\nwendquote} structure.  
+I also mimiced some of the STL hash extension 
+that comes with {\Tt{}g++\nwendquote} version.
+
+The {\Tt{}hash\nwendquote} module also provides special support for string tables.
+
+
+\section{Interface}
+
+\nwfilename{hash.nw}\nwbegincode{1}\sublabel{NW4SmNo8-3WjNHa-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-3WjNHa-1}}}\moddef{hash.h~{\nwtagstyle{}\subpageref{NW4SmNo8-3WjNHa-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef HASH_H
+#define HASH_H
+
+#include <mempool.h>
+
+typedef struct hash_t* hash_t;
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NW4SmNo8-4aCyDR-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-1}}\RA{}
+
+#endif /* HASH_H */
+\nwnotused{hash.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+The {\Tt{}hash{\_}create\nwendquote} and {\Tt{}hash{\_}destroy\nwendquote} function create and
+destroy hash table entries, respectively.  Hash tables created
+using {\Tt{}hash{\_}create\nwendquote} normally have their own internal pool;
+to make a hash table that allocates from an externally defined
+pool, use the {\Tt{}hash{\_}pcreate\nwendquote} function.
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW4SmNo8-2gXoUc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3WjNHa-1}}\nwprevnextdefs{\relax}{NW4SmNo8-2gXoUc-2}\nwenddeflinemarkup
+hash_t hash_create (\LA{}hash creation arguments~{\nwtagstyle{}\subpageref{NW4SmNo8-2xfuUf-1}}\RA{});
+hash_t hash_pcreate(mempool_t pool,
+                            \LA{}hash creation arguments~{\nwtagstyle{}\subpageref{NW4SmNo8-2xfuUf-1}}\RA{});
+void   hash_destroy(hash_t hash);
+
+\nwalsodefined{\\{NW4SmNo8-2gXoUc-2}\\{NW4SmNo8-2gXoUc-3}\\{NW4SmNo8-2gXoUc-4}\\{NW4SmNo8-2gXoUc-5}}\nwused{\\{NW4SmNo8-3WjNHa-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+To create a hash table, you \emph{must} specify a comparison
+function (a la {\Tt{}strcmp\nwendquote}) and a hash function.  You \emph{may}
+also specify a size hint and a copy function.  The {\Tt{}size{\_}hint\nwendquote}
+argument specifies the approximate table size to be used.
+The actual size used will generally be the value given by 
+{\Tt{}size{\_}hint\nwendquote} rounded up to one of a small number of primes.
+If a non-NULL {\Tt{}copy\nwendquote} function is specified, it will be used to
+copy all inserted data items into the memory pool.  If the
+{\Tt{}copy\nwendquote} function is NULL, only a pointer is saved in the table.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW4SmNo8-4aCyDR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-4aCyDR-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NW4SmNo8-4aCyDR-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3WjNHa-1}}\nwenddeflinemarkup
+typedef int      (*hash_compare_fun_t)(const void* x, const void* y);
+typedef unsigned (*hash_hash_fun_t)   (const void* key);
+typedef void*    (*hash_copy_fun_t)   (mempool_t pool, const void* data);
+
+\nwused{\\{NW4SmNo8-3WjNHa-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW4SmNo8-2xfuUf-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2xfuUf-1}}}\moddef{hash creation arguments~{\nwtagstyle{}\subpageref{NW4SmNo8-2xfuUf-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-2gXoUc-1}\\{NW4SmNo8-nRuDO-1}\\{NW4SmNo8-nRuDO-2}}\nwenddeflinemarkup
+int size_hint,
+hash_compare_fun_t compare,
+hash_hash_fun_t    hash,
+hash_copy_fun_t    copy
+\nwused{\\{NW4SmNo8-2gXoUc-1}\\{NW4SmNo8-nRuDO-1}\\{NW4SmNo8-nRuDO-2}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+Two simple hash functions are provided: one for strings, and
+one for fixed-size blocks of data
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW4SmNo8-2gXoUc-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3WjNHa-1}}\nwprevnextdefs{NW4SmNo8-2gXoUc-1}{NW4SmNo8-2gXoUc-3}\nwenddeflinemarkup
+unsigned hash_strhash (const char* key);
+unsigned hash_bytehash(const void* key, int n);
+
+\nwused{\\{NW4SmNo8-3WjNHa-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+The basic operations on a table are insertion, deletion, and retrieval.
+The {\Tt{}hash{\_}insert\nwendquote} routine will return NULL if the specified insertion
+does not overwrite any existing entries with the same key.  If the
+insertion \emph{does} overwrite an existing entry, then the pointer to
+that entry will be returned.  Similarly, the {\Tt{}hash{\_}remove\nwendquote} function
+will return the deleted entry if a match was found or NULL if there
+was no match.  The {\Tt{}hash{\_}add\nwendquote} routine retrieves a match if there is
+one; otherwise, it adds a new entry to the table and returns that.
+
+Requests with NULL data or key arguments are ignored.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW4SmNo8-2gXoUc-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-3}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3WjNHa-1}}\nwprevnextdefs{NW4SmNo8-2gXoUc-2}{NW4SmNo8-2gXoUc-4}\nwenddeflinemarkup
+void* hash_insert  (hash_t hash, void* data);
+void* hash_remove  (hash_t hash, const void* key);
+void* hash_retrieve(hash_t hash, const void* key);
+void* hash_add     (hash_t hash, void* data);
+
+\nwused{\\{NW4SmNo8-3WjNHa-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+It is also possible to iterate over all the entries in the hash
+table.  The {\Tt{}hash{\_}doall\nwendquote} and {\Tt{}hash{\_}doall{\_}arg\nwendquote} functions call
+a specified function for each entry in the hash table.
+\nwenddocs{}\nwbegincode{13}\sublabel{NW4SmNo8-2gXoUc-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-4}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3WjNHa-1}}\nwprevnextdefs{NW4SmNo8-2gXoUc-3}{NW4SmNo8-2gXoUc-5}\nwenddeflinemarkup
+void hash_doall    (hash_t hash, 
+                            void (*func)(void* data));
+void hash_doall_arg(hash_t hash, 
+                            void (*func)(void* data, void* arg),
+                            void* arg);
+
+\nwused{\\{NW4SmNo8-3WjNHa-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+Hash tables are sufficiently often used as \emph{string tables}
+that we provide special constructors for that purpose.  A
+string table, as indicated by the name, is a hash table of just
+string entries.
+
+The {\Tt{}hstrings{\_}add\nwendquote} and {\Tt{}hstrings{\_}retrieve\nwendquote} wrappers are just
+macros around {\Tt{}hash{\_}retrieve\nwendquote} and {\Tt{}hash{\_}add\nwendquote} that make it a
+little less obnoxious to manage the type casts.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW4SmNo8-2gXoUc-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-5}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW4SmNo8-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3WjNHa-1}}\nwprevnextdefs{NW4SmNo8-2gXoUc-4}{\relax}\nwenddeflinemarkup
+hash_t  hstrings_create (int size_hint);
+hash_t  hstrings_pcreate(mempool_t pool, int size_hint);
+#define hstrings_add(h, s)      ((const char*) (hash_add(h, (void*) s)))
+#define hstrings_retrieve(h, s) ((const char*) hash_retrieve(h, s))
+\nwused{\\{NW4SmNo8-3WjNHa-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW4SmNo8-1UYfxu-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-1UYfxu-1}}}\moddef{hash.c~{\nwtagstyle{}\subpageref{NW4SmNo8-1UYfxu-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <assert.h>
+#include <string.h>
+
+#include <mempool.h>
+#include <hash.h>
+
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW4SmNo8-1duChy-1}}\RA{}
+\LA{}types~{\nwtagstyle{}\subpageref{NW4SmNo8-4H4VOG-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}\RA{}
+\nwnotused{hash.c}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{Creating and destroying hash tables}
+
+The hash table structure stores the functions passed to {\Tt{}hash{\_}create\nwendquote},
+a pool on which to to allocation (along with a flag indicating whether
+the pool is managed by the hash table), the table array itself, and
+the number of buckets in the table.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW4SmNo8-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NW4SmNo8-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{\relax}{NW4SmNo8-4H4VOG-2}\nwenddeflinemarkup
+typedef struct hash_entry_t hash_entry_t;
+
+struct hash_t \{
+    int             size;
+    hash_entry_t**  table;
+    mempool_t       pool;
+    int             own_pool_flag;
+
+    hash_compare_fun_t compare;
+    hash_hash_fun_t    hash;
+    hash_copy_fun_t    copy;
+\};
+
+\nwalsodefined{\\{NW4SmNo8-4H4VOG-2}}\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+Hash bucket entries are basic linked list entries.
+\nwenddocs{}\nwbegincode{21}\sublabel{NW4SmNo8-4H4VOG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-4H4VOG-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NW4SmNo8-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-4H4VOG-1}{\relax}\nwenddeflinemarkup
+struct hash_entry_t \{
+    struct hash_entry_t* next;
+    void* data;
+\};
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+The {\Tt{}hash{\_}create\nwendquote} function is essentially just a wrapper around
+{\Tt{}hash{\_}pcreate\nwendquote}.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NW4SmNo8-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{\relax}{NW4SmNo8-nRuDO-2}\nwenddeflinemarkup
+hash_t hash_create(\LA{}hash creation arguments~{\nwtagstyle{}\subpageref{NW4SmNo8-2xfuUf-1}}\RA{})
+\{
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    hash_t    h    = hash_pcreate(pool, size_hint, compare, hash, copy);
+    h->own_pool_flag = 1;
+    return h;
+\}
+
+\nwalsodefined{\\{NW4SmNo8-nRuDO-2}\\{NW4SmNo8-nRuDO-3}\\{NW4SmNo8-nRuDO-4}\\{NW4SmNo8-nRuDO-5}\\{NW4SmNo8-nRuDO-6}\\{NW4SmNo8-nRuDO-7}\\{NW4SmNo8-nRuDO-8}\\{NW4SmNo8-nRuDO-9}\\{NW4SmNo8-nRuDO-A}\\{NW4SmNo8-nRuDO-B}\\{NW4SmNo8-nRuDO-C}\\{NW4SmNo8-nRuDO-D}}\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The only trick to the {\Tt{}hash{\_}pcreate\nwendquote} routine is in picking the
+table size based on the {\Tt{}size{\_}hint\nwendquote}.  A small table of primes
+is used to look up a reasonable size somewhat larger than the
+specified hint.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NW4SmNo8-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-1}{NW4SmNo8-nRuDO-3}\nwenddeflinemarkup
+hash_t hash_pcreate(mempool_t pool,
+                    \LA{}hash creation arguments~{\nwtagstyle{}\subpageref{NW4SmNo8-2xfuUf-1}}\RA{})
+\{
+    \LA{}define list of primes~{\nwtagstyle{}\subpageref{NW4SmNo8-u72h5-1}}\RA{}
+
+    hash_t h = (hash_t) mempool_get(pool, sizeof(struct hash_t));
+    int i;
+
+    \LA{}initialize hash fields~{\nwtagstyle{}\subpageref{NW4SmNo8-3iXDnv-1}}\RA{}
+    return h;
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NW4SmNo8-3iXDnv-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-3iXDnv-1}}}\moddef{initialize hash fields~{\nwtagstyle{}\subpageref{NW4SmNo8-3iXDnv-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-2}}\nwenddeflinemarkup
+for (i = 0; i < num_primes && size_hint < primes[i]; ++i);
+h->size          = primes[i];
+h->pool          = pool;
+h->own_pool_flag = 1;
+h->compare  = compare;
+h->hash     = hash;
+h->copy     = copy;
+h->table    = (hash_entry_t**) 
+              mempool_cget(pool, h->size * sizeof(hash_entry_t*));
+\nwused{\\{NW4SmNo8-nRuDO-2}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NW4SmNo8-u72h5-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-u72h5-1}}}\moddef{define list of primes~{\nwtagstyle{}\subpageref{NW4SmNo8-u72h5-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-2}}\nwenddeflinemarkup
+static int primes[] = \{119,  253,  509,   1021,  2053, 
+                       4093, 8191, 16381, 32771, 65521\};
+static int num_primes = 10;
+\nwused{\\{NW4SmNo8-nRuDO-2}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+The {\Tt{}hash{\_}destroy\nwendquote} function basically just destroys the pool
+(if the pool is managed by the hash table).
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NW4SmNo8-nRuDO-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-3}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-2}{NW4SmNo8-nRuDO-4}\nwenddeflinemarkup
+void hash_destroy(hash_t hash)
+\{
+    if (hash->own_pool_flag)
+        mempool_destroy(hash->pool);
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+
+\subsection{Creating string tables}
+
+The string table creation functions really are just wrappers
+around the ordinary hash creation functions.
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NW4SmNo8-nRuDO-4}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-4}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-3}{NW4SmNo8-nRuDO-5}\nwenddeflinemarkup
+hash_t hstrings_create(int size_hint)
+\{
+    return hash_create(\LA{}string table \code{}hash{\_}create\edoc{} arguments~{\nwtagstyle{}\subpageref{NW4SmNo8-3v4LcX-1}}\RA{});
+\}
+
+hash_t hstrings_pcreate(mempool_t pool, int size_hint)
+\{
+    return hash_pcreate(pool,
+                        \LA{}string table \code{}hash{\_}create\edoc{} arguments~{\nwtagstyle{}\subpageref{NW4SmNo8-3v4LcX-1}}\RA{});
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+
+All the functions we need (compare, hash, and copy) are already
+implemented elsewhere.  The only reason the casts are there is
+to prevent the compiler from complaining about {\Tt{}const\ void*\nwendquote} and
+{\Tt{}const\ char*\nwendquote} not being the same thing.  I'm not even completely
+sure the casts are needed.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NW4SmNo8-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW4SmNo8-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwenddeflinemarkup
+int stdcall_strcmp(const char* a, const char* b)
+\{
+    return strcmp(a, b);
+\}
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NW4SmNo8-3v4LcX-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-3v4LcX-1}}}\moddef{string table \code{}hash{\_}create\edoc{} arguments~{\nwtagstyle{}\subpageref{NW4SmNo8-3v4LcX-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-4}}\nwenddeflinemarkup
+size_hint,
+(hash_compare_fun_t) stdcall_strcmp,
+(hash_hash_fun_t)    hash_strhash,
+(hash_copy_fun_t)    mempool_strdup
+\nwused{\\{NW4SmNo8-nRuDO-4}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+
+\subsection{Basic hash function}
+
+The string hash is {\Tt{}hashpjw\nwendquote}, originally from P.J.~Weinberger's
+C compiler.  See the Dragon Book for details.
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NW4SmNo8-nRuDO-5}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-5}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-4}{NW4SmNo8-nRuDO-6}\nwenddeflinemarkup
+unsigned hash_strhash(const char* key)
+\{
+    unsigned g, h = 0;
+    for (; *key != '\\0'; ++key) \{
+        h = (h << 4) + *key;
+        g = h & 0xF0000000;
+        if (g) \{
+            h = h ^ (g >> 24);
+            h = h ^ g;
+        \}
+    \}
+    return h;   
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+
+The binary hash function is pretty darned simple.
+Some day I will steal a decent one.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NW4SmNo8-nRuDO-6}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-6}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-5}{NW4SmNo8-nRuDO-7}\nwenddeflinemarkup
+unsigned hash_bytehash(const void* key, int n)
+\{
+    const unsigned char* s = (const unsigned char*) key;
+    unsigned h = 0;
+    while (n-- > 0) \{
+        h *= 5;
+        h += *s++;
+    \}
+    return h;
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\subsection{Adding, removing, and retrieving entries}
+
+The {\Tt{}hash{\_}search{\_}bucket\nwendquote} routine looks for an entry matching
+some key in a particular bucket.
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NW4SmNo8-nRuDO-7}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-7}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-6}{NW4SmNo8-nRuDO-8}\nwenddeflinemarkup
+static hash_entry_t* hash_search_bucket(hash_t hash, int bucket,
+                                                const void* key)
+\{
+    hash_entry_t* entry = hash->table[bucket];
+
+    while (entry != NULL && (hash->compare)(entry->data, key) != 0)
+        entry = entry->next;
+
+    return entry;
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+To insert a new entry, we just make a copy of the data (if the copy
+operation was defined), and either add a new entry to the list or
+overwrite an old entry with the same key.
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NW4SmNo8-nRuDO-8}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-8}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-7}{NW4SmNo8-nRuDO-9}\nwenddeflinemarkup
+void* hash_insert(hash_t hash, void* data)
+\{
+    if (data == NULL) \{
+        return NULL;
+    \} else \{
+        int index = (hash->hash)(data) % (hash->size);
+        hash_entry_t* entry = hash_search_bucket(hash, index, data);
+
+        \LA{}copy the data into the hash pool~{\nwtagstyle{}\subpageref{NW4SmNo8-39YZx1-1}}\RA{}
+
+        if (entry != NULL) \{
+            \LA{}overwrite the entry and return the old data~{\nwtagstyle{}\subpageref{NW4SmNo8-1vtvBY-1}}\RA{}
+        \} else \{
+            \LA{}add a new entry~{\nwtagstyle{}\subpageref{NW4SmNo8-3zwv7N-1}}\RA{}
+            return NULL;
+        \}
+    \}
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NW4SmNo8-39YZx1-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-39YZx1-1}}}\moddef{copy the data into the hash pool~{\nwtagstyle{}\subpageref{NW4SmNo8-39YZx1-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-8}}\nwenddeflinemarkup
+if (hash->copy)
+    data = (hash->copy)(hash->pool, data);
+\nwused{\\{NW4SmNo8-nRuDO-8}}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NW4SmNo8-1vtvBY-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-1vtvBY-1}}}\moddef{overwrite the entry and return the old data~{\nwtagstyle{}\subpageref{NW4SmNo8-1vtvBY-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-8}}\nwenddeflinemarkup
+void* old_data = entry->data;
+entry->data = data;
+return old_data;
+\nwused{\\{NW4SmNo8-nRuDO-8}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NW4SmNo8-3zwv7N-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-3zwv7N-1}}}\moddef{add a new entry~{\nwtagstyle{}\subpageref{NW4SmNo8-3zwv7N-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-8}\\{NW4SmNo8-nRuDO-B}}\nwenddeflinemarkup
+entry = (hash_entry_t*) mempool_get(hash->pool, sizeof(hash_entry_t));
+entry->data = data;
+entry->next = hash->table[index];
+hash->table[index] = entry;
+\nwused{\\{NW4SmNo8-nRuDO-8}\\{NW4SmNo8-nRuDO-B}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+To remove an entry, we just find the pointer to that entry
+and change that pointer.  This works because {\Tt{}entry\nwendquote} is
+actually a pointer to one of the pointers \emph{in the list}
+(either to {\Tt{}hash->table[index]\nwendquote} or to some entry's {\Tt{}next\nwendquote}
+field).  It's the standard linked list trick.
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NW4SmNo8-nRuDO-9}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-9}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-8}{NW4SmNo8-nRuDO-A}\nwenddeflinemarkup
+void* hash_remove(hash_t hash, const void* key)
+\{
+    if (key == NULL) \{
+        return NULL;
+    \} else \{
+        int index = (hash->hash)(key) % (hash->size);
+
+        hash_entry_t* prev  = NULL;
+        hash_entry_t* entry = hash->table[index];
+
+        \LA{}find entry to remove~{\nwtagstyle{}\subpageref{NW4SmNo8-40o6BF-1}}\RA{}
+        \LA{}return NULL if no entry~{\nwtagstyle{}\subpageref{NW4SmNo8-1rPhEE-1}}\RA{}
+        \LA{}remove link~{\nwtagstyle{}\subpageref{NW4SmNo8-2M9uit-1}}\RA{}
+        return entry->data;
+    \}
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NW4SmNo8-40o6BF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-40o6BF-1}}}\moddef{find entry to remove~{\nwtagstyle{}\subpageref{NW4SmNo8-40o6BF-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-9}}\nwenddeflinemarkup
+while (entry != NULL && (hash->compare)(entry->data, key) != 0) \{
+    prev  = entry;
+    entry = entry->next;
+\}
+
+\nwused{\\{NW4SmNo8-nRuDO-9}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NW4SmNo8-1rPhEE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-1rPhEE-1}}}\moddef{return NULL if no entry~{\nwtagstyle{}\subpageref{NW4SmNo8-1rPhEE-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-9}}\nwenddeflinemarkup
+if (entry == NULL)
+    return NULL;
+
+\nwused{\\{NW4SmNo8-nRuDO-9}}\nwendcode{}\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}\nwbegincode{59}\sublabel{NW4SmNo8-2M9uit-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2M9uit-1}}}\moddef{remove link~{\nwtagstyle{}\subpageref{NW4SmNo8-2M9uit-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-nRuDO-9}}\nwenddeflinemarkup
+if (prev == NULL)
+    hash->table[index] = entry->next;
+else
+    prev->next = entry->next;
+
+\nwused{\\{NW4SmNo8-nRuDO-9}}\nwendcode{}\nwbegindocs{60}\nwdocspar
+
+And the retrieval function is obvious.
+
+\nwenddocs{}\nwbegincode{61}\sublabel{NW4SmNo8-nRuDO-A}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-A}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-9}{NW4SmNo8-nRuDO-B}\nwenddeflinemarkup
+void* hash_retrieve(hash_t hash, const void* key)
+\{
+    if (key == NULL) \{
+        return NULL;
+    \} else \{
+        int index = (hash->hash)(key) % (hash->size);
+        hash_entry_t* entry = hash_search_bucket(hash, index, key);
+        if (entry == NULL)
+            return NULL;
+        else
+            return entry->data;
+    \}
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{62}\nwdocspar
+
+The {\Tt{}hash{\_}add\nwendquote} function is basically a cross between the retrieval
+function and the insertion function.
+
+\nwenddocs{}\nwbegincode{63}\sublabel{NW4SmNo8-nRuDO-B}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-B}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-A}{NW4SmNo8-nRuDO-C}\nwenddeflinemarkup
+void* hash_add(hash_t hash, void* data)
+\{
+    if (data == NULL) \{
+        return NULL;
+    \} else \{
+        int index = (hash->hash)(data) % (hash->size);
+        hash_entry_t* entry = hash_search_bucket(hash, index, data);
+        if (entry == NULL) \{
+            if (hash->copy)
+                data = (hash->copy)(hash->pool, data);
+            \LA{}add a new entry~{\nwtagstyle{}\subpageref{NW4SmNo8-3zwv7N-1}}\RA{}
+        \} 
+        return entry->data;
+    \}
+\}
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{64}\nwdocspar
+
+\subsection{Iteration}
+
+The iteration functions just run through the entries in each
+bucket in the order they appear.  There isn't very much to it.
+
+\nwenddocs{}\nwbegincode{65}\sublabel{NW4SmNo8-nRuDO-C}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-C}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-B}{NW4SmNo8-nRuDO-D}\nwenddeflinemarkup
+void hash_doall(hash_t hash, void (*func)(void* data))
+\{
+    int bucket;
+    hash_entry_t* entry;
+
+    for (bucket = 0; bucket < hash->size; ++bucket)
+        for (entry = hash->table[bucket]; entry != NULL; entry = entry->next)
+            (func)(entry->data);
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{66}\nwdocspar
+
+\nwenddocs{}\nwbegincode{67}\sublabel{NW4SmNo8-nRuDO-D}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-D}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW4SmNo8-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1UYfxu-1}}\nwprevnextdefs{NW4SmNo8-nRuDO-C}{\relax}\nwenddeflinemarkup
+void hash_doall_arg(hash_t hash, 
+                            void (*func)(void* data, void* arg),
+                            void* arg)
+\{
+    int bucket;
+    hash_entry_t* entry;
+
+    for (bucket = 0; bucket < hash->size; ++bucket)
+        for (entry = hash->table[bucket]; entry != NULL; entry = entry->next)
+            (func)(entry->data, arg);
+\}
+
+\nwused{\\{NW4SmNo8-1UYfxu-1}}\nwendcode{}\nwbegindocs{68}\nwdocspar
+
+
+\subsection{Test program}
+
+Our test program is a standard ``word count'' type of program.
+
+\nwenddocs{}\nwbegincode{69}\sublabel{NW4SmNo8-3BMmrF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-3BMmrF-1}}}\moddef{wc.c~{\nwtagstyle{}\subpageref{NW4SmNo8-3BMmrF-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <string.h>
+
+#include <hash.h>
+
+\LA{}wc types~{\nwtagstyle{}\subpageref{NW4SmNo8-2oxnMF-1}}\RA{}
+\LA{}wc hash functions~{\nwtagstyle{}\subpageref{NW4SmNo8-4Tnqwh-1}}\RA{}
+\LA{}wc support functions~{\nwtagstyle{}\subpageref{NW4SmNo8-1rVEkz-1}}\RA{}
+\LA{}wc main function~{\nwtagstyle{}\subpageref{NW4SmNo8-1wujfJ-1}}\RA{}
+\nwnotused{wc.c}\nwendcode{}\nwbegindocs{70}\nwdocspar
+
+We will keep a hash table whose entries consist of a character
+string and a counter.
+
+\nwenddocs{}\nwbegincode{71}\sublabel{NW4SmNo8-2oxnMF-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2oxnMF-1}}}\moddef{wc types~{\nwtagstyle{}\subpageref{NW4SmNo8-2oxnMF-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3BMmrF-1}}\nwenddeflinemarkup
+typedef struct wc_entry_t \{
+    char* string;
+    int count;
+\} wc_entry_t;
+
+\nwused{\\{NW4SmNo8-3BMmrF-1}}\nwendcode{}\nwbegindocs{72}\nwdocspar
+
+The basic functions {\Tt{}compare\nwendquote}, {\Tt{}hash\nwendquote}, and {\Tt{}copy\nwendquote} are all
+short, simple functions.
+
+\nwenddocs{}\nwbegincode{73}\sublabel{NW4SmNo8-4Tnqwh-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-4Tnqwh-1}}}\moddef{wc hash functions~{\nwtagstyle{}\subpageref{NW4SmNo8-4Tnqwh-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3BMmrF-1}}\nwprevnextdefs{\relax}{NW4SmNo8-4Tnqwh-2}\nwenddeflinemarkup
+int wc_entry_compare(const void* x, const void* y)
+\{
+    return strcmp( ((wc_entry_t*) x)->string, 
+                   ((wc_entry_t*) y)->string );
+\}
+
+\nwalsodefined{\\{NW4SmNo8-4Tnqwh-2}\\{NW4SmNo8-4Tnqwh-3}}\nwused{\\{NW4SmNo8-3BMmrF-1}}\nwendcode{}\nwbegindocs{74}\nwdocspar
+
+\nwenddocs{}\nwbegincode{75}\sublabel{NW4SmNo8-4Tnqwh-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-4Tnqwh-2}}}\moddef{wc hash functions~{\nwtagstyle{}\subpageref{NW4SmNo8-4Tnqwh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3BMmrF-1}}\nwprevnextdefs{NW4SmNo8-4Tnqwh-1}{NW4SmNo8-4Tnqwh-3}\nwenddeflinemarkup
+unsigned wc_entry_hash(const void* key)
+\{
+    return hash_strhash(((wc_entry_t*) key)->string);
+\}
+
+\nwused{\\{NW4SmNo8-3BMmrF-1}}\nwendcode{}\nwbegindocs{76}\nwdocspar
+
+\nwenddocs{}\nwbegincode{77}\sublabel{NW4SmNo8-4Tnqwh-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-4Tnqwh-3}}}\moddef{wc hash functions~{\nwtagstyle{}\subpageref{NW4SmNo8-4Tnqwh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3BMmrF-1}}\nwprevnextdefs{NW4SmNo8-4Tnqwh-2}{\relax}\nwenddeflinemarkup
+void* wc_entry_copy(mempool_t pool, const void* data)
+\{
+    wc_entry_t* entry;
+
+    entry = (wc_entry_t*) mempool_memdup(pool, (void*) data, sizeof(wc_entry_t));
+    entry->string = mempool_strdup(pool, entry->string);
+    return entry;
+\}
+
+\nwused{\\{NW4SmNo8-3BMmrF-1}}\nwendcode{}\nwbegindocs{78}\nwdocspar
+
+\nwenddocs{}\nwbegincode{79}\sublabel{NW4SmNo8-1rVEkz-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-1rVEkz-1}}}\moddef{wc support functions~{\nwtagstyle{}\subpageref{NW4SmNo8-1rVEkz-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3BMmrF-1}}\nwprevnextdefs{\relax}{NW4SmNo8-1rVEkz-2}\nwenddeflinemarkup
+hash_t wc_hash_create(int size_hint)
+\{
+    return hash_create(size_hint, 
+                       wc_entry_compare, 
+                       wc_entry_hash,
+                       wc_entry_copy);
+\}
+
+\nwalsodefined{\\{NW4SmNo8-1rVEkz-2}\\{NW4SmNo8-1rVEkz-3}}\nwused{\\{NW4SmNo8-3BMmrF-1}}\nwendcode{}\nwbegindocs{80}\nwdocspar
+
+Now counting the strings in a file becomes pretty simple.
+For every string, check to see if it is in the table.
+If it is already in the table, increment the count; if it
+isn't in the table, create a new entry.
+
+\nwenddocs{}\nwbegincode{81}\sublabel{NW4SmNo8-1rVEkz-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-1rVEkz-2}}}\moddef{wc support functions~{\nwtagstyle{}\subpageref{NW4SmNo8-1rVEkz-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3BMmrF-1}}\nwprevnextdefs{NW4SmNo8-1rVEkz-1}{NW4SmNo8-1rVEkz-3}\nwenddeflinemarkup
+void count_file(FILE* fp, hash_t hash)
+\{
+    char buf[128];
+
+    wc_entry_t key;
+    key.string = buf;
+
+    while (fscanf(fp, "%s", buf) != EOF) \{
+        wc_entry_t* entry = (wc_entry_t*) hash_retrieve(hash, &key);
+        if (entry == NULL) \{
+            \LA{}add new wc entry~{\nwtagstyle{}\subpageref{NW4SmNo8-2RZM80-1}}\RA{}
+        \} else \{
+            entry->count++;
+        \}
+    \}   
+\}
+
+\nwused{\\{NW4SmNo8-3BMmrF-1}}\nwendcode{}\nwbegindocs{82}\nwdocspar
+
+\nwenddocs{}\nwbegincode{83}\sublabel{NW4SmNo8-2RZM80-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-2RZM80-1}}}\moddef{add new wc entry~{\nwtagstyle{}\subpageref{NW4SmNo8-2RZM80-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-1rVEkz-2}}\nwenddeflinemarkup
+wc_entry_t new_entry;
+new_entry.string = buf;
+new_entry.count  = 1;
+hash_insert(hash, &new_entry);
+\nwused{\\{NW4SmNo8-1rVEkz-2}}\nwendcode{}\nwbegindocs{84}\nwdocspar
+
+The main function counts all the files listed in the command line,
+and then prints all the entries in the table.
+
+\nwenddocs{}\nwbegincode{85}\sublabel{NW4SmNo8-1wujfJ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-1wujfJ-1}}}\moddef{wc main function~{\nwtagstyle{}\subpageref{NW4SmNo8-1wujfJ-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3BMmrF-1}}\nwenddeflinemarkup
+int main(int argc, char** argv)
+\{
+    hash_t hash = wc_hash_create(1000);
+    --argc, ++argv;
+    while (argc != 0) \{
+        FILE* fp = fopen(*argv, "r");
+        count_file(fp, hash);
+        fclose(fp);
+        --argc, ++argv;
+    \}
+    hash_doall(hash, print_entry);
+    hash_destroy(hash);
+    return 0;
+\}
+
+\nwused{\\{NW4SmNo8-3BMmrF-1}}\nwendcode{}\nwbegindocs{86}\nwdocspar
+
+\nwenddocs{}\nwbegincode{87}\sublabel{NW4SmNo8-1rVEkz-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW4SmNo8-1rVEkz-3}}}\moddef{wc support functions~{\nwtagstyle{}\subpageref{NW4SmNo8-1rVEkz-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW4SmNo8-3BMmrF-1}}\nwprevnextdefs{NW4SmNo8-1rVEkz-2}{\relax}\nwenddeflinemarkup
+void print_entry(void* data)
+\{
+    wc_entry_t* entry = (wc_entry_t*) data;
+    printf("%03d: %s\\n", entry->count, entry->string);
+\}
+
+\nwused{\\{NW4SmNo8-3BMmrF-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{add a new entry}{NW4SmNo8-3zwv7N-1}{\nwixu{NW4SmNo8-nRuDO-8}\nwixd{NW4SmNo8-3zwv7N-1}\nwixu{NW4SmNo8-nRuDO-B}}}%
+\nwixlogsorted{c}{{add new wc entry}{NW4SmNo8-2RZM80-1}{\nwixu{NW4SmNo8-1rVEkz-2}\nwixd{NW4SmNo8-2RZM80-1}}}%
+\nwixlogsorted{c}{{copy the data into the hash pool}{NW4SmNo8-39YZx1-1}{\nwixu{NW4SmNo8-nRuDO-8}\nwixd{NW4SmNo8-39YZx1-1}}}%
+\nwixlogsorted{c}{{define list of primes}{NW4SmNo8-u72h5-1}{\nwixu{NW4SmNo8-nRuDO-2}\nwixd{NW4SmNo8-u72h5-1}}}%
+\nwixlogsorted{c}{{exported functions}{NW4SmNo8-2gXoUc-1}{\nwixu{NW4SmNo8-3WjNHa-1}\nwixd{NW4SmNo8-2gXoUc-1}\nwixd{NW4SmNo8-2gXoUc-2}\nwixd{NW4SmNo8-2gXoUc-3}\nwixd{NW4SmNo8-2gXoUc-4}\nwixd{NW4SmNo8-2gXoUc-5}}}%
+\nwixlogsorted{c}{{exported types}{NW4SmNo8-4aCyDR-1}{\nwixu{NW4SmNo8-3WjNHa-1}\nwixd{NW4SmNo8-4aCyDR-1}}}%
+\nwixlogsorted{c}{{find entry to remove}{NW4SmNo8-40o6BF-1}{\nwixu{NW4SmNo8-nRuDO-9}\nwixd{NW4SmNo8-40o6BF-1}}}%
+\nwixlogsorted{c}{{functions}{NW4SmNo8-nRuDO-1}{\nwixu{NW4SmNo8-1UYfxu-1}\nwixd{NW4SmNo8-nRuDO-1}\nwixd{NW4SmNo8-nRuDO-2}\nwixd{NW4SmNo8-nRuDO-3}\nwixd{NW4SmNo8-nRuDO-4}\nwixd{NW4SmNo8-nRuDO-5}\nwixd{NW4SmNo8-nRuDO-6}\nwixd{NW4SmNo8-nRuDO-7}\nwixd{NW4SmNo8-nRuDO-8}\nwixd{NW4SmNo8-nRuDO-9}\nwixd{NW4SmNo8-nRuDO-A}\nwixd{NW4SmNo8-nRuDO-B}\nwixd{NW4SmNo8-nRuDO-C}\nwixd{NW4SmNo8-nRuDO-D}}}%
+\nwixlogsorted{c}{{hash creation arguments}{NW4SmNo8-2xfuUf-1}{\nwixu{NW4SmNo8-2gXoUc-1}\nwixd{NW4SmNo8-2xfuUf-1}\nwixu{NW4SmNo8-nRuDO-1}\nwixu{NW4SmNo8-nRuDO-2}}}%
+\nwixlogsorted{c}{{hash.c}{NW4SmNo8-1UYfxu-1}{\nwixd{NW4SmNo8-1UYfxu-1}}}%
+\nwixlogsorted{c}{{hash.h}{NW4SmNo8-3WjNHa-1}{\nwixd{NW4SmNo8-3WjNHa-1}}}%
+\nwixlogsorted{c}{{initialize hash fields}{NW4SmNo8-3iXDnv-1}{\nwixu{NW4SmNo8-nRuDO-2}\nwixd{NW4SmNo8-3iXDnv-1}}}%
+\nwixlogsorted{c}{{overwrite the entry and return the old data}{NW4SmNo8-1vtvBY-1}{\nwixu{NW4SmNo8-nRuDO-8}\nwixd{NW4SmNo8-1vtvBY-1}}}%
+\nwixlogsorted{c}{{remove link}{NW4SmNo8-2M9uit-1}{\nwixu{NW4SmNo8-nRuDO-9}\nwixd{NW4SmNo8-2M9uit-1}}}%
+\nwixlogsorted{c}{{return NULL if no entry}{NW4SmNo8-1rPhEE-1}{\nwixu{NW4SmNo8-nRuDO-9}\nwixd{NW4SmNo8-1rPhEE-1}}}%
+\nwixlogsorted{c}{{static functions}{NW4SmNo8-1duChy-1}{\nwixu{NW4SmNo8-1UYfxu-1}\nwixd{NW4SmNo8-1duChy-1}}}%
+\nwixlogsorted{c}{{string table \code{}hash{\_}create\edoc{} arguments}{NW4SmNo8-3v4LcX-1}{\nwixu{NW4SmNo8-nRuDO-4}\nwixd{NW4SmNo8-3v4LcX-1}}}%
+\nwixlogsorted{c}{{types}{NW4SmNo8-4H4VOG-1}{\nwixu{NW4SmNo8-1UYfxu-1}\nwixd{NW4SmNo8-4H4VOG-1}\nwixd{NW4SmNo8-4H4VOG-2}}}%
+\nwixlogsorted{c}{{wc hash functions}{NW4SmNo8-4Tnqwh-1}{\nwixu{NW4SmNo8-3BMmrF-1}\nwixd{NW4SmNo8-4Tnqwh-1}\nwixd{NW4SmNo8-4Tnqwh-2}\nwixd{NW4SmNo8-4Tnqwh-3}}}%
+\nwixlogsorted{c}{{wc main function}{NW4SmNo8-1wujfJ-1}{\nwixu{NW4SmNo8-3BMmrF-1}\nwixd{NW4SmNo8-1wujfJ-1}}}%
+\nwixlogsorted{c}{{wc support functions}{NW4SmNo8-1rVEkz-1}{\nwixu{NW4SmNo8-3BMmrF-1}\nwixd{NW4SmNo8-1rVEkz-1}\nwixd{NW4SmNo8-1rVEkz-2}\nwixd{NW4SmNo8-1rVEkz-3}}}%
+\nwixlogsorted{c}{{wc types}{NW4SmNo8-2oxnMF-1}{\nwixu{NW4SmNo8-3BMmrF-1}\nwixd{NW4SmNo8-2oxnMF-1}}}%
+\nwixlogsorted{c}{{wc.c}{NW4SmNo8-3BMmrF-1}{\nwixd{NW4SmNo8-3BMmrF-1}}}%
+\nwbegindocs{88}\nwdocspar
+
+\nwenddocs{}

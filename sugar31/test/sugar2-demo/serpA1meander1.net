@@ -1,0 +1,10 @@
+%serpA1meadner1
+
+subnet serpA1meander1 [A E] [w_=* l_=* a_=* b_=* c_=* inv=* ozh=*]
+[
+   beam3d parent [A b][l=(a_+l_) w=(c_+w_) oz=ozh] %horizonatal left
+   beam3d parent [b c][l=(b_+l_) w=(c_+w_) oz=-pi/2*inv] %vertical up
+   beam3d parent [c d][l=(a_+l_) w=(c_+w_) oz=ozh] %horizonal left
+   beam3d parent [d E][l=(b_+l_) w=(c_+w_) oz=pi/2*inv] %vertical down
+]
+

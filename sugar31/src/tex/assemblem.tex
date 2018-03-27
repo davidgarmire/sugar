@@ -1,0 +1,127 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The purpose of the matrix assembly module is to build global matrix 
+and vector data structures from local contributions.  But what sort of global
+matrices should we build?  We might want a dense matrix, or any of
+a variety of sparse formats.  There might be a reordering in effect,
+or there might not.  We might throw away inactive degrees of freedom,
+or we might not.
+
+Since there are a variety of possible data structures we might want
+to build, we make a generic matrix assembler type.  Given a list of
+variable identifiers and a local contribution (a dense vector if we
+are building a vector, and a dense column-major matrix if we are
+building matrices), the assemble method incorporates the local contribution
+into the global structure.  Information can flow the other way as well --
+using the same interface, we can construct ``disassembler'' objects that
+extract the local part from global structures.
+
+
+\section{Interface}
+
+\nwfilename{assemblem.nw}\nwbegincode{1}\sublabel{NW3qDCht-3YiIiA-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3qDCht-3YiIiA-1}}}\moddef{assemblem.h~{\nwtagstyle{}\subpageref{NW3qDCht-3YiIiA-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef ASSEMBLEM_H
+#define ASSEMBLEM_H
+
+\LA{}exported types~{\nwtagstyle{}\subpageref{NW3qDCht-4aCyDR-1}}\RA{}
+\LA{}exported functions~{\nwtagstyle{}\subpageref{NW3qDCht-2gXoUc-1}}\RA{}
+
+#endif /* ASSEMBLEM_H */
+\nwnotused{assemblem.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW3qDCht-4aCyDR-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3qDCht-4aCyDR-1}}}\moddef{exported types~{\nwtagstyle{}\subpageref{NW3qDCht-4aCyDR-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3qDCht-3YiIiA-1}}\nwenddeflinemarkup
+typedef void (*assemble_matrix_fun_t)(void* self, int* vars, int n, 
+                                      double* local);
+
+typedef struct assemble_matrix_t \{
+    void*   data;
+    void  (*assemble)(void* self, int* vars, int n, double* local);
+    void  (*destroy) (void* self);
+\} assemble_matrix_t;
+
+\nwused{\\{NW3qDCht-3YiIiA-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+The {\Tt{}assemble{\_}matrix{\_}t\nwendquote} object interface is the main type
+exported by this module.  The {\Tt{}assemble\nwendquote} method
+moves a local contribution into the global data structure
+maintained by the object.  The {\Tt{}vars\nwendquote} argument is a vector
+of {\Tt{}n\nwendquote} variable indices that identify the global location
+of the local contributions.  The {\Tt{}local\nwendquote} field contains
+the contribution itself.  If the assembler object is building
+matrices, the {\Tt{}local\nwendquote} field should point to an {\Tt{}n\nwendquote} by {\Tt{}n\nwendquote}
+matrix in column major order.  If the assembler object builds
+vectors, the {\Tt{}local\nwendquote} field should point to a vector of length
+{\Tt{}n\nwendquote}.
+
+The {\Tt{}destroy\nwendquote} method performs any deallocation of the object
+local data.  The {\Tt{}destroy\nwendquote} method does not free the data pointed
+to by {\Tt{}data\nwendquote} by default.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW3qDCht-2gXoUc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3qDCht-2gXoUc-1}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3qDCht-2gXoUc-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3qDCht-3YiIiA-1}}\nwprevnextdefs{\relax}{NW3qDCht-2gXoUc-2}\nwenddeflinemarkup
+void assemble_matrix_add(assemble_matrix_t* matrix, int* vars, int n, 
+                                 double* local);
+void assemble_matrix_add1(assemble_matrix_t* matrix, int var, 
+                                  double local);
+
+\nwalsodefined{\\{NW3qDCht-2gXoUc-2}}\nwused{\\{NW3qDCht-3YiIiA-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The {\Tt{}assemble{\_}matrix{\_}add\nwendquote} function is just a convenient wrapper
+to call the assemble method.  The {\Tt{}assemble{\_}matrix{\_}add1\nwendquote} function
+adds a single entry to a vector or matrix.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW3qDCht-2gXoUc-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW3qDCht-2gXoUc-2}}}\moddef{exported functions~{\nwtagstyle{}\subpageref{NW3qDCht-2gXoUc-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3qDCht-3YiIiA-1}}\nwprevnextdefs{NW3qDCht-2gXoUc-1}{\relax}\nwenddeflinemarkup
+void assembler_matrix_free(assemble_matrix_t* assembler);
+\nwused{\\{NW3qDCht-3YiIiA-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+The destructor {\Tt{}assembler{\_}matrix{\_}free\nwendquote} calls the assembler
+object {\Tt{}destroy\nwendquote} method (if such a method is defined),
+and then frees the {\Tt{}assemble{\_}matrix{\_}t\nwendquote} structure.
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW3qDCht-1WXbOU-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3qDCht-1WXbOU-1}}}\moddef{assemblem.c~{\nwtagstyle{}\subpageref{NW3qDCht-1WXbOU-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include <modelmgr.h>
+#include <assemblem.h>
+
+\LA{}functions~{\nwtagstyle{}\subpageref{NW3qDCht-nRuDO-1}}\RA{}
+\nwnotused{assemblem.c}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW3qDCht-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW3qDCht-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NW3qDCht-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW3qDCht-1WXbOU-1}}\nwenddeflinemarkup
+void assemble_matrix_add(assemble_matrix_t* matrix, int* vars, int n, 
+                                 double* local)
+\{
+    assert(matrix != NULL && matrix->assemble != NULL);
+    matrix->assemble(matrix->data, vars, n, local);
+\}
+
+void assemble_matrix_add1(assemble_matrix_t* matrix, int var,
+                                  double local)
+\{
+    assemble_matrix_add(matrix, &var, 1, &local);
+\}
+
+void assembler_matrix_free(assemble_matrix_t* matrix)
+\{
+    assert(matrix != NULL);
+    if (matrix->destroy)
+        matrix->destroy(matrix->data);
+    free(matrix);
+\}
+
+\nwused{\\{NW3qDCht-1WXbOU-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{assemblem.c}{NW3qDCht-1WXbOU-1}{\nwixd{NW3qDCht-1WXbOU-1}}}%
+\nwixlogsorted{c}{{assemblem.h}{NW3qDCht-3YiIiA-1}{\nwixd{NW3qDCht-3YiIiA-1}}}%
+\nwixlogsorted{c}{{exported functions}{NW3qDCht-2gXoUc-1}{\nwixu{NW3qDCht-3YiIiA-1}\nwixd{NW3qDCht-2gXoUc-1}\nwixd{NW3qDCht-2gXoUc-2}}}%
+\nwixlogsorted{c}{{exported types}{NW3qDCht-4aCyDR-1}{\nwixu{NW3qDCht-3YiIiA-1}\nwixd{NW3qDCht-4aCyDR-1}}}%
+\nwixlogsorted{c}{{functions}{NW3qDCht-nRuDO-1}{\nwixu{NW3qDCht-1WXbOU-1}\nwixd{NW3qDCht-nRuDO-1}}}%
+\nwbegindocs{12}\nwdocspar
+\nwenddocs{}

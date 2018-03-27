@@ -1,0 +1,223 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+This module provides an interactive command interface to SUGAR
+using the Lua language.  It defines little functionality on its
+own.
+
+Commands to the interface include
+\begin{itemize}
+  \item {\Tt{}cho{\_}load\nwendquote}: Load a netlist file and return a mesh object
+\end{itemize}
+Besides these commands, the basic Lua library, the math library,
+and the uses manager library are included.
+All of the standard Lua syntax is, of course, available.
+
+
+\section{Implementation}
+
+\nwfilename{sugar-lua.nw}\nwbegincode{1}\sublabel{NW1c2BfI-1Hk0Ur-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-1Hk0Ur-1}}}\moddef{sugar-lua.c~{\nwtagstyle{}\subpageref{NW1c2BfI-1Hk0Ur-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <lua.h>
+#include <lualib.h>
+#include <luadebug.h>
+
+#ifdef HAVE_READLINE
+#include <readline/readline.h>
+#include <readline/history.h>
+#endif /* HAVE_READLINE */
+
+#include <modelmgr.h>
+#include <model_test.h>
+#include <vars.h>
+#include <assemble.h>
+#include <uses_manager.h>
+
+#include <uses_manager_lua.h>
+#include <meshgen_lua.h>
+#include <mesh_lua.h>
+#include <matrix_lua.h>
+#include <superlu_lua.h>
+
+static uses_manager_t uses_manager;
+static model_mgr_t    model_mgr;
+
+\LA{}static functions~{\nwtagstyle{}\subpageref{NW1c2BfI-1duChy-1}}\RA{}
+\LA{}main function~{\nwtagstyle{}\subpageref{NW1c2BfI-or39s-1}}\RA{}
+
+\nwnotused{sugar-lua.c}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\subsection{Error handling}
+
+When a model wants to report an error, we want to use the
+{\Tt{}lua{\_}error\nwendquote} command rather than the default handler
+(which calls {\Tt{}exit\nwendquote}).
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NW1c2BfI-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW1c2BfI-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-1Hk0Ur-1}}\nwprevnextdefs{\relax}{NW1c2BfI-1duChy-2}\nwenddeflinemarkup
+static void error_handler(void* arg, const char* msg)
+\{
+    lua_State* L = (lua_State*) arg;
+    lua_error(L, msg);
+\}
+
+\nwalsodefined{\\{NW1c2BfI-1duChy-2}}\nwused{\\{NW1c2BfI-1Hk0Ur-1}}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{{\Tt{}cho{\_}load\nwendquote} command}
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NW1c2BfI-BzF6M-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-BzF6M-1}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW1c2BfI-BzF6M-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-or39s-1}}\nwprevnextdefs{\relax}{NW1c2BfI-BzF6M-2}\nwenddeflinemarkup
+lua_register(L, "cho_load", lua_netload);
+\nwalsodefined{\\{NW1c2BfI-BzF6M-2}\\{NW1c2BfI-BzF6M-3}}\nwused{\\{NW1c2BfI-or39s-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NW1c2BfI-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NW1c2BfI-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-1Hk0Ur-1}}\nwprevnextdefs{NW1c2BfI-1duChy-1}{\relax}\nwenddeflinemarkup
+static int lua_netload(lua_State* L)
+\{
+    int n = lua_gettop(L);
+    mesh_t mesh;
+
+    if (n != 1 || !lua_isstring(L,-1))
+        lua_error(L, "Invalid argument to 'cho_load'");
+
+    mesh = mesh_lua_load(L, uses_manager, lua_tostring(L,-1),
+                         model_mgr, error_handler);
+
+    if (mesh == NULL)
+        lua_error(L, "Error opening file");
+
+    lua_settop(L,0);
+    lua_mesh_create(L, mesh);
+    return 1;
+\}
+
+\nwused{\\{NW1c2BfI-1Hk0Ur-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Main}
+
+The main function registers the additional commands with the
+Lua interpreter object, and then executes any scripts specified
+on the command line and any commands executed from {\Tt{}stdin\nwendquote}.
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NW1c2BfI-or39s-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-or39s-1}}}\moddef{main function~{\nwtagstyle{}\subpageref{NW1c2BfI-or39s-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-1Hk0Ur-1}}\nwenddeflinemarkup
+int main(int argc, char** argv)
+\{
+    lua_State* L = lua_open(0);
+    char* line;
+
+    mempool_t pool = mempool_create(MEMPOOL_DEFAULT_SPAN);
+    model_mgr    = model_mgr_init();
+    uses_manager = uses_manager_create(pool);
+
+    printf(SUGAR_MESSAGE);
+
+#ifdef HAVE_X11
+    xtnetdraw_init(argc, argv);
+#endif
+
+    model_test_register(model_mgr);
+    model_mgr_standard_register(model_mgr);
+
+    \LA{}register functions~{\nwtagstyle{}\subpageref{NW1c2BfI-BzF6M-1}}\RA{}
+    \LA{}get \code{}SUGAR{\_}LUA{\_}PATH\edoc{} entries~{\nwtagstyle{}\subpageref{NW1c2BfI-2kE2Rd-1}}\RA{}
+    \LA{}process files from argv~{\nwtagstyle{}\subpageref{NW1c2BfI-2QQFSc-1}}\RA{}
+    \LA{}process commands from stdio~{\nwtagstyle{}\subpageref{NW1c2BfI-879i4-1}}\RA{}
+
+    lua_close(L);
+
+    model_mgr_destroy(model_mgr);
+    mempool_destroy(pool);
+
+    return 0;
+\}
+
+\nwused{\\{NW1c2BfI-1Hk0Ur-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+We want the uses manager functions, but that's about it at the moment.
+The rest of the functions should appear as methods.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NW1c2BfI-BzF6M-2}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-BzF6M-2}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW1c2BfI-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-or39s-1}}\nwprevnextdefs{NW1c2BfI-BzF6M-1}{NW1c2BfI-BzF6M-3}\nwenddeflinemarkup
+lua_matrix_register(L);
+lua_superlu_register(L);
+lua_mesh_register(L);
+lua_usesmgrlib(L);
+lua_set_usesmgr(L, uses_manager);
+\nwused{\\{NW1c2BfI-or39s-1}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+In addition to our extensions, we want to include the functions
+from the base library and the math library.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NW1c2BfI-BzF6M-3}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-BzF6M-3}}}\moddef{register functions~{\nwtagstyle{}\subpageref{NW1c2BfI-BzF6M-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-or39s-1}}\nwprevnextdefs{NW1c2BfI-BzF6M-2}{\relax}\nwenddeflinemarkup
+lua_baselibopen(L);
+lua_mathlibopen(L);
+lua_iolibopen(L);
+\nwused{\\{NW1c2BfI-or39s-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+The {\Tt{}SUGAR{\_}LUA{\_}PATH\nwendquote} environment variable adds to the search path.
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NW1c2BfI-2kE2Rd-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-2kE2Rd-1}}}\moddef{get \code{}SUGAR{\_}LUA{\_}PATH\edoc{} entries~{\nwtagstyle{}\subpageref{NW1c2BfI-2kE2Rd-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-or39s-1}}\nwenddeflinemarkup
+uses_manager_envpath(uses_manager, "SUGAR_LUA_PATH");
+\nwused{\\{NW1c2BfI-or39s-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+We cross our fingers and hope that there are no errors in executing
+the files listed on the command line.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NW1c2BfI-2QQFSc-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-2QQFSc-1}}}\moddef{process files from argv~{\nwtagstyle{}\subpageref{NW1c2BfI-2QQFSc-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-or39s-1}}\nwenddeflinemarkup
+--argc, ++argv;
+while (argc != 0) \{
+    lua_dofile(L, *argv);
+    --argc, ++argv;
+\}
+\nwused{\\{NW1c2BfI-or39s-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+If it is available, we use the GNU readline package for
+our command line.  The readline and history packages provide
+emacs-style line editing, and also history (obviously).
+Unfortunately, it isn't widely portable away from systems
+where the GNU libraries are supported, so we provide an
+alternative using fgets.  Either way, input ends on end of file
+(control-D in Unix).
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NW1c2BfI-879i4-1}\nwmargintag{{\nwtagstyle{}\subpageref{NW1c2BfI-879i4-1}}}\moddef{process commands from stdio~{\nwtagstyle{}\subpageref{NW1c2BfI-879i4-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NW1c2BfI-or39s-1}}\nwenddeflinemarkup
+#ifdef HAVE_READLINE
+
+read_history(".sugar-lua");
+while ((line = readline("sugar> ")) != NULL) \{
+    lua_dostring(L, line);
+    add_history(line);
+    free(line);
+\}
+write_history(".sugar-lua");
+printf("\\n");
+
+#else /* ! HAVE_READLINE */
+
+line = malloc(256);
+printf("sugar> ");
+while (fgets(line, 256, stdin)) \{
+    lua_dostring(L, line);
+    printf("sugar> ");
+\}
+printf("\\n");
+free(line);
+
+#endif /* HAVE_READLINE */
+
+\nwused{\\{NW1c2BfI-or39s-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{get \code{}SUGAR{\_}LUA{\_}PATH\edoc{} entries}{NW1c2BfI-2kE2Rd-1}{\nwixu{NW1c2BfI-or39s-1}\nwixd{NW1c2BfI-2kE2Rd-1}}}%
+\nwixlogsorted{c}{{main function}{NW1c2BfI-or39s-1}{\nwixu{NW1c2BfI-1Hk0Ur-1}\nwixd{NW1c2BfI-or39s-1}}}%
+\nwixlogsorted{c}{{process commands from stdio}{NW1c2BfI-879i4-1}{\nwixu{NW1c2BfI-or39s-1}\nwixd{NW1c2BfI-879i4-1}}}%
+\nwixlogsorted{c}{{process files from argv}{NW1c2BfI-2QQFSc-1}{\nwixu{NW1c2BfI-or39s-1}\nwixd{NW1c2BfI-2QQFSc-1}}}%
+\nwixlogsorted{c}{{register functions}{NW1c2BfI-BzF6M-1}{\nwixd{NW1c2BfI-BzF6M-1}\nwixu{NW1c2BfI-or39s-1}\nwixd{NW1c2BfI-BzF6M-2}\nwixd{NW1c2BfI-BzF6M-3}}}%
+\nwixlogsorted{c}{{static functions}{NW1c2BfI-1duChy-1}{\nwixu{NW1c2BfI-1Hk0Ur-1}\nwixd{NW1c2BfI-1duChy-1}\nwixd{NW1c2BfI-1duChy-2}}}%
+\nwixlogsorted{c}{{sugar-lua.c}{NW1c2BfI-1Hk0Ur-1}{\nwixd{NW1c2BfI-1Hk0Ur-1}}}%
+\nwbegindocs{20}\nwdocspar
+
+
+\nwenddocs{}

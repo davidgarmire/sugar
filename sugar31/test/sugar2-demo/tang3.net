@@ -1,0 +1,128 @@
+use("std2cvt.net")
+
+pi = 3.1415926535897932385
+poly = material {
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p1 = material {
+  parent = poly,
+  h = 2e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+p2 = material {
+  parent = poly,
+  h = 1.5e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+d2 = material {
+  parent = poly,
+  fluid = 0.75e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 0,
+  ambienttemperature = 0
+}
+
+-- PARAM_NODE case
+if not forcerot then forcerot = 0 end
+
+-- PARAM_NODE case
+if not forcesize then forcesize = 30u end
+
+L1 = 150u
+L3 = 130u
+L2 = 90u
+Lm = 50u
+wm = 30u
+LM = 50u
+wM = 100u
+subnet mfhalf_suspension (L, R, material, top, to_anchor, to_mass, w, h)
+  local parent = material
+  _currnodes["L"] = L
+  _currnodes["R"] = R
+  top = top or (material and material.top)
+  to_anchor = to_anchor or (material and material.to_anchor)
+  to_mass = to_mass or (material and material.to_mass)
+  w = w or (2u) or (material and material.w)
+  h = h or (material and material.h)
+  mfbeam3d {_n("topleft"), _n("topmidleft"); material = parent, l = (top)/(3), w = w, h = h, oz = 0}
+  mfbeam3d {_n("topmidleft"), _n("topmidright"); material = parent, l = (top)/(3), w = w, h = h, oz = 0}
+  mfbeam3d {_n("topmidright"), _n("topright"); material = parent, l = (top)/(3), w = w, h = h, oz = 0}
+  mfbeam3d {_n("topleft"), _n("L"); material = parent, l = to_mass, w = w, h = h, oz = -(deg(90))}
+  mfbeam3d {_n("topright"), _n("R"); material = parent, l = to_mass, w = w, h = h, oz = -(deg(90))}
+  mfbeam3d {_n("topmidleft"), _n("leftanchor"); material = parent, l = to_mass, w = w, h = h, oz = -(deg(90))}
+  mfbeam3d {_n("topmidright"), _n("rightanchor"); material = parent, l = to_mass, w = w, h = h, oz = -(deg(90))}
+  mfanchor {_n("leftanchor"); material = parent, l = 5u, w = 10u, h = h, oz = -(deg(90))}
+  mfanchor {_n("rightanchor"); material = parent, l = 5u, w = 10u, h = h, oz = -(deg(90))}
+end
+
+subnet mfhalf_bone (center, top, bottom, tip, material, lbone, wbone, lhandle, whandle, lm, lM, wM)
+  local parent = material
+  _currnodes["center"] = center
+  _currnodes["top"] = top
+  _currnodes["bottom"] = bottom
+  _currnodes["tip"] = tip
+  lbone = lbone or (material and material.lbone)
+  wbone = wbone or (material and material.wbone)
+  lhandle = lhandle or (material and material.lhandle)
+  whandle = whandle or (material and material.whandle)
+  lm = lm or (material and material.lm)
+  lM = lM or (material and material.lM)
+  wM = wM or (material and material.wM)
+  mfbeam3d {_n("top"), _n("connector"); material = parent, l = lhandle, w = whandle, oz = -(deg(90))}
+  mfbeam3d {_n("connector"), _n("bottom"); material = parent, l = lhandle, w = whandle, oz = -(deg(90))}
+  mfbeam3d {_n("center"), _n("connector"); material = parent, l = lbone, w = wbone}
+  mfbeam3d {_n("connector"), _n("massbase"); material = parent, l = lm, w = wbone}
+  mfbeam3d {_n("massbase"), _n("tip"); material = parent, l = lM, w = wM}
+end
+
+mff3d {_n("j"); F = forcesize, oz = forcerot}
+mfhalf_suspension {_n("e"), _n("h"); material = p1, top = L2, to_mass = L1, to_anchor = L2}
+mfhalf_suspension {_n("o"), _n("l"); material = p1, top = L2, to_mass = L1, to_anchor = L2, oz = deg(180)}
+mfhalf_bone {_n("j"), _n("h"), _n("o"), _n("t"); material = p1, lbone = (L2)/(2), wbone = 20u, lhandle = 20u, whandle = 20u, lm = 20u, lM = LM, wM = wM}
+mfhalf_bone {_n("j"), _n("l"), _n("e"), _n("v"); material = p1, lbone = (L2)/(2), wbone = 20u, lhandle = 20u, whandle = 20u, lm = 20u, lM = LM, wM = wM, oz = deg(180)}
+relpos_treewalk()

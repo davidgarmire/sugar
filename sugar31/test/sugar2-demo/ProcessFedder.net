@@ -1,0 +1,32 @@
+process poly = 
+[
+   Poisson = 0.3            %Poisson's Ratio = 0.3
+   thermcond = 2.33		    %Thermal conductivity Si = 2.33e-6/C   
+   viscosity = 1.78e-5		 %%Viscosity = (water=1e-3, air=1.78e-5, glycerine=0.830, oil=0.250, blood=2.7e-3)
+   fluid = 2e-6		       %Between the device and the substrate.   
+   density = 2300		       %Material density = 2300 kg/m^3   
+   Youngsmodulus = 165e9	 %Young's modulus = 1.65e11 N/m^2   
+   permittivity = 8.854e-12 %permittivity: C^2/(uN.um^2)=(C.s)^2/kg.um^3;   
+   sheetresistance = 20	    %Poly-Si sheet resistance [ohm/square]   
+   stress = 0               %-6MPa. stress < 0 compressive, wants to get longer. > 0 tensile, shorter.
+   straingradient=0         %straingradient>0 => positive z => wants to curl up out of the plane. -26.667BiCMOS
+   thermalexpansion=2.3e-6  %coefficient of thermal expansion for Silicon 2.3e-6/celsius.
+   ambienttemperature=30    %ambient temperature
+]
+
+process p1 : poly = 
+[ 
+    h=1.78e-6			%Layer height if poly
+]
+
+process p2 : poly = 
+[ 
+    h=2e-6			%Layer height of mcnc poly1 = 2e-6 meters
+]
+
+process d2 : poly = 
+[
+    fluid = 0.75e-6		%Fluid layer thickness p1:p2 = 0.75e-6 meters.
+]
+
+

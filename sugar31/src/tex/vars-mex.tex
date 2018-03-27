@@ -1,0 +1,390 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+The {\Tt{}vars{\_}mex\nwendquote} module is the Matlab interface to the variable
+manager routines.
+
+
+\section{Interface}
+
+\nwfilename{vars-mex.nw}\nwbegincode{1}\sublabel{NWCkYoC-1UCKgh-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-1UCKgh-1}}}\moddef{vars-mex.h~{\nwtagstyle{}\subpageref{NWCkYoC-1UCKgh-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef VARS_MEX_H
+#define VARS_MEX_H
+
+#include <vars.h>
+
+void vars_mex_register();
+void vars_mex_shutdown();
+int  vars_mex_handle_tag();
+
+vars_mgr_t mx_to_vars_mgr(const mxArray* array);
+
+#endif /* VARS_MEX_H */
+\nwnotused{vars-mex.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWCkYoC-3W5QsJ-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3W5QsJ-1}}}\moddef{vars-mex.c~{\nwtagstyle{}\subpageref{NWCkYoC-3W5QsJ-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+#include <mex_handle.h>
+#include <sugarmex.h>
+#include <mesh_mex.h>
+#include <vars_mex.h>
+#include <assemble.h>
+
+\LA{}static data~{\nwtagstyle{}\subpageref{NWCkYoC-IAwJm-1}}\RA{}
+\LA{}mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}\RA{}
+\LA{}functions~{\nwtagstyle{}\subpageref{NWCkYoC-nRuDO-1}}\RA{}
+\nwnotused{vars-mex.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Variable manager data structures}
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWCkYoC-IAwJm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-IAwJm-1}}}\moddef{static data~{\nwtagstyle{}\subpageref{NWCkYoC-IAwJm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwenddeflinemarkup
+static int vars_handle_tag;
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWCkYoC-nRuDO-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-nRuDO-1}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWCkYoC-nRuDO-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{\relax}{NWCkYoC-nRuDO-2}\nwenddeflinemarkup
+void vars_mex_register()
+\{
+    vars_handle_tag = mex_handle_new_tag();
+    \LA{}register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}\RA{}
+\}
+
+void vars_mex_shutdown()
+\{
+\}
+
+int vars_mex_handle_tag()
+\{
+    return vars_handle_tag;
+\}
+
+\nwalsodefined{\\{NWCkYoC-nRuDO-2}}\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+
+\subsection{Conversion functions}
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWCkYoC-nRuDO-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-nRuDO-2}}}\moddef{functions~{\nwtagstyle{}\subpageref{NWCkYoC-nRuDO-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{NWCkYoC-nRuDO-1}{\relax}\nwenddeflinemarkup
+vars_mgr_t mx_to_vars_mgr(const mxArray* array)
+\{
+    return mx_to_handle(array, vars_handle_tag, "Invalid vars manager handle");
+\}
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+
+\subsection{{\Tt{}vars{\_}node\nwendquote} command}
+
+The {\Tt{}vars{\_}node(vars{\_}mgr,\ node{\_}id,\ name)\nwendquote} function adds a variable
+to the variable manager.
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWCkYoC-48cs59-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-48cs59-1}}}\moddef{cho-vars-node.m~{\nwtagstyle{}\subpageref{NWCkYoC-48cs59-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [var_id] = cho_vars_node(varmgr, node, name)
+var_id = sugarmex('vars_node', varmgr, node, name);
+\nwnotused{cho-vars-node.m}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWCkYoC-Ye2uh-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-nRuDO-1}}\nwprevnextdefs{\relax}{NWCkYoC-Ye2uh-2}\nwenddeflinemarkup
+mexmgr_add("vars_node", mex_vars_node);
+\nwalsodefined{\\{NWCkYoC-Ye2uh-2}\\{NWCkYoC-Ye2uh-3}\\{NWCkYoC-Ye2uh-4}\\{NWCkYoC-Ye2uh-5}\\{NWCkYoC-Ye2uh-6}\\{NWCkYoC-Ye2uh-7}\\{NWCkYoC-Ye2uh-8}}\nwused{\\{NWCkYoC-nRuDO-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWCkYoC-3MtIgE-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{\relax}{NWCkYoC-3MtIgE-2}\nwenddeflinemarkup
+static void mex_vars_node(int nlhs, mxArray* plhs[],
+                          int nrhs, const mxArray* prhs[])
+\{
+    vars_mgr_t vars;
+    int        node_id;
+    char*      name;
+
+    mex_check_num_args(nrhs, 3);
+    vars    = mx_to_vars_mgr    (prhs[0]);
+    node_id = (int) mx_to_double(prhs[1]);
+    name    = mx_to_string      (prhs[2]);
+
+    plhs[0] = mx_from_double(vars_node(vars, node_id, name));
+\}
+
+\nwalsodefined{\\{NWCkYoC-3MtIgE-2}\\{NWCkYoC-3MtIgE-3}\\{NWCkYoC-3MtIgE-4}\\{NWCkYoC-3MtIgE-5}\\{NWCkYoC-3MtIgE-6}\\{NWCkYoC-3MtIgE-7}\\{NWCkYoC-3MtIgE-8}}\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+
+\subsection{{\Tt{}vars{\_}branch\nwendquote} command}
+
+The {\Tt{}vars{\_}branch(vars{\_}mgr,\ name)\nwendquote} function adds a variable
+to the variable manager.
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWCkYoC-2ufzH1-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-2ufzH1-1}}}\moddef{cho-vars-branch.m~{\nwtagstyle{}\subpageref{NWCkYoC-2ufzH1-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [var_id] = cho_mesh_branch(varmgr, name)
+var_id = sugarmex('vars_branch', varmgr, name);
+\nwnotused{cho-vars-branch.m}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWCkYoC-Ye2uh-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-2}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-nRuDO-1}}\nwprevnextdefs{NWCkYoC-Ye2uh-1}{NWCkYoC-Ye2uh-3}\nwenddeflinemarkup
+mexmgr_add("vars_branch", mex_vars_branch);
+\nwused{\\{NWCkYoC-nRuDO-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWCkYoC-3MtIgE-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-2}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{NWCkYoC-3MtIgE-1}{NWCkYoC-3MtIgE-3}\nwenddeflinemarkup
+static void mex_vars_branch(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    vars_mgr_t vars;
+    char*      name;
+
+    mex_check_num_args(nrhs, 2);
+    vars    = mx_to_vars_mgr    (prhs[0]);
+    name    = mx_to_string      (prhs[1]);
+
+    plhs[0] = mx_from_double(vars_branch(vars, name));
+\}
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+
+\subsection{{\Tt{}vars{\_}assign\nwendquote} command}
+
+The {\Tt{}vars{\_}assign\nwendquote} function does variable identifier assignment
+for a mesh.
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWCkYoC-2KFvHf-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-2KFvHf-1}}}\moddef{cho-vars-assign.m~{\nwtagstyle{}\subpageref{NWCkYoC-2KFvHf-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function cho_vars_assign(mesh)
+sugarmex('vars_assign', mesh);
+\nwnotused{cho-vars-assign.m}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWCkYoC-Ye2uh-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-3}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-nRuDO-1}}\nwprevnextdefs{NWCkYoC-Ye2uh-2}{NWCkYoC-Ye2uh-4}\nwenddeflinemarkup
+mexmgr_add("vars_assign", mex_vars_assign);
+\nwused{\\{NWCkYoC-nRuDO-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWCkYoC-3MtIgE-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-3}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{NWCkYoC-3MtIgE-2}{NWCkYoC-3MtIgE-4}\nwenddeflinemarkup
+static void mex_vars_assign(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    mesh_t     mesh;
+    vars_mgr_t vars;
+
+    mex_check_num_args(nrhs, 1);
+    mesh = mx_to_mesh(prhs[0]);
+    vars = mesh_vars_mgr(mesh);
+
+    vars_get_vartypes(vars);
+    vars_assign(vars);
+\}
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+ 
+
+\subsection{{\Tt{}vars{\_}lookup{\_}node\nwendquote} command}
+
+The {\Tt{}vars{\_}lookup{\_}node\nwendquote} function looks up a nodal variable index.
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWCkYoC-uhawz-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-uhawz-1}}}\moddef{cho-vars-lookup-node.m~{\nwtagstyle{}\subpageref{NWCkYoC-uhawz-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [id] = cho_vars_lookup_node(mesh, node_id, name)
+id = sugarmex('vars_lookup_node', mesh, node_id, name);
+\nwnotused{cho-vars-lookup-node.m}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWCkYoC-Ye2uh-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-4}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-nRuDO-1}}\nwprevnextdefs{NWCkYoC-Ye2uh-3}{NWCkYoC-Ye2uh-5}\nwenddeflinemarkup
+mexmgr_add("vars_lookup_node", mex_vars_lookup_node);
+\nwused{\\{NWCkYoC-nRuDO-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWCkYoC-3MtIgE-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-4}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{NWCkYoC-3MtIgE-3}{NWCkYoC-3MtIgE-5}\nwenddeflinemarkup
+static void mex_vars_lookup_node(int nlhs, mxArray* plhs[],
+                                 int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    int         node_id;
+    const char* name;
+    vars_mgr_t  vars;
+
+    mex_check_num_args(nrhs, 3);
+    mesh    = mx_to_mesh(prhs[0]);
+    node_id = (int) mx_to_double(prhs[1]);
+    name    = mx_to_string(prhs[2]);
+    vars    = mesh_vars_mgr(mesh);
+
+    plhs[0] = mx_from_double(vars_lookup_node(vars, node_id, name) + 1);
+\}
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{34}\nwdocspar
+ 
+
+\subsection{{\Tt{}vars{\_}lookup{\_}branch\nwendquote} command}
+
+The {\Tt{}vars{\_}lookup{\_}branch\nwendquote} function looks up a branch variable index.
+
+\nwenddocs{}\nwbegincode{35}\sublabel{NWCkYoC-4ASDAU-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-4ASDAU-1}}}\moddef{cho-vars-lookup-branch.m~{\nwtagstyle{}\subpageref{NWCkYoC-4ASDAU-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [id] = cho_vars_lookup_branch(mesh, elt_id, var_number)
+id = sugarmex('vars_lookup_branch', mesh, elt_id, var_number);
+\nwnotused{cho-vars-lookup-branch.m}\nwendcode{}\nwbegindocs{36}\nwdocspar
+
+\nwenddocs{}\nwbegincode{37}\sublabel{NWCkYoC-Ye2uh-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-5}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-nRuDO-1}}\nwprevnextdefs{NWCkYoC-Ye2uh-4}{NWCkYoC-Ye2uh-6}\nwenddeflinemarkup
+mexmgr_add("vars_lookup_branch", mex_vars_lookup_branch);
+\nwused{\\{NWCkYoC-nRuDO-1}}\nwendcode{}\nwbegindocs{38}\nwdocspar
+
+\nwenddocs{}\nwbegincode{39}\sublabel{NWCkYoC-3MtIgE-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-5}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{NWCkYoC-3MtIgE-4}{NWCkYoC-3MtIgE-6}\nwenddeflinemarkup
+static void mex_vars_lookup_branch(int nlhs, mxArray* plhs[],
+                                   int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    int         elt_id;
+    int         var_number;
+    vars_mgr_t  vars;
+
+    mex_check_num_args(nrhs, 3);
+    mesh        = mx_to_mesh(prhs[0]);
+    elt_id      = (int) mx_to_double(prhs[1]);
+    var_number  = (int) mx_to_double(prhs[2]);
+    vars        = mesh_vars_mgr(mesh);
+
+    plhs[0] = mx_from_double(vars_lookup_branch(vars, elt_id, var_number) + 1);
+\}
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{40}\nwdocspar
+ 
+
+\subsection{{\Tt{}vars{\_}lookup\nwendquote} command}
+
+The {\Tt{}vars{\_}lookup\nwendquote} function builds a table of variable
+information.
+
+\nwenddocs{}\nwbegincode{41}\sublabel{NWCkYoC-4gJkNT-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-4gJkNT-1}}}\moddef{cho-vars-lookup.m~{\nwtagstyle{}\subpageref{NWCkYoC-4gJkNT-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [vars] = cho_vars_lookup(mesh)
+vars = sugarmex('vars_lookup', mesh);
+\nwnotused{cho-vars-lookup.m}\nwendcode{}\nwbegindocs{42}\nwdocspar
+
+\nwenddocs{}\nwbegincode{43}\sublabel{NWCkYoC-Ye2uh-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-6}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-nRuDO-1}}\nwprevnextdefs{NWCkYoC-Ye2uh-5}{NWCkYoC-Ye2uh-7}\nwenddeflinemarkup
+mexmgr_add("vars_lookup", mex_vars_lookup);
+\nwused{\\{NWCkYoC-nRuDO-1}}\nwendcode{}\nwbegindocs{44}\nwdocspar
+
+\nwenddocs{}\nwbegincode{45}\sublabel{NWCkYoC-3MtIgE-6}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-6}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{NWCkYoC-3MtIgE-5}{NWCkYoC-3MtIgE-7}\nwenddeflinemarkup
+static void mex_vars_lookup(int nlhs, mxArray* plhs[],
+                            int nrhs, const mxArray* prhs[])
+\{
+    mesh_t       mesh;
+    vars_mgr_t   vars;
+    vars_desc_t* v;
+    int          nvars;
+    int          i;
+
+    const char* fieldnames[4] = \{
+        "type",
+        "parent",
+        "name",
+        "offset"
+    \};
+
+    mex_check_num_args(nrhs, 1);
+    mesh        = mx_to_mesh(prhs[0]);
+    vars        = mesh_vars_mgr(mesh);
+    nvars       = vars_count(vars);
+
+    v = mxCalloc(nvars, sizeof(vars_desc_t));
+    vars_lookup(vars, v);
+
+    plhs[0] = mxCreateStructMatrix(nvars, 1, 4, fieldnames);
+    for (i = 0; i < nvars; ++i) \{
+        if (v[i].type == 'n') \{
+            mxSetFieldByNumber(plhs[0], i, 0, mxCreateString("node"));
+            mxSetFieldByNumber(plhs[0], i, 1, mx_from_double(v[i].parent));
+            mxSetFieldByNumber(plhs[0], i, 2, mxCreateString(v[i].name));
+            mxSetFieldByNumber(plhs[0], i, 3, mx_from_nil   ());
+        \} else if (v[i].type == 'b') \{
+            mxSetFieldByNumber(plhs[0], i, 0, mxCreateString("branch"));
+            mxSetFieldByNumber(plhs[0], i, 1, mx_from_double(v[i].parent));
+            mxSetFieldByNumber(plhs[0], i, 2, mxCreateString(""));
+            mxSetFieldByNumber(plhs[0], i, 3, mx_from_double(v[i].offset));
+        \} else \{
+            mexErrMsgTxt("Internal error in variable indexing");
+        \}
+    \}
+    mxFree(v);
+\}
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{46}\nwdocspar
+
+
+\subsection{{\Tt{}vars{\_}nvars\nwendquote} command}
+
+The {\Tt{}vars{\_}nvars\nwendquote} function returns the count of the total
+number of variables.
+
+\nwenddocs{}\nwbegincode{47}\sublabel{NWCkYoC-2BwcoV-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-2BwcoV-1}}}\moddef{cho-vars-nvars.m~{\nwtagstyle{}\subpageref{NWCkYoC-2BwcoV-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [nvars] = cho_vars_nvars(mesh)
+nvars = sugarmex('vars_nvars', mesh);
+\nwnotused{cho-vars-nvars.m}\nwendcode{}\nwbegindocs{48}\nwdocspar
+
+\nwenddocs{}\nwbegincode{49}\sublabel{NWCkYoC-Ye2uh-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-7}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-nRuDO-1}}\nwprevnextdefs{NWCkYoC-Ye2uh-6}{NWCkYoC-Ye2uh-8}\nwenddeflinemarkup
+mexmgr_add("vars_nvars", mex_vars_nvars);
+\nwused{\\{NWCkYoC-nRuDO-1}}\nwendcode{}\nwbegindocs{50}\nwdocspar
+
+\nwenddocs{}\nwbegincode{51}\sublabel{NWCkYoC-3MtIgE-7}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-7}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{NWCkYoC-3MtIgE-6}{NWCkYoC-3MtIgE-8}\nwenddeflinemarkup
+static void mex_vars_nvars(int nlhs, mxArray* plhs[],
+                           int nrhs, const mxArray* prhs[])
+\{
+    mesh_t     mesh;
+    vars_mgr_t vars;
+    int        nvars;
+
+    mex_check_num_args(nrhs, 1);
+    mesh  = mx_to_mesh(prhs[0]);
+    vars  = mesh_vars_mgr(mesh);
+    nvars = vars_count(vars);
+
+    plhs[0] = mx_from_double(nvars);
+\}
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}\nwbegindocs{52}\nwdocspar
+
+
+\subsection{{\Tt{}vars{\_}nactive\nwendquote} command}
+
+The {\Tt{}vars{\_}nactive\nwendquote} function returns the count of the total
+number of variables.
+
+\nwenddocs{}\nwbegincode{53}\sublabel{NWCkYoC-3RJOJp-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3RJOJp-1}}}\moddef{cho-vars-nactive.m~{\nwtagstyle{}\subpageref{NWCkYoC-3RJOJp-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+function [nactive] = cho_vars_nactive(mesh)
+nactive = sugarmex('vars_nactive', mesh);
+\nwnotused{cho-vars-nactive.m}\nwendcode{}\nwbegindocs{54}\nwdocspar
+
+\nwenddocs{}\nwbegincode{55}\sublabel{NWCkYoC-Ye2uh-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-8}}}\moddef{register mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-Ye2uh-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-nRuDO-1}}\nwprevnextdefs{NWCkYoC-Ye2uh-7}{\relax}\nwenddeflinemarkup
+mexmgr_add("vars_nactive", mex_vars_nactive);
+\nwused{\\{NWCkYoC-nRuDO-1}}\nwendcode{}\nwbegindocs{56}\nwdocspar
+
+\nwenddocs{}\nwbegincode{57}\sublabel{NWCkYoC-3MtIgE-8}\nwmargintag{{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-8}}}\moddef{mex functions~{\nwtagstyle{}\subpageref{NWCkYoC-3MtIgE-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWCkYoC-3W5QsJ-1}}\nwprevnextdefs{NWCkYoC-3MtIgE-7}{\relax}\nwenddeflinemarkup
+static void mex_vars_nactive(int nlhs, mxArray* plhs[],
+                             int nrhs, const mxArray* prhs[])
+\{
+    mesh_t      mesh;
+    assembler_t assembler;
+    int         nactive;
+
+    mex_check_num_args(nrhs, 1);
+    mesh      = mx_to_mesh(prhs[0]);
+    assembler = mesh_assembler(mesh);
+    nactive   = assemble_get_active(assembler);
+
+    plhs[0] = mx_from_double(nactive);
+\}
+
+\nwused{\\{NWCkYoC-3W5QsJ-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{cho-vars-assign.m}{NWCkYoC-2KFvHf-1}{\nwixd{NWCkYoC-2KFvHf-1}}}%
+\nwixlogsorted{c}{{cho-vars-branch.m}{NWCkYoC-2ufzH1-1}{\nwixd{NWCkYoC-2ufzH1-1}}}%
+\nwixlogsorted{c}{{cho-vars-lookup-branch.m}{NWCkYoC-4ASDAU-1}{\nwixd{NWCkYoC-4ASDAU-1}}}%
+\nwixlogsorted{c}{{cho-vars-lookup-node.m}{NWCkYoC-uhawz-1}{\nwixd{NWCkYoC-uhawz-1}}}%
+\nwixlogsorted{c}{{cho-vars-lookup.m}{NWCkYoC-4gJkNT-1}{\nwixd{NWCkYoC-4gJkNT-1}}}%
+\nwixlogsorted{c}{{cho-vars-nactive.m}{NWCkYoC-3RJOJp-1}{\nwixd{NWCkYoC-3RJOJp-1}}}%
+\nwixlogsorted{c}{{cho-vars-node.m}{NWCkYoC-48cs59-1}{\nwixd{NWCkYoC-48cs59-1}}}%
+\nwixlogsorted{c}{{cho-vars-nvars.m}{NWCkYoC-2BwcoV-1}{\nwixd{NWCkYoC-2BwcoV-1}}}%
+\nwixlogsorted{c}{{functions}{NWCkYoC-nRuDO-1}{\nwixu{NWCkYoC-3W5QsJ-1}\nwixd{NWCkYoC-nRuDO-1}\nwixd{NWCkYoC-nRuDO-2}}}%
+\nwixlogsorted{c}{{mex functions}{NWCkYoC-3MtIgE-1}{\nwixu{NWCkYoC-3W5QsJ-1}\nwixd{NWCkYoC-3MtIgE-1}\nwixd{NWCkYoC-3MtIgE-2}\nwixd{NWCkYoC-3MtIgE-3}\nwixd{NWCkYoC-3MtIgE-4}\nwixd{NWCkYoC-3MtIgE-5}\nwixd{NWCkYoC-3MtIgE-6}\nwixd{NWCkYoC-3MtIgE-7}\nwixd{NWCkYoC-3MtIgE-8}}}%
+\nwixlogsorted{c}{{register mex functions}{NWCkYoC-Ye2uh-1}{\nwixu{NWCkYoC-nRuDO-1}\nwixd{NWCkYoC-Ye2uh-1}\nwixd{NWCkYoC-Ye2uh-2}\nwixd{NWCkYoC-Ye2uh-3}\nwixd{NWCkYoC-Ye2uh-4}\nwixd{NWCkYoC-Ye2uh-5}\nwixd{NWCkYoC-Ye2uh-6}\nwixd{NWCkYoC-Ye2uh-7}\nwixd{NWCkYoC-Ye2uh-8}}}%
+\nwixlogsorted{c}{{static data}{NWCkYoC-IAwJm-1}{\nwixu{NWCkYoC-3W5QsJ-1}\nwixd{NWCkYoC-IAwJm-1}}}%
+\nwixlogsorted{c}{{vars-mex.c}{NWCkYoC-3W5QsJ-1}{\nwixd{NWCkYoC-3W5QsJ-1}}}%
+\nwixlogsorted{c}{{vars-mex.h}{NWCkYoC-1UCKgh-1}{\nwixd{NWCkYoC-1UCKgh-1}}}%
+\nwbegindocs{58}\nwdocspar
+
+\nwenddocs{}

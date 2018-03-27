@@ -1,0 +1,147 @@
+use("std2cvt.net")
+
+pi = 3.1415926535897932385
+F1 = 1u
+WM = 15.266u
+LM = 100u
+poly = material {
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 2.3e-6,
+  ambienttemperature = 30
+}
+
+p1 = material {
+  parent = poly,
+  h = 1.78e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 2.3e-6,
+  ambienttemperature = 30
+}
+
+p2 = material {
+  parent = poly,
+  h = 2e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 2.3e-6,
+  ambienttemperature = 30
+}
+
+d2 = material {
+  parent = poly,
+  fluid = 0.75e-6,
+  Poisson = 0.3,
+  thermcond = 2.33,
+  viscosity = 1.78e-5,
+  fluid = 2e-6,
+  density = 2300,
+  Youngsmodulus = 165e9,
+  permittivity = 8.854e-12,
+  sheetresistance = 20,
+  stress = 0,
+  straingradient = 0,
+  thermalexpansion = 2.3e-6,
+  ambienttemperature = 30
+}
+
+subnet mfserpA1meander1 (A, E, material, w_, l_, a_, b_, c_, inv, ozh)
+  local parent = material
+  _currnodes["A"] = A
+  _currnodes["E"] = E
+  w_ = w_ or (material and material.w_)
+  l_ = l_ or (material and material.l_)
+  a_ = a_ or (material and material.a_)
+  b_ = b_ or (material and material.b_)
+  c_ = c_ or (material and material.c_)
+  inv = inv or (material and material.inv)
+  ozh = ozh or (material and material.ozh)
+  mfbeam3d {_n("A"), _n("b"); material = parent, l = (a_)+(l_), w = (c_)+(w_), oz = ozh}
+  mfbeam3d {_n("b"), _n("c"); material = parent, l = (b_)+(l_), w = (c_)+(w_), oz = ((-(pi))/(2))*(inv)}
+  mfbeam3d {_n("c"), _n("d"); material = parent, l = (a_)+(l_), w = (c_)+(w_), oz = ozh}
+  mfbeam3d {_n("d"), _n("E"); material = parent, l = (b_)+(l_), w = (c_)+(w_), oz = ((pi)/(2))*(inv)}
+end
+
+-- PARAM_NODE case
+if not dW then dW = 0 end
+
+-- PARAM_NODE case
+if not dL then dL = 0 end
+
+b = 81u
+a = 63u
+H = 31.78u
+c = 1.81u
+NumberMeanders = 4
+N1 = NumberMeanders
+inv = -(1)
+ozh = pi
+for k1 = 1 , N1 do
+    mfserpA1meander1 {_n("x1" .. "_" .. (k1)), _n("x1" .. "_" .. ((k1)+(1))); material = p1, l_ = dL, w_ = dW, b_ = b, a_ = a, c_ = c, inv = inv, ozh = ozh}
+end
+mfbeam3d {_n("x1" .. "_" .. ((N1)+(1))), _n("x1" .. "_" .. ((N1)+(2))); material = p1, l = (a)+(dL), w = (c)+(dW), oz = ozh}
+mfbeam3d {_n("x1" .. "_" .. ((N1)+(2))), _n("x1" .. "_" .. ((N1)+(4))); material = p1, l = (b)+(dL), w = (c)+(dW), oz = ((-(pi))/(2))*(inv)}
+mfbeam3d {_n("x1" .. "_" .. ((N1)+(4))), _n("x1" .. "_" .. ((N1)+(5))); material = p1, l = (a)+(dL), w = (c)+(dW), oz = ozh}
+mfanchor {_n("x1" .. "_" .. ((N1)+(5))); material = p1, l = 10u, w = 10u, h = 10u, oz = pi}
+N2 = NumberMeanders
+local inv = -(1)
+local ozh = 0
+for k2 = 1 , N2 do
+    mfserpA1meander1 {_n("x2" .. "_" .. (k2)), _n("x2" .. "_" .. ((k2)+(1))); material = p1, l_ = dL, w_ = dW, b_ = b, a_ = a, c_ = c, inv = inv, ozh = ozh}
+end
+mfbeam3d {_n("x2" .. "_" .. ((N2)+(1))), _n("x2" .. "_" .. ((N2)+(2))); material = p1, l = (a)+(dL), w = (c)+(dW), oz = ozh}
+mfbeam3d {_n("x2" .. "_" .. ((N2)+(2))), _n("x2" .. "_" .. ((N2)+(4))); material = p1, l = (b)+(dL), w = (c)+(dW), oz = ((-(pi))/(2))*(inv)}
+mfbeam3d {_n("x2" .. "_" .. ((N2)+(4))), _n("x2" .. "_" .. ((N2)+(5))); material = p1, l = (a)+(dL), w = (c)+(dW), oz = ozh}
+mfanchor {_n("x2" .. "_" .. ((N2)+(5))); material = p1, l = 10u, w = 10u, h = 10u, oz = pi}
+N3 = NumberMeanders
+local inv = 1
+local ozh = 0
+for k3 = 1 , N3 do
+    mfserpA1meander1 {_n("x3" .. "_" .. (k3)), _n("x3" .. "_" .. ((k3)+(1))); material = p1, l_ = dL, w_ = dW, b_ = b, a_ = a, c_ = c, inv = inv, ozh = ozh}
+end
+mfbeam3d {_n("x3" .. "_" .. ((N3)+(1))), _n("x3" .. "_" .. ((N3)+(2))); material = p1, l = (a)+(dL), w = (c)+(dW), oz = ozh}
+mfbeam3d {_n("x3" .. "_" .. ((N3)+(2))), _n("x3" .. "_" .. ((N3)+(4))); material = p1, l = (b)+(dL), w = (c)+(dW), oz = ((-(pi))/(2))*(inv)}
+mfbeam3d {_n("x3" .. "_" .. ((N3)+(4))), _n("x3" .. "_" .. ((N3)+(5))); material = p1, l = (a)+(dL), w = (c)+(dW), oz = ozh}
+mfanchor {_n("x3" .. "_" .. ((N3)+(5))); material = p1, l = 10u, w = 10u, h = 10u, oz = pi}
+N4 = NumberMeanders
+local inv = 1
+local ozh = pi
+for k4 = 1 , N4 do
+    mfserpA1meander1 {_n("x4" .. "_" .. (k4)), _n("x4" .. "_" .. ((k4)+(1))); material = p1, l_ = dL, w_ = dW, b_ = b, a_ = a, c_ = c, inv = inv, ozh = ozh}
+end
+mfbeam3d {_n("x4" .. "_" .. ((N4)+(1))), _n("x4" .. "_" .. ((N4)+(2))); material = p1, l = (a)+(dL), w = (c)+(dW), oz = ozh}
+mfbeam3d {_n("x4" .. "_" .. ((N4)+(2))), _n("x4" .. "_" .. ((N4)+(4))); material = p1, l = (b)+(dL), w = (c)+(dW), oz = ((-(pi))/(2))*(inv)}
+mfbeam3d {_n("x4" .. "_" .. ((N4)+(4))), _n("x4" .. "_" .. ((N4)+(5))); material = p1, l = (a)+(dL), w = (c)+(dW), oz = ozh}
+mfanchor {_n("x4" .. "_" .. ((N4)+(5))); material = p1, l = 10u, w = 10u, h = 10u, oz = pi}
+mfbeam3d {_n("x1" .. "_" .. (1)), _n("x2" .. "_" .. (1)); material = p1, l = LM, w = WM, oz = 0}
+mfbeam3d {_n("x2" .. "_" .. (1)), _n("x3" .. "_" .. (1)); material = p1, l = LM, w = WM, oz = (-(pi))/(2)}
+mfbeam3d {_n("x3" .. "_" .. (1)), _n("x4" .. "_" .. (1)); material = p1, l = LM, w = WM, oz = pi}
+mfbeam3d {_n("x4" .. "_" .. (1)), _n("x1" .. "_" .. (1)); material = p1, l = LM, w = WM, oz = (pi)/(2)}
+mff3d {_n("x1" .. "_" .. (1)); F = F1, oz = (pi)/(2)}
+mff3d {_n("x2" .. "_" .. (1)); F = F1, oz = (pi)/(2)}
+relpos_treewalk()

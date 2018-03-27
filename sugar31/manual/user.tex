@@ -1,0 +1,93 @@
+\documentclass[10pt]{report}
+\usepackage{fancyhdr}
+\usepackage{amsmath}
+\usepackage{html}
+
+\topmargin=-0.25in
+\textheight=9in
+\oddsidemargin=-0.20in
+\evensidemargin=-0.20in
+\textwidth=6.75in
+
+\newcommand{\sugarday}{20 April 2002}
+\newcommand{\sugartitle}{SUGAR 3.0: A MEMS Simulation Program (User's Guide)}
+\fancyhf{}
+\fancyhead[L]{\leftmark}
+\fancyhead[R]{\rightmark}
+\fancyfoot[L]{\sugarday}
+\fancyfoot[R]{\thepage}
+\renewcommand{\footrulewidth}{0.4pt}
+\newcommand{\chap}[1]{\chapter{#1}\markboth{CHAPTER \thechapter: #1}{\rightmark}}
+
+\begin{document}
+
+\title{\sugartitle}
+\date{\sugarday}
+\author{
+Document Authors - David Bindel, Jason Clark, Ningning Zhou \\
+Revisions for Version 3.0 - David Garmire \\
+\\
+\begin{latexonly}
+\begin{tabular}{l@{\hspace{0in}}r}
+{\bf Principal Investigators} & \\
+Alice M. Agogino \dotfill & \dotfill {\tt aagogino@me.berkeley.edu} \\
+Zhaojun Bai \dotfill & \dotfill {\tt bai@cs.ucdavis.edu} \\
+James Demmel \dotfill & \dotfill {\tt demmel@eecs.berkeley.edu} \\
+Sanjay Govindjee \dotfill & \dotfill {\tt sanjay@ce.berkeley.edu} \\
+Ming Gu \dotfill & \dotfill {\tt mgu@math.berkeley.edu} \\
+Kristofer S. J. Pister \dotfill & \dotfill {\tt pister@eecs.berkeley.edu} \\
+ & \\
+{\bf Graduated Students} & \\
+Ningning Zhou\dotfill & \dotfill {\tt nzhou@bsac.eecs.berkeley.edu} \\ 
+ & \\
+{\bf Graduate Students} & \\
+David Bindel \dotfill & \dotfill {\tt dbindel@cs.berkeley.edu} \\ 
+Jason V. Clark \dotfill & \dotfill {\tt jvclark@bsac.eecs.berkeley.edu} \\
+David Garmire \dotfill & \dotfill {\tt strive@cs.berkeley.edu} \\
+Raffi Kamalian \dotfill & \dotfill {\tt raffi@me.berkeley.edu} \\
+Shyam Lakshmin \dotfill & \dotfill {\tt lakshmin@cs.berkeley.edu} \\
+Jiawang Nie \dotfill & \dotfill {\tt njw@math.berkeley.edu} \\
+ & \\
+{\bf Undergraduate Students} & \\
+Wayne Kao \dotfill & \dotfill {\tt kaotao@usa.net} \\ 
+Ernest Zhu \dotfill & \dotfill \\
+ & \\
+\end{tabular}
+\end{latexonly}
+}
+
+\maketitle
+
+% ==================================
+
+\pagenumbering{roman}
+\tableofcontents
+\newpage
+
+\pagenumbering{arabic}
+\setcounter{page}{1}
+\pagestyle{fancy}
+
+\chap{Introducing SUGAR}
+\input{intro.tex}
+
+\chap{Describing Devices}
+\input{describing.tex}
+
+\chap{Analyzing Devices}
+\input{analyze.tex}
+
+\chap{Examples}
+\input{example.tex}
+
+\chap{Available Models}
+\input{models.tex}
+
+\chap{Function Reference}
+\input{function-ref.tex}
+
+\nocite{*}
+\bibliographystyle{plain}
+\bibliography{user}
+
+\end{document}

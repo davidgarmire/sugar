@@ -1,0 +1,124 @@
+
+% Compiler side of things
+
+(Taken from implementor.pdf -- out of date)
+
+In order to easily support a more powerful netlist language, the parser in
+SUGAR 2.0 was re-written using the UNIX tools flex and bison. flex and
+bison are GNU versions of the classic lex and yacc compiler construction tools.
+For those who wish to understand or modify the parser code, a good source of
+information on the tools used can be found in the book lex \& yacc by John
+Levine, Tony Mason, and Doug Brown, published by O'Reilly and Associates.
+Online resources on flex and bison include the GNU man pages and info pages.
+   In the current version of SUGAR, the cho load command to load netlists
+basically proceeds in two phases. In the first phase, the yacc translator, which
+is compiled into an external Matlab routine (MEX file) converts the user netlist
+into a Matlab function (called nettemp.m by default). In the second phase, the
+Matlab function is executed to partially build the final data structure. After
+that, additional Matlab routines process the data structure to assign global
+variable indices, compute the undisplaced positions of the mechanical nodes,
+and sanity check the model function parameters.
+
+\section{Translator structure}
+
+
+\subsection{Scanning}
+
+The scanner, sugar.lex, is responsible for tokenizing the input file and for
+managing the inclusion of files via the uses statement. The token description
+is straightforward, and the curious reader is referred to the source code for
+further details. The handling of uses statements is slightly more complicated.
+
+A SUGAR uses statement is a combination of the uses statement in a lan- guage
+like Delphi (Object Pascal) and the C \#include statement. The text of a file
+included via uses is processed only at the first place it is encountered. So,
+for example, if subnets.net uses mumps.net, and foo.net uses both subnets.net
+and mumps.net, the text of mumps.net will only be used once. Consequently, the
+scanner file keeps two structures to keep track of uses statements: a stack
+which keeps track of nested uses, and a list of files which have been included
+already.
+
+Before attempting to open a file for inclusion, the scanner calls the function
+which file, defined in the general library file sugar lib.c. When called from
+within a MEX file, which file scans the Matlab path for files of the given
+name.
+
+\subsection{Parsing and intermediate representation}
+
+The parser file sugar.y is little more than a copy of the formal grammar for
+the SUGAR netlist language. The parser actions call routines in parse.c in
+order to build an intermediate representation of the netlist parse tree. The
+intermediate representation is described in parse.h.
+
+The error checking done in the current version of the parser is very rudi-
+mentary. Besides the automatic detection of parse errors, the parsing routines
+check only for undefined variables and invalid process layers.
+
+\subsection{Matlab code generation}
+
+The final output of the SUGAR netlist translator is a Matlab script. The
+task of the code generation routines in codegen.c is to recursively traverse
+the intermediate representation of the netlist structure built by sugar.y and
+parse.c and output Matlab code that will create appropriate corresponding
+data structures.
+
+Perhaps the most confusing aspect of the current code generation code is its
+treatment of subnets. When the code generator starts on a subnet instance, it
+stores relevant state, such as the name and coordinate system associated with
+the subnet, or the assignment of local node names to global node indices, into
+several different places. Some such information is kept with the parse tree data
+structure; other information is kept in local variables in the run-time stack of
+the generator code. Work is underway on a version of the code generator which
+keeps a separate stack for subnet state, similar to the runtime stack kept by
+most modern languages.
+
+\section{Matlab post-translation processing}
+
+\subsection{Argument sanity checks}
+
+The first step after the generated Matlab script generates a partial version of
+the netlist data structure is to sanity check the input arguments. This is done
+by the check netlist routine, which calls the 'check' clause of each model
+function in turn. The model functions are responsible for returning a diagnostic
+message if they lack some piece of information needed for later analysis, or if
+the arguments they receive are inconsistent or out of range.
+
+\subsection{Index assignment}
+
+Global variable index assignment proceeds in two steps. First, grounded
+variables are identified and marked. Then, nodal and branch variables which
+were not identified as grounded in the first phase are assigned indices. Index
+assignment is done in the file parse enrich2.m.
+
+In the current implementation, index assignment requires some string
+comparisons, which slows it down substantially. Index assignment and node
+positioning take substantially more time than other parts of the netlist
+loading process. This is likely to change in future versions, as more of the
+phases that are currently done by post-processing move into the code generator.
+
+\subsection{Node positioning}
+
+Before determining where nodes should be located, the node positioning code
+determines which nodes should be located. This is done by scanning through the
+list of elements and determining which nodes are assigned a relative position
+by the 'pos' clause of some element. It is possible for a single model function
+to contain some mechanical nodes (which have positions) and some nodes which do
+not have an associated position. In this case, the number of columns returned
+by the 'relpos' clause of the model will be smaller than the number of nodes.
+
+The node positioning routine then does a breadth-first traversal of the
+position graph. The first node visited is arbitrarily assigned to be positioned
+at the origin, and subsequently visited nodes are assigned locations based on
+the relative position information contained in the model functions and on the
+already-determined locations of their neighboring nodes. If the mechanical
+nodes are not all in a single connected component, the positioning routine will
+issue a warning message and position at the origin the first node it encounters
+in each component.
+
+Ideally, an additional pass after node positions were determined would check
+that the locations were consistent with the relative position information for
+every element. Such a geometry check is not yet implemented.
+
+Node positioning is implemented in find pos.m.
+
+

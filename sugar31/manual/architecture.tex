@@ -1,0 +1,34 @@
+
+% Code architecture
+
+There are three major components to SUGAR:
+\begin{itemize}
+ \item Model functions which describe how to check parameters, write
+       equations, and display individual elements of a device.
+ \item Routines to assemble and analyze device equations and display
+       results; and
+ \item A parser and preprocessor, written using C and the compiler tools
+       bison and flex;
+\end{itemize}
+
+The three components are respectively in the \texttt{model},
+\texttt{analysis}, and \texttt{compile} subdirectories of the SUGAR 
+distribution.  We have listed the pieces in order from ``most likely to
+be modified by a casual user'' to ``least likely to be modified by
+a casual user.''  It seems likely that many users will want to add
+their own model functions, and the code is organized so that it should
+be possible to do this without learning about any of the rest of
+the code base.  Some users may want to try out new forms of analysis,
+or implement new solvers; in order to do this, they will need a working
+knowledge of how to work with the Matlab representation of the device,
+and how analysis routines interact with the model functions.  The
+brave few who decide to extend the netlist language, or otherwise modify
+SUGAR in a fundamental way will need to understand the parser and
+preprocessor routines along with everything else.  However, we have tried
+to keep the design modular, so that it is possible to change pieces of
+the code without understanding the entirety.
+
+(Still need to describe the communication between the major components
+of the system, perhaps draw a pretty picture, and tell users which chapter
+they need to look at to make which common extension.  But even with that,
+this will be a short section.)

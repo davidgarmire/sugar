@@ -1,0 +1,540 @@
+
+%\section{Dissecting an example netlist}
+%\section{Units and metric suffixes}
+%\section{Expressions}
+%\section{Rotations and Euler angles}
+%\section{Lexical notes}
+%\section{Using library files}
+%\section{Parameters and definitions}
+%\section{Material and processing information}
+%\section{Element lines}
+%\section{Subnets}
+%\section{Arrays}
+%\section{Conditionals}
+
+Devices in SUGAR are described by input files called \emph{netlists}.
+In this chapter, we describe the features of the netlist language which is
+a derivative of the Lua language.
+
+\section{Units and metric suffixes}
+
+By convention, the SUGAR model functions use the familiar MKS
+(meter-kilogram-second) system of units.  This means that beam lengths, for
+example, are measured in meters instead of micrometers.  In order to make it
+easier to type lengths of microns and pressures of gigapascals, we adopt a
+standard system of metric suffixes that can be appended to SUGAR numbers.  For
+example, a hundred micron length in SUGAR could be represented as \texttt{100u}
+as well as in scientific notation (\texttt{100e-6}) or as a simple decimal
+(0.0001).  Similarly, a Young's modulus of 150 gigapascals might be written as
+\texttt{150G}.  Both suffixes and ordinary scientific notation can be used
+together, too; \texttt{0.1e7u} is a perfectly legitimate (if somewhat silly)
+way of writing the number 1.
+
+The standard suffixes are:
+\begin{center}
+\begin{tabular}{|l|ll||l|ll|}
+\hline
+  \texttt{d} & deci  & $10^{-1}$  &              &       &          \\
+  \texttt{c} & centi & $10^{-2}$  &   \texttt{h} & hecto & $10^2$   \\
+  \texttt{m} & milli & $10^{-3}$  &   \texttt{k} & kilo  & $10^3$   \\
+  \texttt{u} & micro & $10^{-6}$  &   \texttt{M} & mega  & $10^6$   \\
+  \texttt{n} & nano  & $10^{-9}$  &   \texttt{G} & giga  & $10^9$   \\
+  \texttt{p} & pico  & $10^{-12}$ &   \texttt{T} & tera  & $10^{12}$  \\
+  \texttt{f} & femto & $10^{-15}$ &   \texttt{P} & peta  & $10^{15}$  \\
+  \texttt{a} & atto  & $10^{-18}$ &   \texttt{E} & exa   & $10^{18}$  \\
+\hline
+\end{tabular}
+\end{center}
+
+
+\section{Expressions}
+
+It's often convenient to do simple calculations inside a netlist.
+For example, suppose I have defined a variable \texttt{beamL} for
+the length of a beam in a device.  Then we can define the length
+of another beam in terms of \texttt{beamL}:
+\begin{verbatim}
+  use("mumps.net")
+  use("stdlib.net")
+
+  beamL = 100u   -- Make a beam one hundred microns long
+
+  -- make a beamL by beamL/2 rectangle
+  A = node{0, 0, 0; name = "A"}
+  B = node{name = "B"}
+  C = node{name = "C"}
+  D = node{name = "D"}
+  
+  beam3d{ A, B ; material=p1, w=2u, l=beamL }
+  beam3d{ C, D ; material=p1, w=2u, l=beamL }
+  beam3d{ A, C ; material=p1, w=2u, l=beamL/2, oz=90 }
+  beam3d{ B, D ; material=p1, w=2u, l=beamL/2, oz=90 }
+\end{verbatim}
+
+SUGAR's treatment of expressions are similar to Lisp's treatment of expressions: we can 
+add, subtract, multiply, divide, exponentiate, and negate numbers, and also 
+evaluate functions. All functionality described in Lua is also available in 
+SUGAR. All operations are left associative, so \texttt{a + b + c} is 
+evaluated as 
+\texttt{(a + b) + c} rather than as \texttt{a + (b + c)}.  The order of operations, from highest precedence
+to lowest precedence, is
+\begin{center}
+\begin{tabular}{|l|l|}
+\hline
+Level & Operators \\
+7 & \verb+|+ (logical or)\\
+6 & \verb+&+ (logical and)\\
+5 & \texttt{==} (equality), \texttt{!=} (inequality), 
+    \texttt{>} (greater), \texttt{<} (less), 
+    \texttt{>=} (greater or equal), \texttt{<=} (less or equal)\\
+4 & \texttt{-} (add), \texttt{+} (subtract)\\
+3 & \texttt{*} (multiply), \texttt{/} (divide)\\
+2 & \texttt{-} (negate), \texttt{!} (logical not)\\
+1 & \verb+^+ (exponentiate) \\
+\hline
+\end{tabular}
+\end{center}
+
+As in C and MATLAB, there is no separate logical type.  Non-zero numbers
+are interpreted as ``true,'' and zero is interpreted as ``false.''  When
+a comparison or logical operation is true, it will evaluate to 1.
+
+Besides numbers, SUGAR supports a string type.  String literals are denoted
+by double quotes.  Unlike C and MATLAB, the backslash does not quote
+characters in SUGAR expressions: \verb+"\t"+ is a backslash followed by
+a t, not a tab.  Strings are values as well and can be used as operands
+to arithmetic or logical operations. 
+
+It is useful to note that a faster way of writing
+\begin{verbatim}
+  if a then
+    x = a
+  elseif b then
+    x = b
+  else
+    x = c
+  end
+\end{verbatim}
+is to form it as
+\begin{verbatim}
+  x = a or b or c
+\end{verbatim}
+
+Lua for SUGAR also contains the primitives {\tt addpath},
+{\tt node}, {\tt material}, {\tt element}, and {\tt subnet}, which will be 
+discussed more thoroughly later. {\tt addpath} allows the inclusion of other 
+directories for the {\tt use} command. {\tt node} defines a node in 3 space 
+for use later in defining elements. {\tt element} invokes a model defined on 
+a set of nodal points with a set of parameters. {\tt subnet} uses a function 
+like declaration to parameterize netlists of sub-components.
+
+
+\section{Rotation angles}
+
+In order to orient structures in SUGAR, users specify how each piece is rotated
+from a model coordinate frame into its actual orientation in the structure.
+This specification can be done according to a global reference frame by specifying
+the exact positions of the nodes (and allowing SUGAR to figure out the internal
+rotations) or by specifying rotations of each component (may be done hierarchically 
+in the case of subnets) and having SUGAR position the nodes.
+Rotations are specified by a sequence of rotations about the $x$, $z$, and $y$
+axes, respectively.  The amount to rotate about each axis is given by angles
+\texttt{ox}, \texttt{oz}, and \texttt{oy}, given in degrees.
+
+%; these three
+%numbers are known as \emph{Euler angles}, and can be used to describe any
+%rotation. Note that we can give 
+
+For many applications, most of the structure will lie initially
+in a single plane, and the only rotations used to describe the device
+will be rotations about the $z$ axis.  For example, the lines
+\begin{verbatim}
+  beam3d{ A, B ; material=p1, w=2u, l=beamL }
+  beam3d{ C, D ; material=p1, w=2u, l=beamL }
+  beam3d{ A, C ; material=p1, w=2u, l=beamL/2, oz=90 }
+  beam3d{ B, D ; material=p1, w=2u, l=beamL/2, oz=90 }
+\end{verbatim}
+describe a rectangle; the first two beams run parallel to the $x$ axis,
+and the latter two beams are rotated ninety degrees in the plane to run
+parallel to the $y$ axis.
+
+For more complicated examples, it is important to remember that order
+matters.  To go from local coordinates to global coordinates, first the
+rotation about the $x$ axis is applied, then the $z$ axis, and then the $y$
+axis.  For instance, in the model coordinate system, a beam points in the
+direction $(1,0,0)$, along the $x$ axis.  If we rotate the beam first $90$
+degrees about the $x$ axis and then $90$ degrees about the $z$ axis, it would
+point along the $y$ axis, in the $(0,1,0)$ direction.  If, however, we were to
+rotate the beam first about the $z$ axis and then about the $x$ axis, it would
+end up pointing along the $z$ axis.
+
+
+\section{Lexical notes}
+
+SUGAR 3.0 netlists are ``free form''; that is, white space characters
+like tabs and carriage returns are not significant.
+
+A comment in a netlist begins with \texttt{--} and extends to the end of
+the line. 
+
+A SUGAR identifier (like a C identifier) consists of a letter
+followed by a string of letters, numbers, and underscores.  
+The keywords \texttt{use}, \texttt{subnet}, \texttt{addpath}, 
+\texttt{element}, and \texttt{node} are reserved (along with a slew of Lua
+commands), and cannot be used as identifiers. See Lua documentation for
+more details.
+
+\section{\texttt{use} statements}
+
+Netlists can contain \texttt{use} statements to include other files.
+A \texttt{use} statement has the form
+\begin{verbatim}
+  use("filename")
+\end{verbatim}
+For example, many netlists use the data for MUMPS process layers defined in 
+\texttt{mumps.net}, and begin with the line
+\begin{verbatim}
+  use("mumps.net")
+\end{verbatim}
+Files included by a \texttt{use} statement are not particularly
+special. You can use \texttt{use} to include files of process parameters,
+libraries of frequently-used subnets, etc.  
+
+A file will only be used once in a netlist.  
+For example, if the file \texttt{subnets.net} started with
+\begin{verbatim}
+  use("mumps.net")
+\end{verbatim}
+and a test netlist called \texttt{test.net} started with
+\begin{verbatim}
+  use("subnets.net")
+  use("mumps.net")
+\end{verbatim}
+then \texttt{test.net} would only include \texttt{mumps.net} once, and 
+would not complain about the contents of \texttt{mumps.net} being defined 
+multiple times.
+
+
+\section{\texttt{addpath} statements}
+
+Netlists can specify directories so the \texttt{use} statement does not need
+to specify the entire path, only a filename. For example,
+\begin{verbatim}
+  use("src/lua/base/mumps.net")
+  use("src/lua/base/std.net")
+\end{verbatim}
+could be rewritten as
+\begin{verbatim}
+  addpath("src/lua/base")
+  use("mumps.net")
+  use("std.net")
+\end{verbatim}
+
+
+\section{\texttt{node} statements}
+
+%Nodes are points in space that elements use to define their positions. 
+%Unlike
+%version 2.0, 3.0 requests the nodes to be declared outside of the element
+%declarations. Both relative and absolute nodal positions are then possible to
+%be achieved. Components can be separated by gaps.
+
+Nodes are connection points which have associated variables shared
+by attached elements.  Mechanical nodes also have positions.
+
+An example of an absolute nodal declaration of node \texttt{A} at position 
+$(0, 0, 0)$ is
+\begin{verbatim}
+  A = node{0, 0, 0; name = "A"}
+\end{verbatim}
+
+An example of a relative nodal declaration of node \texttt{B} is
+\begin{verbatim}
+  B = node{name = "B"}
+\end{verbatim}
+When relative node positioning is used, SUGAR automatically ensures 
+all of the node positions are generated for each of the elements.
+
+The syntax
+\begin{verbatim}
+  node "A"
+\end{verbatim}
+is used to refer to a node named ``A'' in the current scope.
+If no such node exists yet, then a new one is created.  For example,
+if we write
+\begin{verbatim}
+eground {node "ground"}
+Vsrc    {node "ground", node "attach"; V=10}
+\end{verbatim}
+the node ``ground'' is created in the first line, and the reference to
+\verb|node "ground"| in the following line refers to the same node.
+
+
+\section{\texttt{element} statements}
+
+The basic unit of a SUGAR netlist is an element line. For example,
+\begin{verbatim}
+  crossbeam = element{ A, B; model="beam2d", material=p1, l=100u, w=2u }
+\end{verbatim}
+is an element line describing a beam.  This line consists of several
+fields:
+\begin{itemize}
+
+\item Before the equals sign, one may optionally put a name for that element;  
+   in this case, the element is named \texttt{crossbeam}.
+
+\item Before the semicolon is a list of nodes.
+   In this case, the specified beam connects nodes \texttt{A} and \texttt{B}.
+   Elements are connected together by sharing a common node.  For instance, to
+   attach a wider 100 micron beam to the \texttt{B} end of the beam above, 
+   we might write
+\begin{verbatim}
+  element { B, C; model="beam2d", material=p1, l=100u, w=5u }
+\end{verbatim}
+
+   Unlike in previous versions of SUGAR, node names in SUGAR 3.0 must
+   begin with an alphabetic character. 
+
+\item After the list of nodes comes a list of element parameters. Usually a
+   process contains a model, a process, and a list of parameters.
+
+   The name of the model for the element is specified as 
+   \texttt{model="<model name>"}; in this case,
+   it is the two-dimensional beam model \texttt{beam2d}.  There are models
+   for beams, anchors, electrical devices, etc.; a complete list of
+   models, along with information on how to build new models, can
+   be found later in this document.
+
+   The process parameter structure for the element is specified as
+   \texttt{material=<process name>}; 
+   in this case the beam is fabricated in the first layer of polysilicon
+   in a MUMPS process, named \texttt{p1}.  By specifying the process layer 
+   \texttt{p1},
+   a user informs the model function of common material parameters such as 
+   the Young's modulus for polysilicon and the thickness of the deposited
+   layer.  For models which require no process information, such as models 
+   for external forces, the process field may be omitted.
+
+   In the example above, the model parameters consisted of the length and width
+   of a beam; other models will require other parameters.  A parameter
+   specification always has the form \texttt{identifier = expression}.
+   All permutations of arguments connected by commas are equivalent.
+
+\end{itemize}
+
+All the basic models in SUGAR have corresponding \emph{subnet} wrappers.
+For example, these wrappers allow you to rewrite
+\begin{verbatim}
+  element { B, C; model="beam2d", material=p1, l=100u, w=5u }
+\end{verbatim}
+as
+\begin{verbatim}
+  beam2d{ B, C; material=p1, l=100u, w=5u }
+\end{verbatim}
+The preferred way to invoke elements is with the latter syntax.
+
+
+\section{Variables}
+
+In order to allow users to experiment with variations on a simulation,
+or to do parameter sweeps, SUGAR allows users to define variables in
+the Lua environment at load time.  For example, a user might write
+\begin{verbatim}
+  > params.nfingers = 10;
+  > net = cho_load('comb.net', params);
+\end{verbatim}
+to create an instance of \texttt{comb.net} with comb drives having
+ten fingers.  To test inside the netlist whether a variable is defined,
+use the \verb|if| statement
+\begin{verbatim}
+  if not nfingers then
+    nfingers = 10  -- default is ten fingers
+  end
+\end{verbatim}
+a shorter way to write the code above would be as
+\begin{verbatim}
+  nfingers = nfingers or 10
+\end{verbatim}
+
+SUGAR netlists may also include definitions, such as
+\begin{verbatim}
+  long_length = 200u
+  short_length = 100u
+  avg_length = (long_length + short_length)/2
+\end{verbatim}
+Netlist variables are scoped, so that a definition declared with the
+keyword, \texttt{local}, made inside
+a subnet (see below) will not affect top-level element statements.
+
+
+\section{\texttt{material} statements - Process parameter structures}
+
+Physical parameters associated with a particular layer of a particular
+material are process parameters.  An example of the baseline process
+information for the polysilicon layers in MUMPS (\texttt{default}) is provided
+below
+\begin{verbatim}
+  default = material { 
+      Poisson = 0.3,               --Poisson's Ratio = 0.3
+      thermcond = 2.33,            --Thermal conductivity Si = 2.33e-6/C
+      viscosity = 1.78e-5,         --Viscosity (of air) = 1.78e-5
+      fluid = 2e-6,                --Between the device and the substrate.
+      density = 2300,              --Material density = 2300 kg/m^3
+      Youngsmodulus = 165e9,       --Young's modulus = 1.65e11 N/m^2
+      permittivity = 8.854e-12,    --permittivity: C^2/(uN.um^2)=(C.s)^2/kg.um^3
+      sheetresistance = 20         --Poly-Si sheet resistance [ohm/square]
+  }
+\end{verbatim}
+
+In general a process definition has the form \texttt{name = material \{...\}},
+where \texttt{material} is a keyword, \texttt{name} is the name to be given 
+to the process information.
+
+Process parameter structures may be derived from other process parameter
+structures.  For example, a 2 micron poly layer named \texttt{p1} might be 
+written
+\begin{verbatim}
+  p1 = material {
+      parent = default,
+      h = 2u
+  }
+\end{verbatim}
+This layer automatically includes all the definitions made in the default
+process parameter structure.
+
+
+\section{\texttt{subnet} statements}
+
+Subnets provide users with a means to extend the set of available models
+without leaving SUGAR.  An example subnet for a single unit of a serpentine
+structure is shown below:
+\begin{verbatim}
+subnet serpent( A, F, material, unitwid, unitlen, beamw )
+  beamw = beamw or 2u;
+  len2  = unitlen/2
+  beam2d{ A, node "b";        material=material, l=unitwid/2, w=beamw, oz=-90 }
+  beam2d{ node "b", node "c"; material=material, l=len2,      w=beamw }
+  beam2d{ node "c", node "d"; material=material, l=unitwid,   w=beamw, oz=90 }
+  beam2d{ node "d", node "e"; material=material, l=len2,      w=beamw }
+  beam2d{ node "e", F;        material=material, l=unitwid/2, w=beamw, oz=-90 }
+end
+\end{verbatim}
+Element lines using subnets are invoked in the same manner as element lines
+using model functions built in MATLAB
+\begin{verbatim}
+  serp1 = serpent {X, Y; material=p1, unitwid=10u, unitlen=10u}
+  serpent {y, z ; material=p1, unitwid=10u, unitlen=10u, w=3u}
+\end{verbatim}
+The \texttt{parent} process for a subnet is the process specified in creating
+an instance of that subnet.  In the above example, the \texttt{p1} process
+information would be used for the beams in the serpent subnet.
+
+In general, a subnet definition consists of the keyword \texttt{subnet},
+a name for the subnet model, a set of arguments, 
+and a code block followed by \texttt{end}.  The code block
+may include definitions, element lines, and array structures (see below).
+
+Sometimes it may be necessary to access variables attached to nodes
+internal to a netlist.  For example, in the above example we might be
+interested in the version of node \texttt{b} for subnet instance
+\texttt{serp1}.  In the analysis functions, that node would be
+referred to as \texttt{serp1.b}.  It would not be valid to refer
+to node \texttt{x} as \texttt{serp1.A}, since \texttt{x} already has
+a name defined outside the subnet.
+
+Subnet instances that are not explicitly named, like the second 
+\texttt{serpent} element in the example above, are assigned names
+consisting of \texttt{anon} followed by some number.  It is possible
+to use a name like \texttt{anon1.b} to refer to the \texttt{b} node
+in the second line, but it is not recommended since the internal
+naming schemes for anonymous elements are subject to future change.
+
+
+\section{Arrays}
+
+SUGAR supports arrays of structures through the same syntax as Lua.
+Arrays are built enclosed in braces and referenced using brackets.  
+For example, the following code fragment creates a spring composed of 
+twenty of the serpentine units from the subnet example and anchors it 
+at one end:
+\begin{verbatim}
+link = { node {} };
+anchor {p[1]; material=p1, l=5u, w=5u}
+for k = 1,nlinks do
+  link[k+1] = node {};
+  serpent {link[k], link[k+1]; material=p1, unitwid=10u, unitlen=10u, w=2u}
+end
+\end{verbatim}
+Note that \texttt{link} needs to first be initialized.  It is
+possible to have names with multiple indices as well (eg \texttt{link[i][j])}).
+The index variable is only valid within the loop body.
+
+The general syntax of a for loop is
+\begin{verbatim}
+  for index = lowerbound, upperbound [, increment] do
+    ... code lines ...
+  end
+\end{verbatim}
+where \texttt{index} is the name of the index variable, 
+\texttt{lowerbound} is an expression for the lower bound of the loop, and 
+\texttt{upperbound} is an espression for the upper bound of a loop.
+
+
+\section{Conditionals}
+
+SUGAR supports \texttt{if} statements of the form
+\begin{verbatim}
+  if expression then
+    ... code lines ...
+  end
+\end{verbatim}
+and
+\begin{verbatim}
+  if expression then
+    ... code lines ...
+  else
+    ... code lines ...
+  end
+\end{verbatim}
+
+The main purpose of \texttt{if} statements is to give some flexibility
+to subnet writers.  For example, suppose I wanted a beam that would
+automatically compute its electrical resistance if one was not provided.
+I could do that with the following subnet:
+\begin{verbatim}
+  subnet mybeam( A, B, l, w, h, R, resistivity )
+    -- If R is nil, then the user didn't specify anything to override
+    -- the default, so we'll help calculate the resistance.
+    if not R then
+      resistance = resistivity * l/(w*h)
+      beam3de {A, B; material=parent, l=l, w=w, h=h, R=resistance}
+
+    -- Otherwise, we'll just accept whatever the user wrote in
+    else 
+      beam3de {A, B; material=parent, l=l, w=w, h=h, R=R}
+    end
+  end
+\end{verbatim}
+
+There are a few caveats that go with this example:
+\begin{enumerate}
+ \item
+       Usually, \texttt{resistivity} would be defined in the process
+       information when an instance of \texttt{mybeam} was created.
+ \item 
+      A briefer way to write this example would be
+\begin{verbatim}
+  subnet mybeam(A, B, l, w, h, R, resistivity)
+    beam3de{A, B; material=parent, l=l, w=w, h=h, 
+            R=( R or (resistivity * l/(w*h)) )}
+  end
+\end{verbatim}
+    The \texttt{local} statement restricts the variable to the given scope.
+ \item
+    The SUGAR netlist language is designed to be extensible, yet it is limited.
+    By using the \texttt{if} statement, it is possible to write arbitrarily 
+    complicated netlists, with constructs
+    like recursive subnets or even more subtle beasts.  Exercise good taste
+    when you write netlists, and try to relegate any subtle and complicated
+    coding tasks to MATLAB instead of to the SUGAR netlist language.
+\end{enumerate}

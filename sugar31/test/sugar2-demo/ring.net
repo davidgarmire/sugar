@@ -1,0 +1,15 @@
+uses mumps.net
+uses stdlib.net
+
+subnet ring [n(0) n(4)] [radius=100u]
+[
+  for k=0:7
+  [
+    pos    *      [o n(k)] [x=cos(k*pi/4)*radius y=sin(k*pi/4)*radius]
+    beam2d parent [n(k) n(mod(k+1,8))] [w=2u]
+  ]
+]
+
+ring p1 [a b] []
+anchor p1 [a] [l=5u w=5u]
+f3d * [b] [oz=pi/2 F=20u]

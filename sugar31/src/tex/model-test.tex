@@ -1,0 +1,276 @@
+% ===> this file was generated automatically by noweave --- better not edit it
+\section{Introduction}
+
+This pair of model functions (one for materials and one for elements)
+is purely for test purposes.  The initializer saves the parameter
+list, and the output function prints them back out.
+
+
+\section{Interface}
+
+The {\Tt{}model{\_}test{\_}register\nwendquote} function registers the test models with
+the model manager as the default models.
+
+\nwfilename{model-test.nw}\nwbegincode{1}\sublabel{NWID3Tg-1XZJ7P-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-1XZJ7P-1}}}\moddef{model-test.h~{\nwtagstyle{}\subpageref{NWID3Tg-1XZJ7P-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#ifndef MODEL_TEST_H
+#define MODEL_TEST_H
+
+#include <modelmgr.h>
+
+void model_test_register(model_mgr_t model_mgr);
+
+#endif /* MODEL_TEST_H */
+\nwnotused{model-test.h}\nwendcode{}\nwbegindocs{2}\nwdocspar
+
+
+\section{Implementation}
+
+\nwenddocs{}\nwbegincode{3}\sublabel{NWID3Tg-3bjCLX-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3bjCLX-1}}}\moddef{model-test.c~{\nwtagstyle{}\subpageref{NWID3Tg-3bjCLX-1}}}\endmoddef\nwstartdeflinemarkup\nwenddeflinemarkup
+#include <sugar.h>
+
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
+
+#include <model_test.h>
+#include <modelmgr.h>
+#include <mesh.h>
+#include <netout.h>
+
+\LA{}types~{\nwtagstyle{}\subpageref{NWID3Tg-4H4VOG-1}}\RA{}
+\LA{}static functions~{\nwtagstyle{}\subpageref{NWID3Tg-1duChy-1}}\RA{}
+\LA{}model functions~{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-1}}\RA{}
+\LA{}registration function~{\nwtagstyle{}\subpageref{NWID3Tg-CkEIP-1}}\RA{}
+\nwnotused{model-test.c}\nwendcode{}\nwbegindocs{4}\nwdocspar
+
+
+\subsection{Element model}
+
+The element model type is essentially just storage for the list
+of nodes and parameters stored by the element.
+
+\nwenddocs{}\nwbegincode{5}\sublabel{NWID3Tg-4H4VOG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-4H4VOG-1}}}\moddef{types~{\nwtagstyle{}\subpageref{NWID3Tg-4H4VOG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{\relax}{NWID3Tg-4H4VOG-2}\nwenddeflinemarkup
+typedef struct model_test_element_t \{
+    element_t element;
+    const char* model;
+    int* nodes;
+    int num_nodes;
+    mesh_param_t* params;
+    int num_params;
+\} model_test_element_t;
+
+\nwalsodefined{\\{NWID3Tg-4H4VOG-2}}\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{6}\nwdocspar
+
+The initializer function just copies the node and parameter
+lists from the mesh.  Again, both element and material models
+use the same initializer.  Copying over the node information for
+the material just wastes a little time and space.
+
+\nwenddocs{}\nwbegincode{7}\sublabel{NWID3Tg-3N4EZB-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-1}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{\relax}{NWID3Tg-3N4EZB-2}\nwenddeflinemarkup
+static element_t* test_element_init(mesh_t mesh, const char* name,
+                                            model_element_t* modelfunc)
+\{
+    int i;
+    mempool_t pool = mesh_pool(mesh);
+    model_test_element_t* self = (model_test_element_t*)
+        mempool_cget(pool, sizeof(*self));
+
+    self->element.data = self;
+    self->element.model = modelfunc;
+
+    self->model = name;
+    \LA{}copy nodes~{\nwtagstyle{}\subpageref{NWID3Tg-aXR5z-1}}\RA{}
+    \LA{}copy parameters~{\nwtagstyle{}\subpageref{NWID3Tg-3umjzm-1}}\RA{}
+
+    return &(self->element);
+\}
+
+\nwalsodefined{\\{NWID3Tg-3N4EZB-2}\\{NWID3Tg-3N4EZB-3}\\{NWID3Tg-3N4EZB-4}\\{NWID3Tg-3N4EZB-5}}\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{8}\nwdocspar
+
+\nwenddocs{}\nwbegincode{9}\sublabel{NWID3Tg-aXR5z-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-aXR5z-1}}}\moddef{copy nodes~{\nwtagstyle{}\subpageref{NWID3Tg-aXR5z-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3N4EZB-1}}\nwenddeflinemarkup
+self->num_nodes = mesh_num_param_nodes(mesh);
+self->nodes = (int*) 
+    mempool_cget(pool, self->num_nodes * sizeof(int));
+for (i = 0; i < self->num_nodes; ++i)
+    self->nodes[i] = mesh_param_node(mesh, i);
+\nwused{\\{NWID3Tg-3N4EZB-1}}\nwendcode{}\nwbegindocs{10}\nwdocspar
+
+\nwenddocs{}\nwbegincode{11}\sublabel{NWID3Tg-3umjzm-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3umjzm-1}}}\moddef{copy parameters~{\nwtagstyle{}\subpageref{NWID3Tg-3umjzm-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3N4EZB-1}\\{NWID3Tg-3N4EZB-3}}\nwenddeflinemarkup
+self->num_params = mesh_num_params(mesh);
+self->params = (mesh_param_t*)
+    mempool_cget(pool, self->num_params * sizeof(mesh_param_t));
+for (i = 0; i < self->num_params; ++i)
+    self->params[i] = *mesh_param(mesh, i);
+\nwused{\\{NWID3Tg-3N4EZB-1}\\{NWID3Tg-3N4EZB-3}}\nwendcode{}\nwbegindocs{12}\nwdocspar
+
+The output routines print out a header, the node list (in the case
+of an element), and the parameters (in the case of either).  Not
+that much to it.
+
+\nwenddocs{}\nwbegincode{13}\sublabel{NWID3Tg-3N4EZB-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-2}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{NWID3Tg-3N4EZB-1}{NWID3Tg-3N4EZB-3}\nwenddeflinemarkup
+static void output_element(void* pself, netout_t* netout)
+\{
+    model_test_element_t* self = (model_test_element_t*) pself;
+    netout_string(netout, "model", self->model);
+    print_nodes(self, netout);
+    print_params(self->num_params, self->params, netout);
+\}
+
+\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{14}\nwdocspar
+
+\nwenddocs{}\nwbegincode{15}\sublabel{NWID3Tg-1duChy-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-1duChy-1}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWID3Tg-1duChy-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{\relax}{NWID3Tg-1duChy-2}\nwenddeflinemarkup
+static void print_nodes(model_test_element_t* self, netout_t* netout)
+\{
+    netout_int_matrix(netout, "nodes", self->nodes, 1, self->num_nodes);
+\}
+
+\nwalsodefined{\\{NWID3Tg-1duChy-2}}\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{16}\nwdocspar
+
+\nwenddocs{}\nwbegincode{17}\sublabel{NWID3Tg-1duChy-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-1duChy-2}}}\moddef{static functions~{\nwtagstyle{}\subpageref{NWID3Tg-1duChy-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{NWID3Tg-1duChy-1}{\relax}\nwenddeflinemarkup
+static void print_params(int num_params, mesh_param_t* params, 
+                                 netout_t* netout)
+\{
+    int i;
+
+    for (i = 0; i < num_params; ++i) \{
+        if (params[i].tag == MESH_PARAM_STRING)
+            netout_string(netout, params[i].name, params[i].val.s);
+        else if (params[i].tag == MESH_PARAM_NUMBER)
+            netout_double(netout, params[i].name, params[i].val.d);
+        else if (params[i].tag == MESH_PARAM_MATRIX)
+            netout_double_matrix(netout, params[i].name,
+                                 params[i].val.m.data,
+                                 params[i].val.m.m,
+                                 params[i].val.m.n);
+        else
+            netout_string(netout, params[i].name, "???");
+    \}
+\}
+
+\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{18}\nwdocspar
+
+
+\subsection{Material model}
+
+The material model type uses the same structure, but with the nodes unused.
+
+\nwenddocs{}\nwbegincode{19}\sublabel{NWID3Tg-4H4VOG-2}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-4H4VOG-2}}}\moddef{types~{\nwtagstyle{}\subpageref{NWID3Tg-4H4VOG-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{NWID3Tg-4H4VOG-1}{\relax}\nwenddeflinemarkup
+typedef struct model_test_material_t \{
+    material_t material;
+    const char* model;
+    mesh_param_t* params;
+    int num_params;
+    material_t* parent;
+\} model_test_material_t;
+
+\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{20}\nwdocspar
+
+\nwenddocs{}\nwbegincode{21}\sublabel{NWID3Tg-3N4EZB-3}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-3}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{NWID3Tg-3N4EZB-2}{NWID3Tg-3N4EZB-4}\nwenddeflinemarkup
+static material_t* test_material_init(mesh_t mesh, const char* name,
+                                              model_material_t* modelfunc)
+\{
+    int i;
+    mempool_t pool = mesh_pool(mesh);
+
+    model_test_material_t* self = (model_test_material_t*)
+        mempool_cget(pool, sizeof(*self));
+    mesh_param_t* parent_param = NULL;
+    self->material.model = modelfunc;
+    self->material.data = self;
+
+    self->model = name;
+    \LA{}copy parameters~{\nwtagstyle{}\subpageref{NWID3Tg-3umjzm-1}}\RA{}
+    \LA{}set parent~{\nwtagstyle{}\subpageref{NWID3Tg-3PINyG-1}}\RA{}
+
+    return &(self->material);
+\}
+
+\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{22}\nwdocspar
+
+\nwenddocs{}\nwbegincode{23}\sublabel{NWID3Tg-3PINyG-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3PINyG-1}}}\moddef{set parent~{\nwtagstyle{}\subpageref{NWID3Tg-3PINyG-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3N4EZB-3}}\nwenddeflinemarkup
+parent_param = mesh_param_byname(mesh, NULL, "parent");
+if (parent_param)
+    self->parent = mesh_param_material(mesh, parent_param);
+\nwused{\\{NWID3Tg-3N4EZB-3}}\nwendcode{}\nwbegindocs{24}\nwdocspar
+
+The {\Tt{}material{\_}param\nwendquote} method just tries to fetch a material parameter by name.
+
+\nwenddocs{}\nwbegincode{25}\sublabel{NWID3Tg-3N4EZB-4}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-4}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{NWID3Tg-3N4EZB-3}{NWID3Tg-3N4EZB-5}\nwenddeflinemarkup
+static struct mesh_param_t* 
+test_material_param(void* pself, const char* name)
+\{
+    model_test_material_t* self = (model_test_material_t*) pself;
+    int i;
+
+    \LA{}check local parameters~{\nwtagstyle{}\subpageref{NWID3Tg-1AgKMn-1}}\RA{}
+    \LA{}check parent parameters~{\nwtagstyle{}\subpageref{NWID3Tg-3gX8PH-1}}\RA{}
+    return NULL;
+\}
+
+\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{26}\nwdocspar
+
+\nwenddocs{}\nwbegincode{27}\sublabel{NWID3Tg-1AgKMn-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-1AgKMn-1}}}\moddef{check local parameters~{\nwtagstyle{}\subpageref{NWID3Tg-1AgKMn-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3N4EZB-4}}\nwenddeflinemarkup
+for (i = 0; i < self->num_params; ++i) \{
+    if (strcmp(name, self->params[i].name) == 0)
+        return &(self->params[i]);
+\}
+\nwused{\\{NWID3Tg-3N4EZB-4}}\nwendcode{}\nwbegindocs{28}\nwdocspar
+
+\nwenddocs{}\nwbegincode{29}\sublabel{NWID3Tg-3gX8PH-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3gX8PH-1}}}\moddef{check parent parameters~{\nwtagstyle{}\subpageref{NWID3Tg-3gX8PH-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3N4EZB-4}}\nwenddeflinemarkup
+if (self->parent != NULL && self->parent->model->param != NULL)
+    return (self->parent->model->param)(self->parent->data, name);
+\nwused{\\{NWID3Tg-3N4EZB-4}}\nwendcode{}\nwbegindocs{30}\nwdocspar
+
+\nwenddocs{}\nwbegincode{31}\sublabel{NWID3Tg-3N4EZB-5}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-5}}}\moddef{model functions~{\nwtagstyle{}\subpageref{NWID3Tg-3N4EZB-1}}}\plusendmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwprevnextdefs{NWID3Tg-3N4EZB-4}{\relax}\nwenddeflinemarkup
+static void output_material(void* pself, netout_t* netout)
+\{
+    model_test_material_t* self = (model_test_material_t*) pself;
+    netout_string(netout, "model", self->model);
+    print_params(self->num_params, self->params, netout);
+\}
+
+\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}\nwbegindocs{32}\nwdocspar
+
+
+\subsection{Registration}
+
+Now we register the models as the defaults for the model manager,
+and we're ready to go. %'
+
+\nwenddocs{}\nwbegincode{33}\sublabel{NWID3Tg-CkEIP-1}\nwmargintag{{\nwtagstyle{}\subpageref{NWID3Tg-CkEIP-1}}}\moddef{registration function~{\nwtagstyle{}\subpageref{NWID3Tg-CkEIP-1}}}\endmoddef\nwstartdeflinemarkup\nwusesondefline{\\{NWID3Tg-3bjCLX-1}}\nwenddeflinemarkup
+void model_test_register(model_mgr_t model_mgr)
+\{
+    model_element_t  element;
+    model_material_t material;
+
+    memset(&element,  0, sizeof(element));
+    memset(&material, 0, sizeof(material));
+
+    element.init   = test_element_init;
+    element.output = output_element;
+
+    material.init   = test_material_init;
+    material.param  = test_material_param;
+    material.output = output_material;
+
+    model_mgr_add_element(model_mgr, "test", &element);
+    model_mgr_add_material(model_mgr, NULL, &material);
+\}
+
+\nwused{\\{NWID3Tg-3bjCLX-1}}\nwendcode{}
+
+\nwixlogsorted{c}{{check local parameters}{NWID3Tg-1AgKMn-1}{\nwixu{NWID3Tg-3N4EZB-4}\nwixd{NWID3Tg-1AgKMn-1}}}%
+\nwixlogsorted{c}{{check parent parameters}{NWID3Tg-3gX8PH-1}{\nwixu{NWID3Tg-3N4EZB-4}\nwixd{NWID3Tg-3gX8PH-1}}}%
+\nwixlogsorted{c}{{copy nodes}{NWID3Tg-aXR5z-1}{\nwixu{NWID3Tg-3N4EZB-1}\nwixd{NWID3Tg-aXR5z-1}}}%
+\nwixlogsorted{c}{{copy parameters}{NWID3Tg-3umjzm-1}{\nwixu{NWID3Tg-3N4EZB-1}\nwixd{NWID3Tg-3umjzm-1}\nwixu{NWID3Tg-3N4EZB-3}}}%
+\nwixlogsorted{c}{{model functions}{NWID3Tg-3N4EZB-1}{\nwixu{NWID3Tg-3bjCLX-1}\nwixd{NWID3Tg-3N4EZB-1}\nwixd{NWID3Tg-3N4EZB-2}\nwixd{NWID3Tg-3N4EZB-3}\nwixd{NWID3Tg-3N4EZB-4}\nwixd{NWID3Tg-3N4EZB-5}}}%
+\nwixlogsorted{c}{{model-test.c}{NWID3Tg-3bjCLX-1}{\nwixd{NWID3Tg-3bjCLX-1}}}%
+\nwixlogsorted{c}{{model-test.h}{NWID3Tg-1XZJ7P-1}{\nwixd{NWID3Tg-1XZJ7P-1}}}%
+\nwixlogsorted{c}{{registration function}{NWID3Tg-CkEIP-1}{\nwixu{NWID3Tg-3bjCLX-1}\nwixd{NWID3Tg-CkEIP-1}}}%
+\nwixlogsorted{c}{{set parent}{NWID3Tg-3PINyG-1}{\nwixu{NWID3Tg-3N4EZB-3}\nwixd{NWID3Tg-3PINyG-1}}}%
+\nwixlogsorted{c}{{static functions}{NWID3Tg-1duChy-1}{\nwixu{NWID3Tg-3bjCLX-1}\nwixd{NWID3Tg-1duChy-1}\nwixd{NWID3Tg-1duChy-2}}}%
+\nwixlogsorted{c}{{types}{NWID3Tg-4H4VOG-1}{\nwixu{NWID3Tg-3bjCLX-1}\nwixd{NWID3Tg-4H4VOG-1}\nwixd{NWID3Tg-4H4VOG-2}}}%
+\nwbegindocs{34}\nwdocspar
+
+\nwenddocs{}

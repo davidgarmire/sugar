@@ -1,0 +1,20 @@
+use("mumps.net")
+
+A  = node { 0,    0,    0}
+b1 = node { 100u, 0,    0}
+b2 = node {-100u, 0,    0}
+c1 = node { 0   , 100u, 0}
+c2 = node { 0   ,-100u, 0}
+
+element{ A   ; model="anchor", material=p1, w=10u }
+
+element{ A, b1; model="beam2d", material=p1, w=10u, h=10u  }
+element{ b2, A; model="beam2d", material=p1, w=10u, h=10u  }
+element{ A, c1; model="beam2d", material=p1, w=10u, h=10u  }
+element{ A, c2; model="beam2d", material=p1, w=10u, h=10u  }
+
+element{ b1   ; model="force", y=10u }
+element{ b2   ; model="force", y=10u }
+element{ c1   ; model="force", x=10u }
+element{ c2   ; model="force", x=10u }
+
